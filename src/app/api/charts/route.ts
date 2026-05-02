@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
 // 分頁抓取所有資料（繞過 Supabase 1000 筆上限）
-async function fetchAll(fields: string, filter?: { col: string; gte?: string; lt?: string }) {
+async function fetchAll(fields: string, filter?: { gte?: string; lt?: string }) {
   const PAGE = 1000   // Supabase 每頁上限
   const all: Record<string, unknown>[] = []
   let from = 0

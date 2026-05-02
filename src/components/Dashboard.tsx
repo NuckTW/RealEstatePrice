@@ -84,7 +84,7 @@ export default function Dashboard() {
             <YAxis stroke="#9ca3af" tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
             <Tooltip
               contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-              formatter={(v: number) => [`${v.toLocaleString()} 筆`, '交易量']}
+              formatter={(v) => [`${Number(v ?? 0).toLocaleString()} 筆`, '交易量']}
             />
             <Bar dataKey="total_transactions" fill="#3b82f6" radius={[4,4,0,0]} />
           </BarChart>
@@ -104,7 +104,7 @@ export default function Dashboard() {
             <YAxis stroke="#9ca3af" tickFormatter={v => `${v}`} />
             <Tooltip
               contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-              formatter={(v: number) => [`${v} 萬/坪`, '平均單價']}
+              formatter={(v) => [`${v ?? 0} 萬/坪`, '平均單價']}
             />
             <Line type="monotone" dataKey="avg_wan_ping" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
           </LineChart>
@@ -130,7 +130,7 @@ export default function Dashboard() {
             <YAxis stroke="#9ca3af" tickFormatter={v => `${v}`} />
             <Tooltip
               contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-              formatter={(v: number) => [`${v} 萬/坪`, '平均單價']}
+              formatter={(v) => [`${v ?? 0} 萬/坪`, '平均單價']}
             />
             <Line type="monotone" dataKey="avg_unit_price_wan_ping" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="均價(萬/坪)" />
           </LineChart>
@@ -143,7 +143,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-8">
           <ResponsiveContainer width="50%" height={240}>
             <PieChart>
-              <Pie data={types} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ percent }) => `${(percent * 100).toFixed(0)}%`}>
+              <Pie data={types} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}>
                 {types.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }} />
