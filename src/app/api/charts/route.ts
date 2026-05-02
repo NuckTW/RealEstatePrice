@@ -18,7 +18,7 @@ async function fetchAll(fields: string, filter?: { col: string; gte?: string; lt
     const { data, error } = await q.range(from, from + PAGE - 1)
     if (error) throw error
     if (!data || data.length === 0) break
-    all.push(...data)
+    all.push(...(data as Record<string, unknown>[]))
     if (data.length < PAGE) break   // 最後一頁
     from += PAGE
   }
