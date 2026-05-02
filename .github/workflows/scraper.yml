@@ -1,0 +1,31 @@
+name: 台南實價登錄月度更新
+
+on:
+  schedule:
+    # 每月 1日、11日、21日 UTC 01:00（台灣時間 09:00）
+    - cron: '0 1 1,11,21 * *'
+  workflow_dispatch:  # 允許手動觸發
+
+jobs:
+  fetch-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install supabase requests pandas python-dotenv
+
+      - name: Run scraper
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/fetch_latest.py
