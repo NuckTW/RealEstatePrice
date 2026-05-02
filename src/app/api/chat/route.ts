@@ -27,6 +27,8 @@ const DB_SCHEMA = `
 - parking_price (bigint): 車位總價（元）
 - address (text): 地址
 - source_season (text): 資料季別，例如「115S1」
+- is_presale (boolean): 是否為預售屋（true=預售屋，false=成屋）
+- project_name (text): 建案名稱（預售屋專屬，例如「公園伯爵23」）
 
 有用的 View：
 - district_monthly_stats: 行政區月統計（district, month, transaction_count, avg_unit_price, avg_total_price）

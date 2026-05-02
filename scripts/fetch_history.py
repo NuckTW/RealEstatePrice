@@ -1,6 +1,6 @@
 """
 歷史資料初始化腳本
-抓取台南市民國110年Q1至今的實價登錄買賣資料，寫入 Supabase。
+抓取台南市民國110年Q1至今的實價登錄買賣資料（成屋+預售屋），寫入 Supabase。
 
 執行路徑：/Users/nuck/AI/RealEstatePrice
 執行方式：python3 scripts/fetch_history.py
@@ -23,10 +23,8 @@ SUPABASE_KEY = os.environ['SUPABASE_SERVICE_ROLE_KEY']
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 台南市買賣 CSV 下載 URL（季別格式：115S1）
-DOWNLOAD_URL = (
-    'https://plvr.land.moi.gov.tw/DownloadSeason'
-    '?season={season}&fileName=d_lvr_land_a.csv'
-)
+# a = 成屋買賣，b = 預售屋買賣
+BASE_URL = 'https://plvr.land.moi.gov.tw/DownloadSeason?season={season}&fileName={fname}'
 BATCH_SIZE = 500
 START_YEAR = 110
 DELAY_SEC  = 1.5
@@ -89,25 +87,25 @@ def safe_bool(val):
     return None
 
 
-def download_season_csv(session: requests.Session, season: str):
-    url = DOWNLOAD_URL.format(season=season)
+def download_csv(session: requests.Session, season: str, fname: str):
+    url = BASE_URL.format(season=season, fname=fname)
     try:
         resp = session.get(url, timeout=30)
         if resp.status_code != 200 or len(resp.content) < 1000:
-            print(f'  [跳過] {season} 無資料（{len(resp.content)} bytes）')
             return None
         raw = resp.content.decode('utf-8-sig', errors='replace')
         lines = raw.splitlines()
         # 跳過第2行英文說明
         if len(lines) > 1 and not lines[1][:1].encode('utf-8').isdigit():
             raw = '\n'.join([lines[0]] + lines[2:])
-        return pd.read_csv(io.StringIO(raw), dtype=str, low_memory=False)
+        df = pd.read_csv(io.StringIO(raw), dtype=str, low_memory=False)
+        return df if not df.empty else None
     except Exception as e:
-        print(f'  [錯誤] {season} 下載失敗：{e}')
+        print(f'  [錯誤] {season}/{fname} 下載失敗：{e}')
         return None
 
 
-def parse_row(row: pd.Series, season: str) -> dict:
+def parse_row(row: pd.Series, season: str, is_presale: bool = False) -> dict:
     idx = {c.strip(): c for c in row.index}
 
     def get(col):
@@ -120,6 +118,7 @@ def parse_row(row: pd.Series, season: str) -> dict:
     return {
         'serial_number':           get('編號') or get('移轉編號'),
         'source_season':           season,
+        'is_presale':              is_presale,
         'district':                get('鄉鎮市區'),
         'address':                 get('土地位置建物門牌'),
         'transaction_date':        roc_date_to_iso(get('交易年月日')),
@@ -137,11 +136,11 @@ def parse_row(row: pd.Series, season: str) -> dict:
         'auxiliary_building_area': safe_float(get('附屬建物面積')),
         'balcony_area_sqm':        safe_float(get('陽台面積')),
         'floor':                   get('移轉層次'),
-        'total_floors':            safe_int(get('總樓層數')),
+        'total_floors':            min(safe_int(get('總樓層數')) or 0, 200) or None,
         'has_elevator':            safe_bool(get('電梯')),
-        'rooms':                   safe_int(get('建物現況格局-房')),
-        'living_rooms':            safe_int(get('建物現況格局-廳')),
-        'bathrooms':               safe_int(get('建物現況格局-衛')),
+        'rooms':                   min(safe_int(get('建物現況格局-房')) or 0, 99) or None,
+        'living_rooms':            min(safe_int(get('建物現況格局-廳')) or 0, 99) or None,
+        'bathrooms':               min(safe_int(get('建物現況格局-衛')) or 0, 99) or None,
         'has_management':          safe_bool(get('有無管理組織')),
         'parking_type':            get('車位類別'),
         'parking_area_sqm':        safe_float(get('車位移轉總面積平方公尺')),
@@ -149,6 +148,7 @@ def parse_row(row: pd.Series, season: str) -> dict:
         'total_price':             safe_int(get('總價元')),
         'unit_price_sqm':          safe_float(get('單價元平方公尺')),
         'notes':                   get('備註'),
+        'project_name':            get('建案名稱') if is_presale else None,
     }
 
 
@@ -176,21 +176,20 @@ def log_scrape(season, status, inserted, skipped, error=None):
         print(f'  [log 錯誤] {e}')
 
 
-def process_season(session: requests.Session, season: str):
-    print(f'▶ {season}', end='  ', flush=True)
-    df = download_season_csv(session, season)
-    if df is None or df.empty:
-        log_scrape(season, 'failed', 0, 0, '無資料或下載失敗')
-        return
-
-    # 只保留含建物的買賣
+def process_df(df, season: str, is_presale: bool):
+    """處理 DataFrame，過濾並回傳筆數。"""
+    # 只保留含建物的交易
     if '交易標的' in df.columns:
         df = df[df['交易標的'].str.contains('建物', na=False)]
+
+    # 預售屋：排除解約案件
+    if is_presale and '解約情形' in df.columns:
+        df = df[df['解約情形'].isna() | (df['解約情形'].str.strip() == '')]
 
     total_ins = total_skip = 0
     batch = []
     for _, row in df.iterrows():
-        rec = parse_row(row, season)
+        rec = parse_row(row, season, is_presale=is_presale)
         if not rec['district'] or not rec['transaction_date']:
             continue
         batch.append(rec)
@@ -201,13 +200,37 @@ def process_season(session: requests.Session, season: str):
         i, s = upsert_batch(batch, season)
         total_ins += i; total_skip += s
 
+    return total_ins, total_skip
+
+
+def process_season(session: requests.Session, season: str):
+    print(f'▶ {season}', end='  ', flush=True)
+    total_ins = total_skip = 0
+
+    # 成屋買賣（a 檔）
+    df_a = download_csv(session, season, 'd_lvr_land_a.csv')
+    if df_a is not None:
+        i, s = process_df(df_a, season, is_presale=False)
+        total_ins += i; total_skip += s
+
+    # 預售屋（b 檔，從 110S2 開始才有）
+    df_b = download_csv(session, season, 'd_lvr_land_b.csv')
+    if df_b is not None:
+        i, s = process_df(df_b, season, is_presale=True)
+        total_ins += i; total_skip += s
+
+    if total_ins == 0 and total_skip == 0:
+        log_scrape(season, 'failed', 0, 0, '無資料或下載失敗')
+        print('無資料')
+        return
+
     log_scrape(season, 'success', total_ins, total_skip)
     print(f'寫入 {total_ins} 筆，跳過 {total_skip} 筆')
 
 
 def main():
     seasons = get_seasons(START_YEAR)
-    print(f'台南市實價登錄歷史初始化')
+    print(f'台南市實價登錄歷史初始化（成屋 + 預售屋）')
     print(f'共 {len(seasons)} 個季別：{seasons[0]} ～ {seasons[-1]}')
     print('=' * 50)
 
