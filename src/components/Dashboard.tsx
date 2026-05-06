@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 
 interface MonthlyData {
@@ -26,18 +26,10 @@ interface BuildingType {
   value: number
 }
 
-const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4']
+type PresaleMode = 'false' | 'true' | 'all'
 
-const TOP_DISTRICTS = ['東區','永康區','仁德區','北區','安南區','歸仁區']
-
-function formatPrice(val: number) {
-  return `${Math.round(val / 10000).toLocaleString()} 萬`
-}
-
-function formatUnitPrice(val: number) {
-  // 元/㎡ → 萬元/坪
-  return `${((val * 3.3058) / 10000).toFixed(1)} 萬/坪`
-}
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+const TOP_DISTRICTS = ['東區', '永康區', '仁德區', '北區', '安南區', '歸仁區']
 
 export default function Dashboard() {
   const [monthly, setMonthly] = useState<MonthlyData[]>([])
@@ -45,9 +37,11 @@ export default function Dashboard() {
   const [types, setTypes] = useState<BuildingType[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDistrict, setSelectedDistrict] = useState('東區')
+  const [presale, setPresale] = useState<PresaleMode>('false')
 
   useEffect(() => {
-    fetch('/api/charts')
+    setLoading(true)
+    fetch(`/api/charts?presale=${presale}`)
       .then(r => r.json())
       .then(d => {
         setMonthly(d.monthlyData || [])
@@ -55,25 +49,44 @@ export default function Dashboard() {
         setTypes(d.buildingTypes || [])
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [presale])
 
-  // 過濾選定行政區的月資料
   const districtData = monthly
     .filter(d => d.district === selectedDistrict)
     .map(d => ({
       ...d,
-      month: d.month?.slice(0, 7),
       avg_unit_price_wan_ping: parseFloat(((d.avg_unit_price * 3.3058) / 10000).toFixed(1)),
     }))
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="text-gray-400 animate-pulse">載入資料中...</div>
-    </div>
-  )
+  const PRESALE_TABS: { label: string; value: PresaleMode }[] = [
+    { label: '成屋', value: 'false' },
+    { label: '預售屋', value: 'true' },
+    { label: '全部', value: 'all' },
+  ]
 
   return (
     <div className="space-y-8">
+      {/* 切換成屋 / 預售屋 */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-gray-400 mr-1">資料類型：</span>
+        {PRESALE_TABS.map(tab => (
+          <button
+            key={tab.value}
+            onClick={() => setPresale(tab.value)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              presale === tab.value
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+        {loading && (
+          <span className="text-xs text-gray-500 ml-2 animate-pulse">載入中...</span>
+        )}
+      </div>
+
       {/* 年度交易量 */}
       <div className="bg-gray-800 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4">📊 台南市年度交易量</h2>
@@ -81,12 +94,12 @@ export default function Dashboard() {
           <BarChart data={yearly}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis dataKey="year" stroke="#9ca3af" />
-            <YAxis stroke="#9ca3af" tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
+            <YAxis stroke="#9ca3af" tickFormatter={v => `${(Number(v) / 1000).toFixed(0)}k`} />
             <Tooltip
               contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
               formatter={(v) => [`${Number(v ?? 0).toLocaleString()} 筆`, '交易量']}
             />
-            <Bar dataKey="total_transactions" fill="#3b82f6" radius={[4,4,0,0]} />
+            <Bar dataKey="total_transactions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -97,11 +110,11 @@ export default function Dashboard() {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={yearly.map(d => ({
             ...d,
-            avg_wan_ping: parseFloat(((d.avg_unit_price * 3.3058) / 10000).toFixed(1))
+            avg_wan_ping: parseFloat(((d.avg_unit_price * 3.3058) / 10000).toFixed(1)),
           }))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis dataKey="year" stroke="#9ca3af" />
-            <YAxis stroke="#9ca3af" tickFormatter={v => `${v}`} />
+            <YAxis stroke="#9ca3af" />
             <Tooltip
               contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
               formatter={(v) => [`${v ?? 0} 萬/坪`, '平均單價']}
@@ -127,7 +140,7 @@ export default function Dashboard() {
           <LineChart data={districtData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis dataKey="month" stroke="#9ca3af" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#9ca3af" tickFormatter={v => `${v}`} />
+            <YAxis stroke="#9ca3af" />
             <Tooltip
               contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
               formatter={(v) => [`${v ?? 0} 萬/坪`, '平均單價']}
@@ -143,7 +156,15 @@ export default function Dashboard() {
         <div className="flex items-center gap-8">
           <ResponsiveContainer width="50%" height={240}>
             <PieChart>
-              <Pie data={types} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}>
+              <Pie
+                data={types}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={90}
+                label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+              >
                 {types.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }} />
