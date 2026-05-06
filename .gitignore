@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Claude Code local settings (may contain tokens/secrets)
+.claude/settings.local.json
+
 # Python
 __pycache__/
 *.pyc
