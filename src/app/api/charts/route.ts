@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 export const revalidate = 21600
 
 async function runQuery(sql: string) {
-  const { data, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql })
+  const { data, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql.trim() })
   if (error) throw error
   return (data as Record<string, unknown>[]) ?? []
 }
