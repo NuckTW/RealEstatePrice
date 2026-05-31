@@ -1,186 +1,140 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
-} from 'recharts'
+import { useState, useEffect, useCallback } from 'react'
+import FilterBar, { FilterValues, DEFAULT_FILTERS } from './FilterBar'
+import KpiBar from './KpiBar'
+import DataTable, { ColDef } from './DataTable'
 
-interface MonthlyData {
-  district: string
-  month: string
-  transaction_count: number
-  avg_unit_price: number
-  avg_total_price: number
+/* ── Column definitions ────────────────────────────────────── */
+const DIST_COLS: ColDef[] = [
+  { key: 'district',  label: '行政區',     align: 'left' },
+  { key: 'count',     label: '戶數',       barColor: '#7c3aed', minWidth: 72 },
+  { key: 'unit_price',label: '單價(萬/坪)',barColor: '#0891b2', minWidth: 72 },
+  { key: 'area',      label: '坪數',       barColor: '#0d9488', minWidth: 64 },
+  { key: 'avg_total', label: '均總價(萬)', barColor: '#d97706', minWidth: 80 },
+  { key: 'sales',     label: '總銷(億)',   barColor: '#059669', minWidth: 64 },
+  { key: 'pct',       label: '佔比', barColor: '#2563eb', format: v => `${v}%`, minWidth: 52 },
+]
+
+const TYPE_COLS: ColDef[] = [
+  { key: 'type',  label: '類型',     align: 'left',
+    format: v => {
+      const s = String(v ?? '')
+      if (s.startsWith('住宅大樓')) return '住宅大樓'
+      if (s.startsWith('透天厝'))  return '透天厝'
+      if (s.startsWith('公寓'))    return '公寓'
+      if (s.startsWith('華廈'))    return '華廈'
+      if (s.startsWith('套房'))    return '套房'
+      if (s.startsWith('辦公'))    return '辦公商業'
+      return s.slice(0, 10)
+    }
+  },
+  { key: 'count', label: '戶數',     barColor: '#7c3aed', minWidth: 72 },
+  { key: 'sales', label: '總銷(億)', barColor: '#059669', minWidth: 64 },
+  { key: 'pct',   label: '佔比', barColor: '#2563eb', format: v => `${v}%`, minWidth: 52 },
+]
+
+const ROOMS_COLS: ColDef[] = [
+  { key: 'rooms',     label: '房型',       align: 'left',
+    format: v => v === 0 || v === '0' ? '0房' : `${v}房` },
+  { key: 'count',     label: '戶數',       barColor: '#7c3aed', minWidth: 72 },
+  { key: 'unit_price',label: '單價(萬/坪)',barColor: '#0891b2', minWidth: 72 },
+  { key: 'area',      label: '坪數',       barColor: '#0d9488', minWidth: 64 },
+  { key: 'avg_total', label: '均總價(萬)', barColor: '#d97706', minWidth: 80 },
+  { key: 'sales',     label: '總銷(億)',   barColor: '#059669', minWidth: 64 },
+  { key: 'pct',       label: '佔比', barColor: '#2563eb', format: v => `${v}%`, minWidth: 52 },
+  { key: 'min_price', label: '最低(萬)',   barColor: '#3b82f6', minWidth: 72 },
+  { key: 'max_price', label: '最高(萬)',   barColor: '#e11d48', minWidth: 72 },
+]
+
+const CASES_COLS: ColDef[] = [
+  { key: 'district',  label: '行政區',     align: 'left' },
+  { key: 'name',      label: '建案名稱',   align: 'left' },
+  { key: 'count',     label: '戶數',       barColor: '#7c3aed', minWidth: 64 },
+  { key: 'unit_price',label: '單價(萬/坪)',barColor: '#0891b2', minWidth: 72 },
+  { key: 'area',      label: '坪數',       barColor: '#0d9488', minWidth: 64 },
+  { key: 'avg_total', label: '均總價(萬)', barColor: '#d97706', minWidth: 80 },
+  { key: 'sales',     label: '總銷(億)',   barColor: '#059669', minWidth: 64 },
+  { key: 'min_price', label: '最低(萬)',   barColor: '#3b82f6', minWidth: 72 },
+  { key: 'max_price', label: '最高(萬)',   barColor: '#e11d48', minWidth: 72 },
+]
+
+/* ── Types ─────────────────────────────────────────────────── */
+interface ChartData {
+  kpi: {
+    total?: number
+    avg_unit_price?: number
+    avg_area?: number
+    avg_total?: number
+    total_sales?: number
+  }
+  districts: Record<string, unknown>[]
+  types:     Record<string, unknown>[]
+  rooms:     Record<string, unknown>[]
+  cases:     Record<string, unknown>[]
 }
 
-interface YearlyData {
-  year: number
-  total_transactions: number
-  avg_unit_price: number
-  avg_total_price_wan: number
-}
-
-interface BuildingType {
-  name: string
-  value: number
-}
-
-type PresaleMode = 'false' | 'true' | 'all'
-
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
-const TOP_DISTRICTS = ['東區', '永康區', '仁德區', '北區', '安南區', '歸仁區']
-
+/* ── Dashboard ─────────────────────────────────────────────── */
 export default function Dashboard() {
-  const [monthly, setMonthly] = useState<MonthlyData[]>([])
-  const [yearly, setYearly] = useState<YearlyData[]>([])
-  const [types, setTypes] = useState<BuildingType[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedDistrict, setSelectedDistrict] = useState('東區')
-  const [presale, setPresale] = useState<PresaleMode>('false')
+  const [data, setData]       = useState<ChartData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS)
 
-  useEffect(() => {
+  const fetchData = useCallback(async (f: FilterValues) => {
     setLoading(true)
-    fetch(`/api/charts?presale=${presale}`)
-      .then(r => r.json())
-      .then(d => {
-        setMonthly(d.monthlyData || [])
-        setYearly(d.yearlyData || [])
-        setTypes(d.buildingTypes || [])
-      })
-      .finally(() => setLoading(false))
-  }, [presale])
+    try {
+      const p = new URLSearchParams({ months: f.months, type: f.type, rooms: f.rooms, presale: f.presale })
+      if (f.districts.length > 0) p.set('districts', f.districts.join(','))
+      const res  = await fetch(`/api/charts?${p}`)
+      const json = await res.json()
+      if (!json.error) setData(json)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  const districtData = monthly
-    .filter(d => d.district === selectedDistrict)
-    .map(d => ({
-      ...d,
-      avg_unit_price_wan_ping: parseFloat(((d.avg_unit_price * 3.3058) / 10000).toFixed(1)),
-    }))
+  useEffect(() => { fetchData(DEFAULT_FILTERS) }, [fetchData])
 
-  const PRESALE_TABS: { label: string; value: PresaleMode }[] = [
-    { label: '成屋', value: 'false' },
-    { label: '預售屋', value: 'true' },
-    { label: '全部', value: 'all' },
-  ]
+  const handleApply = (f: FilterValues) => {
+    setFilters(f)
+    fetchData(f)
+  }
 
   return (
-    <div className="space-y-8">
-      {/* 切換成屋 / 預售屋 */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-400 mr-1">資料類型：</span>
-        {PRESALE_TABS.map(tab => (
-          <button
-            key={tab.value}
-            onClick={() => setPresale(tab.value)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              presale === tab.value
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-        {loading && (
-          <span className="text-xs text-gray-500 ml-2 animate-pulse">載入中...</span>
-        )}
-      </div>
+    <div className="min-h-screen bg-[#0d1117]">
+      <FilterBar onApply={handleApply} loading={loading} />
 
-      {/* 年度交易量 */}
-      <div className="bg-gray-800 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">📊 台南市年度交易量</h2>
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={yearly}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="year" stroke="#9ca3af" />
-            <YAxis stroke="#9ca3af" tickFormatter={v => `${(Number(v) / 1000).toFixed(0)}k`} />
-            <Tooltip
-              contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-              formatter={(v) => [`${Number(v ?? 0).toLocaleString()} 筆`, '交易量']}
-            />
-            <Bar dataKey="total_transactions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* 年度均價趨勢 */}
-      <div className="bg-gray-800 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">📈 全市年度均價趨勢（萬元/坪）</h2>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={yearly.map(d => ({
-            ...d,
-            avg_wan_ping: parseFloat(((d.avg_unit_price * 3.3058) / 10000).toFixed(1)),
-          }))}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="year" stroke="#9ca3af" />
-            <YAxis stroke="#9ca3af" />
-            <Tooltip
-              contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-              formatter={(v) => [`${v ?? 0} 萬/坪`, '平均單價']}
-            />
-            <Line type="monotone" dataKey="avg_wan_ping" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* 行政區月均價 */}
-      <div className="bg-gray-800 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">🏘 行政區月均價趨勢</h2>
-          <select
-            value={selectedDistrict}
-            onChange={e => setSelectedDistrict(e.target.value)}
-            className="bg-gray-700 text-white rounded-lg px-3 py-1.5 text-sm border border-gray-600"
-          >
-            {TOP_DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+      {/* Loading skeleton */}
+      {loading && !data && (
+        <div className="flex items-center justify-center h-64 text-gray-500 animate-pulse text-sm">
+          載入資料中…
         </div>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={districtData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="month" stroke="#9ca3af" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#9ca3af" />
-            <Tooltip
-              contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }}
-              formatter={(v) => [`${v ?? 0} 萬/坪`, '平均單價']}
-            />
-            <Line type="monotone" dataKey="avg_unit_price_wan_ping" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} name="均價(萬/坪)" />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      )}
 
-      {/* 建物型態分佈 */}
-      <div className="bg-gray-800 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">🏠 建物型態分佈</h2>
-        <div className="flex items-center gap-8">
-          <ResponsiveContainer width="50%" height={240}>
-            <PieChart>
-              <Pie
-                data={types}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
-              >
-                {types.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: 8 }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex-1 space-y-2">
-            {types.map((t, i) => (
-              <div key={t.name} className="flex items-center gap-2 text-sm">
-                <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                <span className="text-gray-300 truncate">{t.name}</span>
-                <span className="text-gray-400 ml-auto">{t.value.toLocaleString()} 筆</span>
-              </div>
-            ))}
+      {data && (
+        <>
+          <KpiBar data={data.kpi} months={filters.months} />
+
+          <div className="p-5 space-y-5">
+            {/* Row 1: Districts + Types */}
+            <div className="grid grid-cols-1 xl:grid-cols-[3fr_1.6fr] gap-5">
+              <DataTable title="行政區排行" columns={DIST_COLS}  data={data.districts} pageSize={8} />
+              <DataTable title="類型統計"   columns={TYPE_COLS}  data={data.types}     pageSize={8} />
+            </div>
+
+            {/* Row 2: Rooms */}
+            <DataTable title="房型統計" columns={ROOMS_COLS} data={data.rooms} pageSize={10} />
+
+            {/* Row 3: Cases */}
+            <DataTable
+              title="個案統計（預售屋）"
+              columns={CASES_COLS}
+              data={data.cases}
+              pageSize={10}
+            />
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   )
 }
