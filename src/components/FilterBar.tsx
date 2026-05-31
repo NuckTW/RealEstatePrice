@@ -42,16 +42,26 @@ const PRESALE_OPTIONS = [
   { label: '預售屋', value: 'true' },
 ]
 
+const BUILDING_AGE_OPTIONS = [
+  { label: '全部',    value: 'all' },
+  { label: '5年以內', value: '5' },
+  { label: '10年以內', value: '10' },
+  { label: '20年以內', value: '20' },
+  { label: '30年以內', value: '30' },
+  { label: '30年以上', value: '30+' },
+]
+
 export interface FilterValues {
   months: string
   districts: string[]
   type: string
   rooms: string
   presale: string
+  buildingAge: string
 }
 
 export const DEFAULT_FILTERS: FilterValues = {
-  months: '12', districts: [], type: 'all', rooms: 'all', presale: 'all',
+  months: '12', districts: [], type: 'all', rooms: 'all', presale: 'all', buildingAge: 'all',
 }
 
 /* ── Simple single-select ──────────────────────────────────── */
@@ -163,7 +173,19 @@ export default function FilterBar({ onApply, loading }: FilterBarProps) {
         <MultiSelect  label="行政區（可多選）" options={TAINAN_DISTRICTS} selected={f.districts} onChange={v => set('districts', v)} />
         <SimpleSelect label="類型" options={TYPE_OPTIONS} value={f.type} onChange={v => set('type', v)} />
         <SimpleSelect label="房型" options={ROOMS_OPTIONS} value={f.rooms} onChange={v => set('rooms', v)} />
-        <SimpleSelect label="成／預售" options={PRESALE_OPTIONS} value={f.presale} onChange={v => set('presale', v)} />
+        <SimpleSelect
+          label="成／預售"
+          options={PRESALE_OPTIONS}
+          value={f.presale}
+          onChange={v => {
+            // 切離成屋時重置屋齡
+            const reset = v !== 'false' ? { presale: v, buildingAge: 'all' } : { presale: v }
+            setF(prev => ({ ...prev, ...reset }))
+          }}
+        />
+        {f.presale === 'false' && (
+          <SimpleSelect label="屋齡" options={BUILDING_AGE_OPTIONS} value={f.buildingAge} onChange={v => set('buildingAge', v)} />
+        )}
 
         <div className="flex gap-2 pb-0.5 mt-auto">
           <button

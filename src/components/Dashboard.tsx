@@ -83,7 +83,7 @@ export default function Dashboard() {
   const fetchData = useCallback(async (f: FilterValues) => {
     setLoading(true)
     try {
-      const p = new URLSearchParams({ months: f.months, type: f.type, rooms: f.rooms, presale: f.presale })
+      const p = new URLSearchParams({ months: f.months, type: f.type, rooms: f.rooms, presale: f.presale, buildingAge: f.buildingAge })
       if (f.districts.length > 0) p.set('districts', f.districts.join(','))
       const res  = await fetch(`/api/charts?${p}`)
       const json = await res.json()

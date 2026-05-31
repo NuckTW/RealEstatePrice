@@ -38,6 +38,20 @@ function buildWhere(params: URLSearchParams): string {
   if (presale === 'true') conds.push('is_presale = true')
   else if (presale === 'false') conds.push('is_presale = false')
 
+  const buildingAge = params.get('buildingAge') ?? 'all'
+  if (buildingAge !== 'all' && presale === 'false') {
+    // completion_date 格式為 7碼民國日期，如 "1100315" = 民國110年03月15日
+    // 取前3碼為民國年，+1911 = 西元年
+    const ageExpr = `(EXTRACT(YEAR FROM transaction_date) - (CAST(LEFT(completion_date, 3) AS INT) + 1911))`
+    const ageFilter = `completion_date IS NOT NULL AND LENGTH(completion_date) >= 3 AND ${ageExpr} >= 0`
+    if (buildingAge === '30+') {
+      conds.push(`${ageFilter} AND ${ageExpr} > 30`)
+    } else {
+      const maxAge = parseInt(buildingAge)
+      conds.push(`${ageFilter} AND ${ageExpr} <= ${maxAge}`)
+    }
+  }
+
   return conds.join(' AND ')
 }
 
