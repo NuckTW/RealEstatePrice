@@ -11,13 +11,14 @@ const TAINAN_DISTRICTS = [
   '柳營區','鹽水區','善化區','大內區','山上區','新市區','安定區',
 ]
 
-const MONTHS_OPTIONS = [
-  { label: '1個月', value: '1' },
-  { label: '3個月', value: '3' },
-  { label: '6個月', value: '6' },
-  { label: '1年',   value: '12' },
-  { label: '全部',  value: '0' },
-]
+const ROC_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => {
+  const y = 110 + i
+  return { label: `${y}年`, value: String(y) }
+})
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+  label: `${i + 1}月`, value: String(i + 1),
+}))
+
 const TYPE_OPTIONS = [
   { label: '全部',   value: 'all' },
   { label: '住宅大樓', value: '住宅大樓' },
@@ -52,7 +53,10 @@ const BUILDING_AGE_OPTIONS = [
 ]
 
 export interface FilterValues {
-  months: string
+  dateFromYear: string
+  dateFromMonth: string
+  dateToYear: string
+  dateToMonth: string
   districts: string[]
   type: string
   rooms: string
@@ -61,7 +65,9 @@ export interface FilterValues {
 }
 
 export const DEFAULT_FILTERS: FilterValues = {
-  months: '12', districts: [], type: 'all', rooms: 'all', presale: 'all', buildingAge: 'all',
+  dateFromYear: '114', dateFromMonth: '1',
+  dateToYear: '115',   dateToMonth: '6',
+  districts: [], type: 'all', rooms: 'all', presale: 'all', buildingAge: 'all',
 }
 
 /* ── Simple single-select ──────────────────────────────────── */
@@ -169,7 +175,22 @@ export default function FilterBar({ onApply, loading }: FilterBarProps) {
   return (
     <div className="sticky top-14 z-20 bg-[#0d1117]/95 backdrop-blur border-b border-gray-800 px-6 py-3">
       <div className="flex items-end gap-3 flex-wrap">
-        <SimpleSelect label="日期區間" options={MONTHS_OPTIONS} value={f.months} onChange={v => set('months', v)} />
+        {/* 日期範圍：起 */}
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] text-gray-400 whitespace-nowrap">起始</span>
+          <div className="flex items-center gap-1">
+            <SimpleSelect label="" options={ROC_YEAR_OPTIONS} value={f.dateFromYear} onChange={v => set('dateFromYear', v)} />
+            <SimpleSelect label="" options={MONTH_OPTIONS}    value={f.dateFromMonth} onChange={v => set('dateFromMonth', v)} />
+          </div>
+        </div>
+        {/* 日期範圍：迄 */}
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] text-gray-400 whitespace-nowrap">結束</span>
+          <div className="flex items-center gap-1">
+            <SimpleSelect label="" options={ROC_YEAR_OPTIONS} value={f.dateToYear} onChange={v => set('dateToYear', v)} />
+            <SimpleSelect label="" options={MONTH_OPTIONS}    value={f.dateToMonth} onChange={v => set('dateToMonth', v)} />
+          </div>
+        </div>
         <MultiSelect  label="行政區（可多選）" options={TAINAN_DISTRICTS} selected={f.districts} onChange={v => set('districts', v)} />
         <SimpleSelect label="類型" options={TYPE_OPTIONS} value={f.type} onChange={v => set('type', v)} />
         <SimpleSelect label="房型" options={ROOMS_OPTIONS} value={f.rooms} onChange={v => set('rooms', v)} />

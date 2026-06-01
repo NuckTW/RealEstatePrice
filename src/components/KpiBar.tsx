@@ -6,11 +6,6 @@ interface KpiData {
   total_sales?: number
 }
 
-const MONTHS_LABEL: Record<string, string> = {
-  '1': '近 1 個月', '3': '近 3 個月', '6': '近 6 個月',
-  '12': '近 1 年', '0': '全部資料',
-}
-
 function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="flex flex-col items-center px-5 py-3 border-r border-gray-700/60 last:border-0">
@@ -20,12 +15,12 @@ function KpiCard({ label, value, color }: { label: string; value: string; color:
   )
 }
 
-export default function KpiBar({ data, months }: { data: KpiData; months: string }) {
+export default function KpiBar({ data, dateRange }: { data: KpiData; dateRange: string }) {
   return (
     <div className="flex items-center bg-gray-800/40 border-b border-gray-700/60 px-6 flex-wrap">
       <div className="flex items-center py-3 pr-5 border-r border-gray-700/60 mr-2">
         <span className="text-xs bg-blue-900/50 text-blue-300 border border-blue-700/50 rounded-full px-3 py-1 whitespace-nowrap">
-          {MONTHS_LABEL[months] ?? ''}
+          {dateRange}
         </span>
       </div>
       <div className="flex flex-wrap">

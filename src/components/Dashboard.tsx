@@ -83,7 +83,11 @@ export default function Dashboard() {
   const fetchData = useCallback(async (f: FilterValues) => {
     setLoading(true)
     try {
-      const p = new URLSearchParams({ months: f.months, type: f.type, rooms: f.rooms, presale: f.presale, buildingAge: f.buildingAge })
+      const p = new URLSearchParams({
+        dateFromYear: f.dateFromYear, dateFromMonth: f.dateFromMonth,
+        dateToYear:   f.dateToYear,   dateToMonth:   f.dateToMonth,
+        type: f.type, rooms: f.rooms, presale: f.presale, buildingAge: f.buildingAge,
+      })
       if (f.districts.length > 0) p.set('districts', f.districts.join(','))
       const res  = await fetch(`/api/charts?${p}`)
       const json = await res.json()
@@ -113,7 +117,10 @@ export default function Dashboard() {
 
       {data && (
         <>
-          <KpiBar data={data.kpi} months={filters.months} />
+          <KpiBar
+            data={data.kpi}
+            dateRange={`${filters.dateFromYear}年${filters.dateFromMonth}月 ～ ${filters.dateToYear}年${filters.dateToMonth}月`}
+          />
 
           <div className="p-5 space-y-5">
             {/* Row 1: Districts + Types */}

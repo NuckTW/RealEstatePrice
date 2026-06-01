@@ -10,12 +10,18 @@ async function runQuery(sql: string) {
 function buildWhere(params: URLSearchParams): string {
   const conds: string[] = ['unit_price_sqm > 0', 'total_price > 0']
 
-  const months = parseInt(params.get('months') ?? '1')
-  if (months > 0) {
-    const cutoff = new Date(Date.now() - months * 30 * 24 * 60 * 60 * 1000)
-      .toISOString().slice(0, 10)
-    conds.push(`transaction_date >= '${cutoff}'`)
-  }
+  const fromYear  = parseInt(params.get('dateFromYear')  ?? '110') + 1911
+  const fromMonth = parseInt(params.get('dateFromMonth') ?? '1')
+  const toYear    = parseInt(params.get('dateToYear')    ?? '115') + 1911
+  const toMonth   = parseInt(params.get('dateToMonth')   ?? '12')
+
+  const fromDate = `${fromYear}-${String(fromMonth).padStart(2,'0')}-01`
+  // 結束月的下一月第一天，以 < 做篩選（含當月全部）
+  const nextMonth = toMonth === 12 ? 1 : toMonth + 1
+  const nextYear  = toMonth === 12 ? toYear + 1 : toYear
+  const toDateExcl = `${nextYear}-${String(nextMonth).padStart(2,'0')}-01`
+
+  conds.push(`transaction_date >= '${fromDate}' AND transaction_date < '${toDateExcl}'`)
 
   const districts = (params.get('districts') ?? '').split(',').map(s => s.trim()).filter(Boolean)
   if (districts.length > 0) {
