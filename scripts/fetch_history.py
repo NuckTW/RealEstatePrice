@@ -228,6 +228,42 @@ def process_season(session: requests.Session, season: str):
     print(f'寫入 {total_ins} 筆，跳過 {total_skip} 筆')
 
 
+def get_season_from_iso(iso_date: str):
+    """'2026-04-15' → '115S2'"""
+    if not iso_date or len(iso_date) < 7:
+        return None
+    y, m = int(iso_date[:4]), int(iso_date[5:7])
+    q = (m - 1) // 3 + 1
+    return f'{y - 1911}S{q}'
+
+
+def process_df_auto_season(df: pd.DataFrame, is_presale: bool):
+    """同 process_df，但 source_season 由每筆 transaction_date 自動推算（用於批次下載）。"""
+    if '交易標的' in df.columns:
+        df = df[df['交易標的'].str.contains('建物', na=False)]
+    if is_presale and '解約情形' in df.columns:
+        df = df[df['解約情形'].isna() | (df['解約情形'].str.strip() == '')]
+
+    total_ins = total_skip = 0
+    batch: list = []
+    for _, row in df.iterrows():
+        rec = parse_row(row, '_tmp', is_presale=is_presale)
+        if not rec['district'] or not rec['transaction_date']:
+            continue
+        season = get_season_from_iso(rec['transaction_date'])
+        if not season:
+            continue
+        rec['source_season'] = season
+        batch.append(rec)
+        if len(batch) >= BATCH_SIZE:
+            i, s = upsert_batch(batch, season)
+            total_ins += i; total_skip += s; batch = []
+    if batch:
+        i, s = upsert_batch(batch, batch[0]['source_season'])
+        total_ins += i; total_skip += s
+    return total_ins, total_skip
+
+
 def main():
     seasons = get_seasons(START_YEAR)
     print(f'台南市實價登錄歷史初始化（成屋 + 預售屋）')
