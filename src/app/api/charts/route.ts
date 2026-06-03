@@ -134,19 +134,40 @@ export async function GET(req: NextRequest) {
 
       runQuery(`
         SELECT
-          district,
-          project_name                                                    AS name,
-          COUNT(*)::int                                                   AS count,
-          ROUND((AVG(unit_price_sqm) * 3.3058 / 10000)::numeric, 1)      AS unit_price,
-          ROUND((AVG(NULLIF(building_area_sqm,0)) * 0.3025)::numeric, 1) AS area,
-          ROUND(AVG(total_price) / 10000)::int                           AS avg_total,
-          ROUND(SUM(total_price) / 100000000)::int                       AS sales,
-          ROUND(MIN(total_price) / 10000)::int                           AS min_price,
-          ROUND(MAX(total_price) / 10000)::int                           AS max_price
-        FROM transactions
-        WHERE ${where} AND is_presale = true
-          AND project_name IS NOT NULL AND project_name != ''
-        GROUP BY district, project_name ORDER BY count DESC LIMIT 500
+          f.district,
+          f.name,
+          f.count,
+          COALESCE(a.total_count, f.count)                               AS total_count,
+          ROUND(f.count::numeric / NULLIF(COALESCE(a.total_count, f.count), 0) * 100)::int AS sales_ratio,
+          f.unit_price,
+          f.area,
+          f.avg_total,
+          f.sales,
+          f.min_price,
+          f.max_price
+        FROM (
+          SELECT
+            district,
+            project_name                                                    AS name,
+            COUNT(*)::int                                                   AS count,
+            ROUND((AVG(unit_price_sqm) * 3.3058 / 10000)::numeric, 1)      AS unit_price,
+            ROUND((AVG(NULLIF(building_area_sqm,0)) * 0.3025)::numeric, 1) AS area,
+            ROUND(AVG(total_price) / 10000)::int                           AS avg_total,
+            ROUND(SUM(total_price) / 100000000)::int                       AS sales,
+            ROUND(MIN(total_price) / 10000)::int                           AS min_price,
+            ROUND(MAX(total_price) / 10000)::int                           AS max_price
+          FROM transactions
+          WHERE ${where} AND is_presale = true
+            AND project_name IS NOT NULL AND project_name != ''
+          GROUP BY district, project_name
+        ) f
+        LEFT JOIN (
+          SELECT project_name, COUNT(*)::int AS total_count
+          FROM transactions
+          WHERE is_presale = true AND project_name IS NOT NULL AND project_name != ''
+          GROUP BY project_name
+        ) a ON f.name = a.project_name
+        ORDER BY f.count DESC LIMIT 500
       `),
     ])
 

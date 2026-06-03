@@ -48,15 +48,17 @@ const ROOMS_COLS: ColDef[] = [
 ]
 
 const CASES_COLS: ColDef[] = [
-  { key: 'district',   label: '行政區',      align: 'left' },
-  { key: 'name',       label: '建案名稱',    align: 'left' },
-  { key: 'count',      label: '戶數',        barColor: '#8b5cf6', minWidth: 64 },
-  { key: 'unit_price', label: '單價(萬/坪)', barColor: '#06b6d4', minWidth: 72 },
-  { key: 'area',       label: '坪數',        barColor: '#14b8a6', minWidth: 64 },
-  { key: 'avg_total',  label: '均總價(萬)',  barColor: '#f59e0b', minWidth: 80 },
-  { key: 'sales',      label: '總銷(億)',    barColor: '#10b981', minWidth: 64 },
-  { key: 'min_price',  label: '最低(萬)',    barColor: '#3b82f6', minWidth: 72 },
-  { key: 'max_price',  label: '最高(萬)',    barColor: '#ef4444', minWidth: 72 },
+  { key: 'district',    label: '行政區',      align: 'left' },
+  { key: 'name',        label: '建案名稱',    align: 'left' },
+  { key: 'total_count', label: '總戶數',      barColor: '#6366f1', minWidth: 64 },
+  { key: 'count',       label: '銷售戶數',    barColor: '#8b5cf6', minWidth: 72 },
+  { key: 'sales_ratio', label: '銷售成數',    barColor: '#a78bfa', format: v => `${v ?? 0}%`, minWidth: 72 },
+  { key: 'unit_price',  label: '單價(萬/坪)', barColor: '#06b6d4', minWidth: 72 },
+  { key: 'area',        label: '坪數',        barColor: '#14b8a6', minWidth: 64 },
+  { key: 'avg_total',   label: '均總價(萬)',  barColor: '#f59e0b', minWidth: 80 },
+  { key: 'sales',       label: '總銷(億)',    barColor: '#10b981', minWidth: 64 },
+  { key: 'min_price',   label: '最低(萬)',    barColor: '#3b82f6', minWidth: 72 },
+  { key: 'max_price',   label: '最高(萬)',    barColor: '#ef4444', minWidth: 72 },
 ]
 
 /* ── Types ─────────────────────────────────────────────────── */
