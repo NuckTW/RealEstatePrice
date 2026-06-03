@@ -5,7 +5,7 @@ import { useState, ReactNode } from 'react'
 export interface ColDef {
   key: string
   label: string
-  barColor?: string          // hex — shows inline progress bar
+  barColor?: string
   format?: (v: unknown) => string
   align?: 'left' | 'right' | 'center'
   minWidth?: number
@@ -16,29 +16,34 @@ interface DataTableProps {
   columns: ColDef[]
   data: Record<string, unknown>[]
   pageSize?: number
-  extra?: ReactNode          // optional right-side header content
+  extra?: ReactNode
 }
 
-/* ── Mini-bar cell ─────────────────────────────────────────── */
+/* ── Bar cell ─────────────────────────────────────────────── */
 function BarCell({ col, value, maxVal }: { col: ColDef; value: unknown; maxVal: number }) {
   const num = Number(value)
   const display = col.format
     ? col.format(value)
     : isNaN(num) ? String(value ?? '—') : num.toLocaleString()
-
   const pct = maxVal > 0 && !isNaN(num) ? Math.min((num / maxVal) * 100, 100) : 0
 
   return (
-    <td className="px-2 py-2 text-right">
+    <td className="px-3 py-2.5 text-right">
       <div
-        className="relative inline-flex items-center justify-end rounded overflow-hidden h-[26px]"
+        className="relative inline-flex items-center justify-end rounded-md overflow-hidden h-[24px]"
         style={{ minWidth: col.minWidth ?? 64 }}
       >
         <div
-          className="absolute inset-y-0 left-0 rounded"
-          style={{ width: `${pct}%`, backgroundColor: col.barColor, opacity: 0.65 }}
+          className="absolute inset-y-0 left-0 rounded-md transition-all"
+          style={{ width: `${pct}%`, backgroundColor: col.barColor, opacity: 0.18 }}
         />
-        <span className="relative z-10 text-sm font-medium text-white px-2 whitespace-nowrap">
+        {pct > 5 && (
+          <div
+            className="absolute left-0 top-1 bottom-1 w-[2px] rounded-full"
+            style={{ backgroundColor: col.barColor, opacity: 0.7 }}
+          />
+        )}
+        <span className="relative z-10 text-xs font-medium text-gray-200 px-2 whitespace-nowrap tabular-nums">
           {display}
         </span>
       </div>
@@ -48,14 +53,12 @@ function BarCell({ col, value, maxVal }: { col: ColDef; value: unknown; maxVal: 
 
 /* ── Plain cell ────────────────────────────────────────────── */
 function PlainCell({ col, value }: { col: ColDef; value: unknown }) {
-  const display = col.format
-    ? col.format(value)
-    : String(value ?? '—')
+  const display = col.format ? col.format(value) : String(value ?? '—')
   const align =
     col.align === 'left' ? 'text-left' :
     col.align === 'center' ? 'text-center' : 'text-right'
   return (
-    <td className={`px-3 py-2 text-sm text-gray-200 whitespace-nowrap ${align}`}>
+    <td className={`px-3 py-2.5 text-xs text-gray-300 whitespace-nowrap ${align}`}>
       {display}
     </td>
   )
@@ -67,9 +70,8 @@ export default function DataTable({
 }: DataTableProps) {
   const [page, setPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize))
-  const pageData   = data.slice((page - 1) * pageSize, page * pageSize)
+  const pageData = data.slice((page - 1) * pageSize, page * pageSize)
 
-  // Compute max per barred column (across ALL data, not just current page)
   const maxValues = columns
     .filter(c => c.barColor)
     .reduce<Record<string, number>>((acc, col) => {
@@ -78,25 +80,33 @@ export default function DataTable({
     }, {})
 
   return (
-    <div className="bg-gray-800/40 rounded-xl overflow-hidden border border-gray-700/40">
+    <div className="rounded-2xl overflow-hidden border border-white/6 bg-[#0d1420]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/60">
-        <span className="font-semibold text-white text-sm">{title}</span>
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-4 rounded-full bg-gradient-to-b from-violet-400 to-indigo-500 opacity-70" />
+          <span className="text-sm font-semibold text-white">{title}</span>
+          {data.length > 0 && (
+            <span className="text-[10px] text-gray-600 bg-white/5 rounded-full px-2 py-0.5">
+              {data.length}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
           {extra}
           {totalPages > 1 && (
-            <div className="flex items-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 transition-colors"
-              >上一頁</button>
-              <span>{page} / {totalPages}</span>
+                className="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors flex items-center justify-center text-gray-400"
+              >‹</button>
+              <span className="tabular-nums">{page} / {totalPages}</span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-40 transition-colors"
-              >下一頁</button>
+                className="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors flex items-center justify-center text-gray-400"
+              >›</button>
             </div>
           )}
         </div>
@@ -106,12 +116,14 @@ export default function DataTable({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-700/60">
+            <tr className="border-b border-white/5">
               {columns.map(col => (
                 <th
                   key={col.key}
-                  className={`px-3 py-2 text-[11px] text-gray-400 font-medium whitespace-nowrap
-                    ${col.align === 'left' ? 'text-left' : 'text-right'}`}
+                  className={`
+                    px-3 py-2 text-[10px] text-gray-500 font-semibold uppercase tracking-wider whitespace-nowrap
+                    ${col.align === 'left' ? 'text-left' : 'text-right'}
+                  `}
                 >
                   {col.label}
                 </th>
@@ -121,15 +133,18 @@ export default function DataTable({
           <tbody>
             {pageData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="text-center py-10 text-gray-500 text-sm">
-                  無資料
+                <td colSpan={columns.length} className="text-center py-12 text-gray-600 text-sm">
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-2xl opacity-30">◌</span>
+                    <span>無符合條件的資料</span>
+                  </div>
                 </td>
               </tr>
             ) : (
               pageData.map((row, i) => (
                 <tr
                   key={i}
-                  className="border-b border-gray-700/30 hover:bg-gray-700/20 transition-colors"
+                  className="border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors"
                 >
                   {columns.map(col =>
                     col.barColor ? (

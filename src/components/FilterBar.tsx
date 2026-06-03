@@ -18,34 +18,32 @@ const ROC_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => {
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
   label: `${i + 1}月`, value: String(i + 1),
 }))
-
 const TYPE_OPTIONS = [
-  { label: '全部',   value: 'all' },
+  { label: '全部類型', value: 'all' },
   { label: '住宅大樓', value: '住宅大樓' },
-  { label: '透天厝', value: '透天厝' },
-  { label: '公寓',   value: '公寓' },
-  { label: '華廈',   value: '華廈' },
-  { label: '套房',   value: '套房' },
+  { label: '透天厝',   value: '透天厝' },
+  { label: '公寓',     value: '公寓' },
+  { label: '華廈',     value: '華廈' },
+  { label: '套房',     value: '套房' },
   { label: '辦公商業', value: '辦公' },
 ]
 const ROOMS_OPTIONS = [
-  { label: '全部',  value: 'all' },
-  { label: '0房',   value: '0' },
-  { label: '1房',   value: '1' },
-  { label: '2房',   value: '2' },
-  { label: '3房',   value: '3' },
-  { label: '4房',   value: '4' },
+  { label: '全部房型', value: 'all' },
+  { label: '0房',     value: '0' },
+  { label: '1房',     value: '1' },
+  { label: '2房',     value: '2' },
+  { label: '3房',     value: '3' },
+  { label: '4房',     value: '4' },
   { label: '5房以上', value: '5+' },
 ]
 const PRESALE_OPTIONS = [
-  { label: '全部',  value: 'all' },
-  { label: '成屋',  value: 'false' },
-  { label: '預售屋', value: 'true' },
+  { label: '成屋 + 預售', value: 'all' },
+  { label: '成屋',        value: 'false' },
+  { label: '預售屋',      value: 'true' },
 ]
-
 const BUILDING_AGE_OPTIONS = [
-  { label: '全部',    value: 'all' },
-  { label: '5年以內', value: '5' },
+  { label: '不限屋齡', value: 'all' },
+  { label: '5年以內',  value: '5' },
   { label: '10年以內', value: '10' },
   { label: '20年以內', value: '20' },
   { label: '30年以內', value: '30' },
@@ -66,26 +64,32 @@ export interface FilterValues {
 
 export const DEFAULT_FILTERS: FilterValues = {
   dateFromYear: '114', dateFromMonth: '1',
-  dateToYear: '115',   dateToMonth: '6',
+  dateToYear:   '115', dateToMonth:   '6',
   districts: [], type: 'all', rooms: 'all', presale: 'all', buildingAge: 'all',
 }
 
-/* ── Simple single-select ──────────────────────────────────── */
-function SimpleSelect({
+/* ── Styled select ─────────────────────────────────────────── */
+function StyledSelect({
   label, options, value, onChange,
 }: {
-  label: string
+  label?: string
   options: { label: string; value: string }[]
   value: string
   onChange: (v: string) => void
 }) {
   return (
     <div className="flex flex-col gap-1 min-w-0">
-      <span className="text-[11px] text-gray-400 whitespace-nowrap">{label}</span>
+      {label && <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{label}</span>}
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 cursor-pointer"
+        className="
+          bg-[#111827] border border-white/8 text-gray-200 rounded-lg
+          px-2.5 py-1.5 text-xs focus:outline-none focus:border-violet-500/50
+          cursor-pointer appearance-none pr-7 transition-colors
+          hover:border-white/15
+        "
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
       >
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
@@ -93,12 +97,10 @@ function SimpleSelect({
   )
 }
 
-/* ── Multi-select dropdown ─────────────────────────────────── */
-function MultiSelect({
-  label, options, selected, onChange,
+/* ── District multi-select ──────────────────────────────────── */
+function DistrictSelect({
+  selected, onChange,
 }: {
-  label: string
-  options: string[]
   selected: string[]
   onChange: (v: string[]) => void
 }) {
@@ -117,38 +119,49 @@ function MultiSelect({
     onChange(selected.includes(d) ? selected.filter(x => x !== d) : [...selected, d])
 
   const displayText =
-    selected.length === 0 || selected.length === options.length
-      ? '全部'
-      : `已選 ${selected.length} 區`
+    selected.length === 0 || selected.length === TAINAN_DISTRICTS.length
+      ? '全部行政區'
+      : `${selected.length} 個行政區`
 
   return (
     <div className="flex flex-col gap-1 relative" ref={ref}>
-      <span className="text-[11px] text-gray-400 whitespace-nowrap">{label}</span>
+      <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">行政區</span>
       <button
         onClick={() => setOpen(!open)}
-        className="bg-gray-800 border border-gray-700 text-white rounded px-2 py-1.5 text-sm flex items-center justify-between gap-2 min-w-[120px] focus:outline-none focus:border-blue-500"
+        className={`
+          bg-[#111827] border text-gray-200 rounded-lg
+          px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 min-w-[120px]
+          focus:outline-none cursor-pointer transition-all
+          ${open ? 'border-violet-500/50' : 'border-white/8 hover:border-white/15'}
+        `}
       >
-        <span>{displayText}</span>
-        <span className="text-gray-400 text-xs">▼</span>
+        <span className={selected.length > 0 && selected.length < TAINAN_DISTRICTS.length ? 'text-violet-300' : ''}>
+          {displayText}
+        </span>
+        <svg className={`w-2.5 h-2.5 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 10 6">
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
       </button>
 
       {open && (
-        <div className="absolute top-full mt-1 left-0 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-52 max-h-72 overflow-y-auto">
-          <div className="flex gap-3 px-3 py-2 border-b border-gray-700 sticky top-0 bg-gray-800">
-            <button onClick={() => onChange(options)} className="text-xs text-blue-400 hover:text-blue-300">全選</button>
-            <button onClick={() => onChange([])} className="text-xs text-gray-400 hover:text-gray-300">清除</button>
+        <div className="absolute top-full mt-1 left-0 z-50 bg-[#111827] border border-white/10 rounded-xl shadow-2xl shadow-black/50 w-56 max-h-72 overflow-y-auto">
+          <div className="flex gap-3 px-3 py-2 border-b border-white/5 sticky top-0 bg-[#111827]">
+            <button onClick={() => onChange(TAINAN_DISTRICTS)} className="text-xs text-violet-400 hover:text-violet-300 transition-colors">全選</button>
+            <button onClick={() => onChange([])} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">清除</button>
           </div>
-          {options.map(d => (
-            <label key={d} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-700 cursor-pointer text-sm text-white">
-              <input
-                type="checkbox"
-                checked={selected.includes(d)}
-                onChange={() => toggle(d)}
-                className="accent-blue-500"
-              />
-              {d}
-            </label>
-          ))}
+          <div className="p-1">
+            {TAINAN_DISTRICTS.map(d => (
+              <label key={d} className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-white/5 rounded-lg cursor-pointer text-xs text-gray-300 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(d)}
+                  onChange={() => toggle(d)}
+                  className="accent-violet-500 w-3 h-3"
+                />
+                {d}
+              </label>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -163,62 +176,77 @@ interface FilterBarProps {
 
 export default function FilterBar({ onApply, loading }: FilterBarProps) {
   const [f, setF] = useState<FilterValues>(DEFAULT_FILTERS)
-
   const set = <K extends keyof FilterValues>(key: K, val: FilterValues[K]) =>
     setF(prev => ({ ...prev, [key]: val }))
 
-  const handleClear = () => {
-    setF(DEFAULT_FILTERS)
-    onApply(DEFAULT_FILTERS)
-  }
+  const handleClear = () => { setF(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS) }
 
   return (
-    <div className="sticky top-14 z-20 bg-[#0d1117]/95 backdrop-blur border-b border-gray-800 px-6 py-3">
-      <div className="flex items-end gap-3 flex-wrap">
-        {/* 日期範圍：起 */}
+    <div className="sticky top-14 z-20 bg-[#080d16]/95 backdrop-blur-xl border-b border-white/5 px-5 py-3">
+      <div className="flex items-end gap-2.5 flex-wrap">
+
+        {/* Date range */}
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] text-gray-400 whitespace-nowrap">起始</span>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">起始</span>
           <div className="flex items-center gap-1">
-            <SimpleSelect label="" options={ROC_YEAR_OPTIONS} value={f.dateFromYear} onChange={v => set('dateFromYear', v)} />
-            <SimpleSelect label="" options={MONTH_OPTIONS}    value={f.dateFromMonth} onChange={v => set('dateFromMonth', v)} />
+            <StyledSelect options={ROC_YEAR_OPTIONS} value={f.dateFromYear} onChange={v => set('dateFromYear', v)} />
+            <StyledSelect options={MONTH_OPTIONS}    value={f.dateFromMonth} onChange={v => set('dateFromMonth', v)} />
           </div>
         </div>
-        {/* 日期範圍：迄 */}
+
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] text-gray-400 whitespace-nowrap">結束</span>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">結束</span>
           <div className="flex items-center gap-1">
-            <SimpleSelect label="" options={ROC_YEAR_OPTIONS} value={f.dateToYear} onChange={v => set('dateToYear', v)} />
-            <SimpleSelect label="" options={MONTH_OPTIONS}    value={f.dateToMonth} onChange={v => set('dateToMonth', v)} />
+            <StyledSelect options={ROC_YEAR_OPTIONS} value={f.dateToYear} onChange={v => set('dateToYear', v)} />
+            <StyledSelect options={MONTH_OPTIONS}    value={f.dateToMonth} onChange={v => set('dateToMonth', v)} />
           </div>
         </div>
-        <MultiSelect  label="行政區（可多選）" options={TAINAN_DISTRICTS} selected={f.districts} onChange={v => set('districts', v)} />
-        <SimpleSelect label="類型" options={TYPE_OPTIONS} value={f.type} onChange={v => set('type', v)} />
-        <SimpleSelect label="房型" options={ROOMS_OPTIONS} value={f.rooms} onChange={v => set('rooms', v)} />
-        <SimpleSelect
+
+        {/* Divider */}
+        <div className="h-8 w-px bg-white/5 self-end mb-0.5 hidden sm:block" />
+
+        <DistrictSelect selected={f.districts} onChange={v => set('districts', v)} />
+        <StyledSelect label="類型" options={TYPE_OPTIONS}   value={f.type}    onChange={v => set('type', v)} />
+        <StyledSelect label="房型" options={ROOMS_OPTIONS}  value={f.rooms}   onChange={v => set('rooms', v)} />
+        <StyledSelect
           label="成／預售"
           options={PRESALE_OPTIONS}
           value={f.presale}
           onChange={v => {
-            // 切離成屋時重置屋齡
             const reset = v !== 'false' ? { presale: v, buildingAge: 'all' } : { presale: v }
             setF(prev => ({ ...prev, ...reset }))
           }}
         />
         {f.presale === 'false' && (
-          <SimpleSelect label="屋齡" options={BUILDING_AGE_OPTIONS} value={f.buildingAge} onChange={v => set('buildingAge', v)} />
+          <StyledSelect label="屋齡" options={BUILDING_AGE_OPTIONS} value={f.buildingAge} onChange={v => set('buildingAge', v)} />
         )}
 
-        <div className="flex gap-2 pb-0.5 mt-auto">
+        {/* Divider */}
+        <div className="h-8 w-px bg-white/5 self-end mb-0.5 hidden sm:block" />
+
+        {/* Buttons */}
+        <div className="flex gap-2 self-end">
           <button
             onClick={() => onApply(f)}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded px-5 py-1.5 text-sm font-medium transition-colors"
+            className="
+              relative overflow-hidden px-4 py-1.5 rounded-lg text-xs font-semibold
+              bg-gradient-to-r from-violet-600 to-indigo-600
+              hover:from-violet-500 hover:to-indigo-500
+              disabled:opacity-50 text-white transition-all
+              shadow-lg shadow-violet-500/20
+            "
           >
-            {loading ? '載入中…' : '套用'}
+            {loading ? (
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 border border-white/40 border-t-white rounded-full animate-spin" />
+                載入中
+              </span>
+            ) : '套用篩選'}
           </button>
           <button
             onClick={handleClear}
-            className="bg-gray-700 hover:bg-gray-600 text-white rounded px-4 py-1.5 text-sm transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/5 transition-all"
           >
             清除
           </button>

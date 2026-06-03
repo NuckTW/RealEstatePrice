@@ -6,29 +6,106 @@ interface KpiData {
   total_sales?: number
 }
 
-function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="flex flex-col items-center px-5 py-3 border-r border-gray-700/60 last:border-0">
-      <span className="text-[11px] text-gray-400 mb-1 whitespace-nowrap">{label}</span>
-      <span className={`text-lg font-bold tracking-tight ${color}`}>{value}</span>
-    </div>
-  )
-}
+const CARDS = [
+  {
+    key: 'total' as const,
+    label: '成交戶數',
+    icon: '🏠',
+    format: (v: number) => `${v.toLocaleString()}`,
+    unit: '戶',
+    color: 'from-violet-500/10 to-violet-500/5',
+    border: 'border-violet-500/20',
+    accent: 'bg-violet-500',
+    text: 'text-violet-300',
+  },
+  {
+    key: 'avg_unit_price' as const,
+    label: '均單價',
+    icon: '📐',
+    format: (v: number) => `${v}`,
+    unit: '萬/坪',
+    color: 'from-cyan-500/10 to-cyan-500/5',
+    border: 'border-cyan-500/20',
+    accent: 'bg-cyan-500',
+    text: 'text-cyan-300',
+  },
+  {
+    key: 'avg_area' as const,
+    label: '均坪數',
+    icon: '📏',
+    format: (v: number) => `${v}`,
+    unit: '坪',
+    color: 'from-teal-500/10 to-teal-500/5',
+    border: 'border-teal-500/20',
+    accent: 'bg-teal-500',
+    text: 'text-teal-300',
+  },
+  {
+    key: 'avg_total' as const,
+    label: '均總價',
+    icon: '💰',
+    format: (v: number) => `${v.toLocaleString()}`,
+    unit: '萬',
+    color: 'from-amber-500/10 to-amber-500/5',
+    border: 'border-amber-500/20',
+    accent: 'bg-amber-500',
+    text: 'text-amber-300',
+  },
+  {
+    key: 'total_sales' as const,
+    label: '總銷售額',
+    icon: '📊',
+    format: (v: number) => `${v.toLocaleString()}`,
+    unit: '億',
+    color: 'from-emerald-500/10 to-emerald-500/5',
+    border: 'border-emerald-500/20',
+    accent: 'bg-emerald-500',
+    text: 'text-emerald-300',
+  },
+]
 
 export default function KpiBar({ data, dateRange }: { data: KpiData; dateRange: string }) {
   return (
-    <div className="flex items-center bg-gray-800/40 border-b border-gray-700/60 px-6 flex-wrap">
-      <div className="flex items-center py-3 pr-5 border-r border-gray-700/60 mr-2">
-        <span className="text-xs bg-blue-900/50 text-blue-300 border border-blue-700/50 rounded-full px-3 py-1 whitespace-nowrap">
+    <div className="px-5 py-4 space-y-3">
+      {/* Date badge */}
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs text-violet-300/80 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
           {dateRange}
         </span>
       </div>
-      <div className="flex flex-wrap">
-        <KpiCard label="總戶數"   value={`${(data.total ?? 0).toLocaleString()} 戶`} color="text-purple-400" />
-        <KpiCard label="均單價"   value={`${data.avg_unit_price ?? 0} 萬/坪`}        color="text-cyan-400" />
-        <KpiCard label="均坪數"   value={`${data.avg_area ?? 0} 坪`}                  color="text-teal-400" />
-        <KpiCard label="均總價"   value={`${(data.avg_total ?? 0).toLocaleString()} 萬`} color="text-amber-400" />
-        <KpiCard label="總銷"     value={`${data.total_sales ?? 0} 億`}               color="text-green-400" />
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {CARDS.map(card => {
+          const raw = data[card.key]
+          const value = raw != null ? raw : 0
+          return (
+            <div
+              key={card.key}
+              className={`
+                relative overflow-hidden rounded-xl border ${card.border}
+                bg-gradient-to-br ${card.color}
+                p-4 flex flex-col gap-2
+              `}
+            >
+              {/* Left accent bar */}
+              <div className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-r ${card.accent}`} />
+
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">{card.label}</span>
+                <span className="text-base opacity-60">{card.icon}</span>
+              </div>
+
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-2xl font-bold tracking-tight ${card.text}`}>
+                  {card.format(value)}
+                </span>
+                <span className="text-xs text-gray-500">{card.unit}</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
