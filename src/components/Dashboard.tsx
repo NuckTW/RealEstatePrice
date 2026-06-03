@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import FilterBar, { FilterValues, DEFAULT_FILTERS } from './FilterBar'
+import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
 import KpiBar from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
 
@@ -106,8 +106,10 @@ export default function Dashboard() {
       const p = new URLSearchParams({
         dateFromYear: f.dateFromYear, dateFromMonth: f.dateFromMonth,
         dateToYear:   f.dateToYear,   dateToMonth:   f.dateToMonth,
-        type: f.type, rooms: f.rooms, presale: f.presale, buildingAge: f.buildingAge,
+        presale: f.presale, buildingAge: f.buildingAge,
       })
+      if (f.types.length > 0)     p.set('types', f.types.join(','))
+      if (f.rooms.length > 0)     p.set('rooms', f.rooms.join(','))
       if (f.districts.length > 0) p.set('districts', f.districts.join(','))
       const res  = await fetch(`/api/charts?${p}`)
       const json = await res.json()
@@ -120,6 +122,12 @@ export default function Dashboard() {
   useEffect(() => { fetchData(DEFAULT_FILTERS) }, [fetchData])
 
   const handleApply = (f: FilterValues) => { setFilters(f); fetchData(f) }
+
+  // 標籤刪除 → 立即套用
+  const handleTagRemove = (updated: FilterValues) => {
+    setFilters(updated)
+    fetchData(updated)
+  }
 
   const dateRange = `${filters.dateFromYear}年${filters.dateFromMonth}月 ～ ${filters.dateToYear}年${filters.dateToMonth}月`
 
@@ -140,6 +148,11 @@ export default function Dashboard() {
 
       {data && (
         <div className="pb-10">
+            {/* Active filter tags */}
+          <div className="px-5 pt-3">
+            <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
+          </div>
+
           {/* KPI */}
           <KpiBar data={data.kpi} dateRange={dateRange} />
 

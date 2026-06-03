@@ -29,15 +29,24 @@ function buildWhere(params: URLSearchParams): string {
     conds.push(`district IN (${list})`)
   }
 
-  const type = params.get('type') ?? ''
-  if (type && type !== 'all') {
-    conds.push(`TRIM(building_type) LIKE '${type.replace(/'/g, "''")}%'`)
+  // 類型（多選，逗號分隔）
+  const types = (params.get('types') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  if (types.length > 0) {
+    const typeConds = types.map(t => {
+      const safe = t.replace(/'/g, "''")
+      return `TRIM(building_type) LIKE '${safe}%'`
+    })
+    conds.push(`(${typeConds.join(' OR ')})`)
   }
 
-  const rooms = params.get('rooms') ?? ''
-  if (rooms && rooms !== 'all') {
-    if (rooms === '5+') conds.push('rooms >= 5')
-    else conds.push(`COALESCE(rooms, 0) = ${parseInt(rooms)}`)
+  // 房型（多選，逗號分隔）
+  const rooms = (params.get('rooms') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  if (rooms.length > 0) {
+    const roomConds = rooms.map(r => {
+      if (r === '5+') return 'rooms >= 5'
+      return `COALESCE(rooms, 0) = ${parseInt(r)}`
+    })
+    conds.push(`(${roomConds.join(' OR ')})`)
   }
 
   const presale = params.get('presale') ?? 'all'
