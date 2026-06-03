@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from fetch_history import (
     make_session, process_season, process_df_auto_season, log_scrape,
 )
+from fetch_buildcase import main as update_buildcase
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 SUPABASE_URL = os.environ['NEXT_PUBLIC_SUPABASE_URL']
@@ -188,6 +189,10 @@ def main():
     else:
         ins, skip = process_dfs(dfs, 'current')
         print(f'  寫入 {ins} 筆，跳過 {skip} 筆')
+
+    # ── 4. 更新備查建案核准戶數 ────────────────────────────────
+    print('\n[4/4] 備查建案（核准總戶數）')
+    update_buildcase()
 
     print('\n✅ 月度更新完成！')
 
