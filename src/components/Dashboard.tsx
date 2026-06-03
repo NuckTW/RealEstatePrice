@@ -50,9 +50,11 @@ const ROOMS_COLS: ColDef[] = [
 const CASES_COLS: ColDef[] = [
   { key: 'district',    label: '行政區',      align: 'left' },
   { key: 'name',        label: '建案名稱',    align: 'left' },
-  { key: 'total_count', label: '總戶數',      barColor: '#6366f1', minWidth: 64 },
+  { key: 'total_count', label: '總戶數',      align: 'right',
+    format: v => (v == null || v === '') ? 'x' : Number(v).toLocaleString() },
   { key: 'count',       label: '銷售戶數',    barColor: '#8b5cf6', minWidth: 72 },
-  { key: 'sales_ratio', label: '銷售成數',    barColor: '#a78bfa', format: v => `${v ?? 0}%`, minWidth: 72 },
+  { key: 'sales_ratio', label: '銷售成數',    barColor: '#a78bfa',
+    format: v => (v == null || v === '') ? 'x' : `${v}%`, minWidth: 72 },
   { key: 'unit_price',  label: '單價(萬/坪)', barColor: '#06b6d4', minWidth: 72 },
   { key: 'area',        label: '坪數',        barColor: '#14b8a6', minWidth: 64 },
   { key: 'avg_total',   label: '均總價(萬)',  barColor: '#f59e0b', minWidth: 80 },

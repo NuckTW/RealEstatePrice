@@ -137,8 +137,11 @@ export async function GET(req: NextRequest) {
           f.district,
           f.name,
           f.count,
-          COALESCE(p.total_units, f.count)                               AS total_count,
-          ROUND(f.count::numeric / NULLIF(COALESCE(p.total_units, f.count), 0) * 100)::int AS sales_ratio,
+          p.total_units                                                  AS total_count,
+          CASE WHEN p.total_units IS NOT NULL
+            THEN ROUND(f.count::numeric / NULLIF(p.total_units, 0) * 100)::int
+            ELSE NULL
+          END                                                            AS sales_ratio,
           f.unit_price,
           f.area,
           f.avg_total,
