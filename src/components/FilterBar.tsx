@@ -340,12 +340,13 @@ export default function FilterBar({ onApply, loading }: FilterBarProps) {
           options={PRESALE_OPTIONS}
           value={f.presale}
           onChange={v => {
-            const reset = v !== 'false' ? { presale: v, buildingAge: 'all' } : { presale: v }
+            // 只在切到「純預售屋」時才重置屋齡
+            const reset = v === 'true' ? { presale: v, buildingAge: 'all' } : { presale: v }
             setF(prev => ({ ...prev, ...reset }))
           }}
         />
 
-        {f.presale === 'false' && (
+        {f.presale !== 'true' && (
           <StyledSelect label="屋齡" options={BUILDING_AGE_OPTIONS} value={f.buildingAge} onChange={v => set('buildingAge', v)} />
         )}
 

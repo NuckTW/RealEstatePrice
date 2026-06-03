@@ -54,16 +54,20 @@ function buildWhere(params: URLSearchParams): string {
   else if (presale === 'false') conds.push('is_presale = false')
 
   const buildingAge = params.get('buildingAge') ?? 'all'
-  if (buildingAge !== 'all' && presale === 'false') {
+  if (buildingAge !== 'all' && presale !== 'true') {
     // completion_date 格式為 7碼民國日期，如 "1100315" = 民國110年03月15日
-    // 取前3碼為民國年，+1911 = 西元年
     const ageExpr = `(EXTRACT(YEAR FROM transaction_date) - (CAST(LEFT(completion_date, 3) AS INT) + 1911))`
     const ageFilter = `completion_date IS NOT NULL AND LENGTH(completion_date) >= 3 AND ${ageExpr} >= 0`
-    if (buildingAge === '30+') {
-      conds.push(`${ageFilter} AND ${ageExpr} > 30`)
+    const ageCond = buildingAge === '30+'
+      ? `${ageFilter} AND ${ageExpr} > 30`
+      : `${ageFilter} AND ${ageExpr} <= ${parseInt(buildingAge)}`
+
+    if (presale === 'all') {
+      // 成屋+預售屋：預售屋全部通過，成屋才套用屋齡篩選
+      conds.push(`(is_presale = true OR (${ageCond}))`)
     } else {
-      const maxAge = parseInt(buildingAge)
-      conds.push(`${ageFilter} AND ${ageExpr} <= ${maxAge}`)
+      // 純成屋：直接套用
+      conds.push(ageCond)
     }
   }
 
