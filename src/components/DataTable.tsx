@@ -18,6 +18,7 @@ interface DataTableProps {
   data: Record<string, unknown>[]
   pageSize?: number
   extra?: ReactNode
+  onRowClick?: (row: Record<string, unknown>) => void
 }
 
 /* ── Bar cell ─────────────────────────────────────────────── */
@@ -72,7 +73,7 @@ function PlainCell({ col, value }: { col: ColDef; value: unknown }) {
 
 /* ── DataTable ─────────────────────────────────────────────── */
 export default function DataTable({
-  title, columns, data, pageSize = 7, extra,
+  title, columns, data, pageSize = 7, extra, onRowClick,
 }: DataTableProps) {
   const [page, setPage] = useState(1)
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize))
@@ -150,7 +151,8 @@ export default function DataTable({
               pageData.map((row, i) => (
                 <tr
                   key={i}
-                  className="border-b border-white/[0.03] hover:bg-white/[0.03] transition-colors"
+                  onClick={() => onRowClick?.(row)}
+                  className={`border-b border-white/[0.03] transition-colors ${onRowClick ? 'cursor-pointer hover:bg-violet-500/[0.06]' : 'hover:bg-white/[0.03]'}`}
                 >
                   {columns.map(col =>
                     col.barColor ? (

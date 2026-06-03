@@ -138,7 +138,7 @@ export async function GET(req: NextRequest) {
 
       runQuery(`
         SELECT case_type, district, name, count,
-               total_count, sales_ratio,
+               total_count, sales_ratio, common_ratio,
                unit_price, area, avg_total, sales, min_price, max_price
         FROM (
           -- 預售屋建案
@@ -149,6 +149,7 @@ export async function GET(req: NextRequest) {
             CASE WHEN p.total_units IS NOT NULL
               THEN ROUND(f.count::numeric / NULLIF(p.total_units,0)*100)::int
               ELSE NULL END AS sales_ratio,
+            f.common_ratio,
             f.unit_price, f.area, f.avg_total, f.sales, f.min_price, f.max_price
           FROM (
             SELECT district, project_name AS name, COUNT(*)::int AS count,
@@ -157,7 +158,8 @@ export async function GET(req: NextRequest) {
               ROUND(AVG(total_price)/10000)::int                        AS avg_total,
               ROUND(SUM(total_price)/100000000)::int                    AS sales,
               ROUND(MIN(total_price)/10000)::int                        AS min_price,
-              ROUND(MAX(total_price)/10000)::int                        AS max_price
+              ROUND(MAX(total_price)/10000)::int                        AS max_price,
+              NULL::numeric                                              AS common_ratio
             FROM transactions
             WHERE ${where} AND is_presale = true
               AND project_name IS NOT NULL AND project_name != ''
@@ -176,6 +178,16 @@ export async function GET(req: NextRequest) {
             COUNT(*)::int AS count,
             NULL::int AS total_count,
             NULL::int AS sales_ratio,
+            ROUND(AVG(
+              CASE WHEN main_building_area_sqm > 0
+                    AND building_area_sqm > main_building_area_sqm
+                THEN (building_area_sqm
+                      - main_building_area_sqm
+                      - COALESCE(auxiliary_building_area,0)
+                      - COALESCE(balcony_area_sqm,0))
+                     / NULLIF(building_area_sqm,0) * 100
+                ELSE NULL END
+            )::numeric, 1)                                              AS common_ratio,
             ROUND((AVG(unit_price_sqm)*3.3058/10000)::numeric,1)      AS unit_price,
             ROUND((AVG(NULLIF(building_area_sqm,0))*0.3025)::numeric,1) AS area,
             ROUND(AVG(total_price)/10000)::int                        AS avg_total,

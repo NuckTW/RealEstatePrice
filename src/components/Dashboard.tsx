@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
 import KpiBar from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
+import CaseDetailPanel from './CaseDetailPanel'
 
 /* ── Column definitions ────────────────────────────────────── */
 const DIST_COLS: ColDef[] = [
@@ -64,6 +65,8 @@ function getCasesCols(presale: string): ColDef[] {
     { key: 'count',       label: '銷售戶數',    barColor: '#8b5cf6', minWidth: 72 },
     { key: 'sales_ratio', label: '銷售成數',    barColor: '#a78bfa',
       format: v => (v == null || v === '') ? 'x' : `${v}%`, minWidth: 72 },
+    { key: 'common_ratio', label: '公設比', align: 'right',
+      format: v => (v == null || v === '') ? '—' : `${v}%` },
     { key: 'unit_price',  label: '單價(萬/坪)', barColor: '#06b6d4', minWidth: 72 },
     { key: 'area',        label: '坪數',        barColor: '#14b8a6', minWidth: 64 },
     { key: 'avg_total',   label: '均總價(萬)',  barColor: '#f59e0b', minWidth: 80 },
@@ -115,6 +118,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS)
 
+  // Case detail panel state
+  const [panelOpen, setPanelOpen]         = useState(false)
+  const [panelCase, setPanelCase]         = useState<{ name: string; district: string; caseType: 'presale' | 'existing' } | null>(null)
+
   const fetchData = useCallback(async (f: FilterValues) => {
     setLoading(true)
     try {
@@ -144,11 +151,38 @@ export default function Dashboard() {
     fetchData(updated)
   }
 
+  // 點擊個案列 → 開啟詳情面板
+  const handleCaseClick = (row: Record<string, unknown>) => {
+    const rawType = String(row.case_type ?? '')
+    // 純預售模式下 case_type 欄不存在，用 filters.presale 判斷
+    const caseType: 'presale' | 'existing' =
+      rawType === '預售' ? 'presale' :
+      rawType === '成屋' ? 'existing' :
+      filters.presale === 'true' ? 'presale' : 'existing'
+
+    setPanelCase({
+      name:     String(row.name     ?? ''),
+      district: String(row.district ?? ''),
+      caseType,
+    })
+    setPanelOpen(true)
+  }
+
   const dateRange = `${filters.dateFromYear}年${filters.dateFromMonth}月 ～ ${filters.dateToYear}年${filters.dateToMonth}月`
 
   return (
     <div className="min-h-screen bg-[#080d16]">
       <FilterBar onApply={handleApply} loading={loading} />
+
+      {/* Case detail panel */}
+      <CaseDetailPanel
+        open={panelOpen}
+        caseName={panelCase?.name ?? ''}
+        caseType={panelCase?.caseType ?? 'presale'}
+        district={panelCase?.district ?? ''}
+        filters={filters}
+        onClose={() => setPanelOpen(false)}
+      />
 
       {/* Loading state */}
       {loading && !data && <Skeleton />}
@@ -194,6 +228,7 @@ export default function Dashboard() {
               columns={getCasesCols(filters.presale)}
               data={data.cases}
               pageSize={10}
+              onRowClick={handleCaseClick}
             />
           </div>
         </div>
