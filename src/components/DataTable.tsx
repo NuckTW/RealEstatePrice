@@ -9,6 +9,7 @@ export interface ColDef {
   format?: (v: unknown) => string
   align?: 'left' | 'right' | 'center'
   minWidth?: number
+  valueColors?: Record<string, string>  // value → tailwind bg+text classes
 }
 
 interface DataTableProps {
@@ -57,9 +58,14 @@ function PlainCell({ col, value }: { col: ColDef; value: unknown }) {
   const align =
     col.align === 'left' ? 'text-left' :
     col.align === 'center' ? 'text-center' : 'text-right'
+  const badgeClass = col.valueColors?.[display]
   return (
     <td className={`px-3 py-2.5 text-xs text-gray-300 whitespace-nowrap ${align}`}>
-      {display}
+      {badgeClass ? (
+        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeClass}`}>
+          {display}
+        </span>
+      ) : display}
     </td>
   )
 }

@@ -47,21 +47,32 @@ const ROOMS_COLS: ColDef[] = [
   { key: 'max_price',  label: '最高(萬)',    barColor: '#ef4444', minWidth: 72 },
 ]
 
-const CASES_COLS: ColDef[] = [
-  { key: 'district',    label: '行政區',      align: 'left' },
-  { key: 'name',        label: '建案名稱',    align: 'left' },
-  { key: 'total_count', label: '總戶數',      align: 'right',
-    format: v => (v == null || v === '') ? 'x' : Number(v).toLocaleString() },
-  { key: 'count',       label: '銷售戶數',    barColor: '#8b5cf6', minWidth: 72 },
-  { key: 'sales_ratio', label: '銷售成數',    barColor: '#a78bfa',
-    format: v => (v == null || v === '') ? 'x' : `${v}%`, minWidth: 72 },
-  { key: 'unit_price',  label: '單價(萬/坪)', barColor: '#06b6d4', minWidth: 72 },
-  { key: 'area',        label: '坪數',        barColor: '#14b8a6', minWidth: 64 },
-  { key: 'avg_total',   label: '均總價(萬)',  barColor: '#f59e0b', minWidth: 80 },
-  { key: 'sales',       label: '總銷(億)',    barColor: '#10b981', minWidth: 64 },
-  { key: 'min_price',   label: '最低(萬)',    barColor: '#3b82f6', minWidth: 72 },
-  { key: 'max_price',   label: '最高(萬)',    barColor: '#ef4444', minWidth: 72 },
-]
+function getCasesCols(presale: string): ColDef[] {
+  const showType = presale === 'all'
+  const cols: ColDef[] = [
+    ...(showType ? [{
+      key: 'case_type', label: '類型', align: 'left' as const,
+      valueColors: {
+        '預售': 'bg-violet-500/20 text-violet-300',
+        '成屋': 'bg-teal-500/20 text-teal-300',
+      }
+    }] : []),
+    { key: 'district',    label: '行政區',      align: 'left' },
+    { key: 'name',        label: showType ? '建案／地址' : (presale === 'true' ? '建案名稱' : '地址'), align: 'left' },
+    { key: 'total_count', label: '總戶數',      align: 'right',
+      format: v => (v == null || v === '') ? 'x' : Number(v).toLocaleString() },
+    { key: 'count',       label: '銷售戶數',    barColor: '#8b5cf6', minWidth: 72 },
+    { key: 'sales_ratio', label: '銷售成數',    barColor: '#a78bfa',
+      format: v => (v == null || v === '') ? 'x' : `${v}%`, minWidth: 72 },
+    { key: 'unit_price',  label: '單價(萬/坪)', barColor: '#06b6d4', minWidth: 72 },
+    { key: 'area',        label: '坪數',        barColor: '#14b8a6', minWidth: 64 },
+    { key: 'avg_total',   label: '均總價(萬)',  barColor: '#f59e0b', minWidth: 80 },
+    { key: 'sales',       label: '總銷(億)',    barColor: '#10b981', minWidth: 64 },
+    { key: 'min_price',   label: '最低(萬)',    barColor: '#3b82f6', minWidth: 72 },
+    { key: 'max_price',   label: '最高(萬)',    barColor: '#ef4444', minWidth: 72 },
+  ]
+  return cols
+}
 
 /* ── Types ─────────────────────────────────────────────────── */
 interface ChartData {
@@ -175,8 +186,12 @@ export default function Dashboard() {
 
             {/* Row 3: Cases */}
             <DataTable
-              title="個案統計（預售屋）"
-              columns={CASES_COLS}
+              title={
+                filters.presale === 'true' ? '個案統計（預售屋）' :
+                filters.presale === 'false' ? '個案統計（成屋）' :
+                '個案統計（成屋 ＋ 預售屋）'
+              }
+              columns={getCasesCols(filters.presale)}
               data={data.cases}
               pageSize={10}
             />
