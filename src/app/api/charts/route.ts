@@ -1,77 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { buildWhere } from '@/lib/queryBuilder'
 
 async function runQuery(sql: string) {
   const { data, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql.trim() })
   if (error) throw error
   return (data as Record<string, unknown>[]) ?? []
-}
-
-function buildWhere(params: URLSearchParams): string {
-  const conds: string[] = ['unit_price_sqm > 0', 'total_price > 0']
-
-  const fromYear  = parseInt(params.get('dateFromYear')  ?? '110') + 1911
-  const fromMonth = parseInt(params.get('dateFromMonth') ?? '1')
-  const toYear    = parseInt(params.get('dateToYear')    ?? '115') + 1911
-  const toMonth   = parseInt(params.get('dateToMonth')   ?? '12')
-
-  const fromDate = `${fromYear}-${String(fromMonth).padStart(2,'0')}-01`
-  // 結束月的下一月第一天，以 < 做篩選（含當月全部）
-  const nextMonth = toMonth === 12 ? 1 : toMonth + 1
-  const nextYear  = toMonth === 12 ? toYear + 1 : toYear
-  const toDateExcl = `${nextYear}-${String(nextMonth).padStart(2,'0')}-01`
-
-  conds.push(`transaction_date >= '${fromDate}' AND transaction_date < '${toDateExcl}'`)
-
-  const districts = (params.get('districts') ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  if (districts.length > 0) {
-    const list = districts.map(d => `'${d.replace(/'/g, "''")}'`).join(',')
-    conds.push(`district IN (${list})`)
-  }
-
-  // 類型（多選，逗號分隔）
-  const types = (params.get('types') ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  if (types.length > 0) {
-    const typeConds = types.map(t => {
-      const safe = t.replace(/'/g, "''")
-      return `TRIM(building_type) LIKE '${safe}%'`
-    })
-    conds.push(`(${typeConds.join(' OR ')})`)
-  }
-
-  // 房型（多選，逗號分隔）
-  const rooms = (params.get('rooms') ?? '').split(',').map(s => s.trim()).filter(Boolean)
-  if (rooms.length > 0) {
-    const roomConds = rooms.map(r => {
-      if (r === '5+') return 'rooms >= 5'
-      return `COALESCE(rooms, 0) = ${parseInt(r)}`
-    })
-    conds.push(`(${roomConds.join(' OR ')})`)
-  }
-
-  const presale = params.get('presale') ?? 'all'
-  if (presale === 'true') conds.push('is_presale = true')
-  else if (presale === 'false') conds.push('is_presale = false')
-
-  const buildingAge = params.get('buildingAge') ?? 'all'
-  if (buildingAge !== 'all' && presale !== 'true') {
-    // completion_date 格式為 7碼民國日期，如 "1100315" = 民國110年03月15日
-    const ageExpr = `(EXTRACT(YEAR FROM transaction_date) - (CAST(LEFT(completion_date, 3) AS INT) + 1911))`
-    const ageFilter = `completion_date IS NOT NULL AND LENGTH(completion_date) >= 3 AND ${ageExpr} >= 0`
-    const ageCond = buildingAge === '30+'
-      ? `${ageFilter} AND ${ageExpr} > 30`
-      : `${ageFilter} AND ${ageExpr} <= ${parseInt(buildingAge)}`
-
-    if (presale === 'all') {
-      // 成屋+預售屋：預售屋全部通過，成屋才套用屋齡篩選
-      conds.push(`(is_presale = true OR (${ageCond}))`)
-    } else {
-      // 純成屋：直接套用
-      conds.push(ageCond)
-    }
-  }
-
-  return conds.join(' AND ')
 }
 
 type Row = Record<string, unknown>

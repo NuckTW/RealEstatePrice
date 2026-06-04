@@ -21,7 +21,7 @@ export default function Navbar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/5 bg-[#080d16]/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-[2100] border-b border-white/5 bg-[#080d16]/90 backdrop-blur-xl">
       <div className="px-6 h-14 flex items-center justify-between">
 
         {/* Brand */}

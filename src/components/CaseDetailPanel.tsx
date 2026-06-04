@@ -68,14 +68,14 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[3000] bg-black/40 backdrop-blur-[2px] transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
       {/* Panel */}
       <div
         className={`
-          fixed top-0 right-0 z-50 h-full w-full max-w-2xl
+          fixed top-0 right-0 z-[3100] h-full w-full max-w-2xl
           bg-[#0d1420] border-l border-white/8 shadow-2xl
           flex flex-col
           transition-transform duration-300 ease-out

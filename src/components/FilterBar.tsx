@@ -295,7 +295,7 @@ export default function FilterBar({ onApply, loading }: FilterBarProps) {
   const handleClear = () => { setF(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS) }
 
   return (
-    <div className="sticky top-14 z-20 bg-[#080d16]/95 backdrop-blur-xl border-b border-white/5 px-5 py-3">
+    <div className="sticky top-14 z-[2000] bg-[#080d16]/95 backdrop-blur-xl border-b border-white/5 px-5 py-3">
       <div className="flex items-end gap-2.5 flex-wrap">
 
         {/* Date range */}

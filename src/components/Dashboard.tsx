@@ -1,10 +1,18 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
 import KpiBar from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
 import CaseDetailPanel from './CaseDetailPanel'
+
+// 動態 import 避免 SSR（Leaflet 需要 window）
+const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => (
+  <div className="w-full rounded-2xl bg-[#0d1420] border border-white/6 flex items-center justify-center" style={{height: 'calc(100vh - 140px)'}}>
+    <span className="text-gray-600 text-sm">地圖載入中…</span>
+  </div>
+) })
 
 /* ── Column definitions ────────────────────────────────────── */
 const DIST_COLS: ColDef[] = [
@@ -117,6 +125,7 @@ export default function Dashboard() {
   const [data, setData]       = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS)
+  const [activeTab, setActiveTab] = useState<'data' | 'map'>('data')
 
   // Case detail panel state
   const [panelOpen, setPanelOpen]         = useState(false)
@@ -174,6 +183,23 @@ export default function Dashboard() {
     <div className="min-h-screen bg-[#080d16]">
       <FilterBar onApply={handleApply} loading={loading} />
 
+      {/* Tab 切換 */}
+      <div className="px-5 pt-3 flex items-center gap-2">
+        {(['data','map'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+              activeTab === tab
+                ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {tab === 'data' ? '📊 數據看板' : '🗺️ 地圖'}
+          </button>
+        ))}
+      </div>
+
       {/* Case detail panel */}
       <CaseDetailPanel
         open={panelOpen}
@@ -184,54 +210,75 @@ export default function Dashboard() {
         onClose={() => setPanelOpen(false)}
       />
 
-      {/* Loading state */}
-      {loading && !data && <Skeleton />}
-
-      {/* Refetch overlay */}
-      {loading && data && (
-        <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-[#111827] border border-white/10 rounded-full px-4 py-2 shadow-2xl text-xs text-gray-300">
-          <span className="w-3 h-3 border border-gray-500 border-t-violet-400 rounded-full animate-spin" />
-          更新中…
+      {/* ── 地圖 tab ── */}
+      {activeTab === 'map' && (
+        <div className="px-5 pt-3 pb-6">
+          <div className="px-0 pt-1 pb-2">
+            <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
+          </div>
+          <MapView
+            filters={filters}
+            onCaseClick={(name, caseType, district) => {
+              setPanelCase({ name, caseType, district })
+              setPanelOpen(true)
+            }}
+          />
         </div>
       )}
 
-      {data && (
-        <div className="pb-10">
-            {/* Active filter tags */}
-          <div className="px-5 pt-3">
-            <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
-          </div>
+      {/* ── 數據 tab ── */}
+      {activeTab === 'data' && (
+        <>
+          {/* Loading state */}
+          {loading && !data && <Skeleton />}
 
-          {/* KPI */}
-          <KpiBar data={data.kpi} dateRange={dateRange} />
-
-          {/* Divider */}
-          <div className="mx-5 h-px bg-white/4 mb-4" />
-
-          <div className="px-5 space-y-4">
-            {/* Row 1: Districts + Types */}
-            <div className="grid grid-cols-1 xl:grid-cols-[3fr_1.6fr] gap-4">
-              <DataTable title="行政區排行" columns={DIST_COLS}  data={data.districts} pageSize={8} />
-              <DataTable title="類型統計"   columns={TYPE_COLS}  data={data.types}     pageSize={8} />
+          {/* Refetch overlay */}
+          {loading && data && (
+            <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-[#111827] border border-white/10 rounded-full px-4 py-2 shadow-2xl text-xs text-gray-300">
+              <span className="w-3 h-3 border border-gray-500 border-t-violet-400 rounded-full animate-spin" />
+              更新中…
             </div>
+          )}
 
-            {/* Row 2: Rooms */}
-            <DataTable title="房型統計" columns={ROOMS_COLS} data={data.rooms} pageSize={10} />
+          {data && (
+            <div className="pb-10">
+              {/* Active filter tags */}
+              <div className="px-5 pt-3">
+                <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
+              </div>
 
-            {/* Row 3: Cases */}
-            <DataTable
-              title={
-                filters.presale === 'true' ? '個案統計（預售屋）' :
-                filters.presale === 'false' ? '個案統計（成屋）' :
-                '個案統計（成屋 ＋ 預售屋）'
-              }
-              columns={getCasesCols(filters.presale)}
-              data={data.cases}
-              pageSize={10}
-              onRowClick={handleCaseClick}
-            />
-          </div>
-        </div>
+              {/* KPI */}
+              <KpiBar data={data.kpi} dateRange={dateRange} />
+
+              {/* Divider */}
+              <div className="mx-5 h-px bg-white/4 mb-4" />
+
+              <div className="px-5 space-y-4">
+                {/* Row 1: Districts + Types */}
+                <div className="grid grid-cols-1 xl:grid-cols-[3fr_1.6fr] gap-4">
+                  <DataTable title="行政區排行" columns={DIST_COLS}  data={data.districts} pageSize={8} />
+                  <DataTable title="類型統計"   columns={TYPE_COLS}  data={data.types}     pageSize={8} />
+                </div>
+
+                {/* Row 2: Rooms */}
+                <DataTable title="房型統計" columns={ROOMS_COLS} data={data.rooms} pageSize={10} />
+
+                {/* Row 3: Cases */}
+                <DataTable
+                  title={
+                    filters.presale === 'true' ? '個案統計（預售屋）' :
+                    filters.presale === 'false' ? '個案統計（成屋）' :
+                    '個案統計（成屋 ＋ 預售屋）'
+                  }
+                  columns={getCasesCols(filters.presale)}
+                  data={data.cases}
+                  pageSize={10}
+                  onRowClick={handleCaseClick}
+                />
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
