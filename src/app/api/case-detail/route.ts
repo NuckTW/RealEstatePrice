@@ -43,17 +43,17 @@ export async function GET(req: NextRequest) {
         END                                                              AS parking_price`
 
   if (caseType === 'presale') {
+    // 預售屋：建案只要在篩選範圍內有銷售記錄就顯示全部交易（不限日期）
+    // 因為預售銷售期可能跨越使用者設定的範圍，顯示完整建案資料較有意義
     sql = `
       SELECT ${selectCols}
       FROM transactions
       WHERE district = '${safeDistrict}'
         AND project_name = '${safeName}'
         AND is_presale = true
-        AND transaction_date >= '${fromDate}'
-        AND transaction_date < '${toDateExcl}'
         AND unit_price_sqm > 0
       ORDER BY transaction_date DESC
-      LIMIT 200
+      LIMIT 500
     `
   } else {
     sql = `

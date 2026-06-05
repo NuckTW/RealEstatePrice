@@ -97,7 +97,10 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
             </div>
             <h2 className="text-base font-semibold text-white leading-tight">{caseName}</h2>
             {!loading && rows.length > 0 && (
-              <p className="text-[11px] text-gray-500 mt-0.5">共 {rows.length} 筆交易紀錄</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">
+                共 {rows.length} 筆交易紀錄
+                {caseType === 'presale' && <span className="text-gray-600 ml-1">（完整銷售期）</span>}
+              </p>
             )}
           </div>
           <button
