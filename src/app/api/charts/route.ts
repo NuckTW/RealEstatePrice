@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
   try {
     const where = buildWhere(req.nextUrl.searchParams)
 
+    // 預售屋：不含日期的篩選條件（用於統計完整銷售期資料）
+    const whereNoDate = buildWhere(req.nextUrl.searchParams, '', true)
+
     const [kpiRows, distRows, typeRows, roomRows, caseRows] = await Promise.all([
 
       runQuery(`
@@ -86,17 +89,26 @@ export async function GET(req: NextRequest) {
             f.common_ratio,
             f.unit_price, f.area, f.avg_total, f.sales, f.min_price, f.max_price
           FROM (
+            -- 統計在日期範圍內有交易的建案的「完整」銷售資料（不限日期）
             SELECT district, project_name AS name, COUNT(*)::int AS count,
-              ROUND((AVG(unit_price_sqm)*3.3058/10000)::numeric,1)      AS unit_price,
+              ROUND((AVG(unit_price_sqm)*3.3058/10000)::numeric,1)        AS unit_price,
               ROUND((AVG(NULLIF(building_area_sqm,0))*0.3025)::numeric,1) AS area,
-              ROUND(AVG(total_price)/10000)::int                        AS avg_total,
-              ROUND(SUM(total_price)/100000000)::int                    AS sales,
-              ROUND(MIN(total_price)/10000)::int                        AS min_price,
-              ROUND(MAX(total_price)/10000)::int                        AS max_price,
-              NULL::numeric                                              AS common_ratio
+              ROUND(AVG(total_price)/10000)::int                          AS avg_total,
+              ROUND(SUM(total_price)/100000000)::int                      AS sales,
+              ROUND(MIN(total_price)/10000)::int                          AS min_price,
+              ROUND(MAX(total_price)/10000)::int                          AS max_price,
+              NULL::numeric                                                AS common_ratio
             FROM transactions
-            WHERE ${where} AND is_presale = true
+            WHERE is_presale = true
               AND project_name IS NOT NULL AND project_name != ''
+              AND (${whereNoDate})
+              AND project_name IN (
+                -- 只取日期範圍內有銷售的建案
+                SELECT DISTINCT project_name
+                FROM transactions
+                WHERE ${where} AND is_presale = true
+                  AND project_name IS NOT NULL AND project_name != ''
+              )
             GROUP BY district, project_name
           ) f
           LEFT JOIN presale_projects p ON f.name = p.project_name

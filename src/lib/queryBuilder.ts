@@ -5,7 +5,7 @@
  * @param params      URL search params
  * @param tableAlias  有 JOIN 時需傳入 transactions 的 alias（如 't'），避免欄位名稱衝突
  */
-export function buildWhere(params: URLSearchParams, tableAlias = ''): string {
+export function buildWhere(params: URLSearchParams, tableAlias = '', skipDate = false): string {
   const p = tableAlias ? `${tableAlias}.` : ''
   const conds: string[] = [`${p}unit_price_sqm > 0`, `${p}total_price > 0`]
 
@@ -19,7 +19,9 @@ export function buildWhere(params: URLSearchParams, tableAlias = ''): string {
   const nextYear   = toMonth === 12 ? toYear + 1 : toYear
   const toDateExcl = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
 
-  conds.push(`${p}transaction_date >= '${fromDate}' AND ${p}transaction_date < '${toDateExcl}'`)
+  if (!skipDate) {
+    conds.push(`${p}transaction_date >= '${fromDate}' AND ${p}transaction_date < '${toDateExcl}'`)
+  }
 
   const districts = (params.get('districts') ?? '').split(',').map(s => s.trim()).filter(Boolean)
   if (districts.length > 0) {
