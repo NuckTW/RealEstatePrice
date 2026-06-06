@@ -149,6 +149,7 @@ def parse_row(row: pd.Series, season: str, is_presale: bool = False) -> dict:
         'unit_price_sqm':          safe_float(get('單價元平方公尺')),
         'notes':                   get('備註'),
         'project_name':            get('建案名稱') if is_presale else None,
+        'unit_number':             get('棟及號') if is_presale else None,
     }
 
 

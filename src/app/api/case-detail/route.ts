@@ -40,7 +40,19 @@ export async function GET(req: NextRequest) {
           WHEN parking_type IS NULL OR parking_type = '' THEN 'x'
           WHEN COALESCE(parking_price, 0) = 0             THEN '含'
           ELSE ROUND(parking_price / 10000)::int::text
-        END                                                              AS parking_price`
+        END                                                              AS parking_price,
+        unit_number,
+        building_type,
+        main_material,
+        ROUND((NULLIF(main_building_area_sqm,0) * 0.3025)::numeric, 1)  AS main_area,
+        ROUND((NULLIF(auxiliary_building_area,0) * 0.3025)::numeric, 1) AS aux_area,
+        ROUND((NULLIF(balcony_area_sqm,0) * 0.3025)::numeric, 1)        AS balcony_area,
+        ROUND((NULLIF(land_area_sqm,0) * 0.3025)::numeric, 1)           AS land_area,
+        urban_land_use,
+        parking_type,
+        ROUND((NULLIF(parking_area_sqm,0) * 0.3025)::numeric, 2)        AS parking_area,
+        bathrooms,
+        living_rooms`
 
   if (caseType === 'presale') {
     // 預售屋：建案只要在篩選範圍內有銷售記錄就顯示全部交易（不限日期）
