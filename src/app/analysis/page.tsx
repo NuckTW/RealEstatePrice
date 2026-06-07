@@ -1,9 +1,5 @@
-'use client'
-
 import Navbar from '@/components/Navbar'
-import dynamic from 'next/dynamic'
-
-const AnalysisPanel = dynamic(() => import('@/components/AnalysisPanel'), { ssr: false })
+import AnalysisPanel from '@/components/AnalysisPanel'
 
 export default function AnalysisPage() {
   return (
