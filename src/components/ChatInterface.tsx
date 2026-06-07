@@ -422,7 +422,9 @@ export default function ChatInterface() {
           <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) sendMessage()
+            }}
             placeholder="輸入問題，可追問上一輪…"
             disabled={loading}
             style={{
