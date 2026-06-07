@@ -45,6 +45,18 @@ const tooltipContentStyle = {
   color: 'var(--text-default)',
 }
 
+// 格式化 X 軸 label（日期/月份清理）
+function fmtXLabel(val: unknown): string {
+  const s = String(val ?? '')
+  // ISO datetime → YYYY-MM
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-\d{2}/)
+  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}`
+  // YYYY-MM-DD → YYYY-MM
+  const dateMatch = s.match(/^(\d{4}-\d{2})/)
+  if (dateMatch) return dateMatch[1]
+  return s
+}
+
 interface Props {
   rows: Record<string, unknown>[]
   chart: ChartConfig
@@ -54,7 +66,7 @@ export default function ChatChart({ rows, chart }: Props) {
   const { type, xKey, yKeys } = chart
 
   const data = rows.map(r => {
-    const entry: Record<string, unknown> = { [xKey]: r[xKey] }
+    const entry: Record<string, unknown> = { [xKey]: fmtXLabel(r[xKey]) }
     for (const k of yKeys) entry[k] = Number(r[k]) || 0
     return entry
   })

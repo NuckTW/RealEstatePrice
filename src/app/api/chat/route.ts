@@ -219,10 +219,13 @@ ${historyCtx}使用者問題：「${question}」
 ${rowSummary}
 
 ${dbError ? `查詢時發生錯誤：${dbError.message}\n` : ''}
-請用繁體中文、口語化方式回答使用者問題。
+請用**繁體中文**、條列式方式回答使用者問題。
+- 必須使用繁體中文，禁止出現簡體字
+- 回答格式以「・」或「－」開頭的條列項目呈現，每點一個重點
 - 金額請加「萬元」單位，數量加「筆」或「件」
+- 數字盡量精確，並標明是平均值或總計
 - 若結果為空，請說明可能原因
-- 回答簡潔有重點，150-250 字`
+- 總結放在最後一條，以「📌 小結：」開頭`
 
         const answerStream = await model.generateContentStream(answerPrompt)
 
