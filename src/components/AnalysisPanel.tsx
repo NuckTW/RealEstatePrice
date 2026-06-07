@@ -218,7 +218,7 @@ export default function AnalysisPanel() {
   const [metric,      setMetric]      = useState('unit_price')
   const [granularity, setGranularity] = useState('quarter')
   const [chartType,   setChartType]   = useState<ChartType>('line')
-  const [splitType,   setSplitType]   = useState(false)
+  const [mode, setMode] = useState('all')  // 'all' | 'presale' | 'existing'
   const [yearFrom,    setYearFrom]    = useState(110)
   const [monthFrom,   setMonthFrom]   = useState(1)
   const [yearTo,      setYearTo]      = useState(115)
@@ -236,7 +236,7 @@ export default function AnalysisPanel() {
     try {
       const dists = overrideDistricts ?? selectedDistricts
       const p = new URLSearchParams({
-        metric, granularity, splitType: String(splitType),
+        metric, granularity, mode,
         yearFrom: String(yearFrom), monthFrom: String(monthFrom),
         yearTo:   String(yearTo),   monthTo:   String(monthTo),
       })
@@ -245,7 +245,7 @@ export default function AnalysisPanel() {
       setData(json)
       if (!selectedDistricts.length && json.districts?.length) setSelectedDistricts(json.districts)
     } finally { setLoading(false) }
-  }, [metric, granularity, splitType, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
+  }, [metric, granularity, mode, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData() }, [])
@@ -292,18 +292,12 @@ export default function AnalysisPanel() {
             <ChartTypePills value={chartType} onChange={setChartType} />
           </div>
           <div>
-            {label('預售 / 成屋')}
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[false, true].map(v => (
-                <button key={String(v)} onClick={() => setSplitType(v)} style={{
-                  height: 28, padding: '0 12px', borderRadius: 'var(--radius-full)',
-                  fontSize: 11, fontFamily: 'var(--font-sans)', cursor: 'pointer',
-                  background: splitType === v ? 'var(--accent-wash)' : 'transparent',
-                  color: splitType === v ? 'var(--accent-tint)' : 'var(--text-muted)',
-                  border: splitType === v ? '1px solid var(--accent-wash-border)' : '1px solid var(--border-control)',
-                }}>{v ? '分開顯示' : '合計'}</button>
-              ))}
-            </div>
+            {label('類型')}
+            <select value={mode} onChange={e => setMode(e.target.value)} style={selectStyle()}>
+              <option value="all">合計</option>
+              <option value="presale">預售屋</option>
+              <option value="existing">成屋</option>
+            </select>
           </div>
         </div>
 
@@ -350,7 +344,7 @@ export default function AnalysisPanel() {
             {selectedDistricts.length > 0 && (
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
                 {selectedDistricts.join(' · ')}
-                {splitType && ' · 分開顯示'}
+                {mode !== 'all' && ` · ${mode === 'presale' ? '預售屋' : '成屋'}`}
               </span>
             )}
           </div>

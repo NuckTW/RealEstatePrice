@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
 
   const metric      = p.get('metric')      ?? 'unit_price'
   const granularity = p.get('granularity') ?? 'quarter'
-  const splitType   = p.get('splitType')   === 'true'   // true → 分開預售/成屋
+  const mode = p.get('mode') ?? 'all'  // 'all' | 'presale' | 'existing'
   const yearFrom    = parseInt(p.get('yearFrom')  ?? '110') + 1911
   const monthFrom   = parseInt(p.get('monthFrom') ?? '1')
   const yearTo      = parseInt(p.get('yearTo')    ?? '115') + 1911
@@ -93,19 +93,30 @@ export async function GET(req: NextRequest) {
 
   if (!districts.length) return NextResponse.json({ periods: [], series: [], districts: [] })
 
-  if (splitType) {
-    // ── 分開模式：預售 + 成屋各自一條線 ────────────────
+  if (mode === 'presale' || mode === 'existing') {
+    // ── 單一類型：只看預售 or 只看成屋 ─────────────────
+    const cond = mode === 'presale' ? `is_presale = true` : `is_presale = false`
+    const rows = await queryOneSeries(districts, metric, granularity, [dateCond, cond])
+    const periodSet = Array.from(new Set(rows.map(r => r.period))).sort()
+    const series = districts.map(district => ({
+      district,
+      data: periodSet.map(period => {
+        const found = rows.find(r => r.district === district && r.period === period)
+        return { period, value: found ? found.value : null }
+      }),
+    }))
+    return NextResponse.json({ periods: periodSet, series, districts })
+
+  } else if (mode === 'split') {
+    // ── 分開模式：每區兩條線（預售 + 成屋） ─────────────
     const [presaleRows, existingRows] = await Promise.all([
       queryOneSeries(districts, metric, granularity, [dateCond, `is_presale = true`]),
       queryOneSeries(districts, metric, granularity, [dateCond, `is_presale = false`]),
     ])
-
     const allPeriods = Array.from(new Set([
       ...presaleRows.map(r => r.period),
       ...existingRows.map(r => r.period),
     ])).sort()
-
-    // 每個行政區產生兩條線：「東區（預售）」和「東區（成屋）」
     const series = districts.flatMap(district => [
       {
         district: `${district}（預售）`,
@@ -122,10 +133,10 @@ export async function GET(req: NextRequest) {
         }),
       },
     ])
-
     return NextResponse.json({ periods: allPeriods, series, districts })
+
   } else {
-    // ── 合計模式 ────────────────────────────────────────
+    // ── 合計模式（預設） ─────────────────────────────────
     const rows = await queryOneSeries(districts, metric, granularity, [dateCond])
     const periodSet = Array.from(new Set(rows.map(r => r.period))).sort()
     const series = districts.map(district => ({
