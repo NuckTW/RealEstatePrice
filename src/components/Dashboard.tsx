@@ -77,8 +77,6 @@ function getCasesCols(presale: string): ColDef[] {
     { key: 'count',       label: '銷售戶數',    barColor: S1, minWidth: 72 },
     { key: 'sales_ratio', label: '銷售成數',    barColor: S3,
       format: v => (v == null || v === '') ? 'x' : `${v}%`, minWidth: 72 },
-    { key: 'common_ratio', label: '公設比', align: 'right',
-      format: v => (v == null || v === '') ? '—' : `${v}%` },
     { key: 'unit_price',  label: '單價(萬/坪)', barColor: S3, minWidth: 72 },
     { key: 'area',        label: '坪數',        barColor: S6, minWidth: 64 },
     { key: 'avg_total',   label: '均總價(萬)',  barColor: S2, minWidth: 80 },
