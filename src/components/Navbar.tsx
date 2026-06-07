@@ -22,8 +22,9 @@ export default function Navbar() {
   }, [])
 
   const navItems = [
-    { href: '/',     label: '數據看板', icon: '▦' },
-    { href: '/chat', label: 'AI 問答',  icon: '◇' },
+    { href: '/',          label: '數據看板', icon: '▦' },
+    { href: '/analysis',  label: '數據分析', icon: '◈' },
+    { href: '/chat',      label: 'AI 問答',  icon: '◇' },
   ]
 
   return (
