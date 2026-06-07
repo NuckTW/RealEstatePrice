@@ -104,10 +104,8 @@ function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
 }
 
 /* ── Message Bubble ─────────────────────────────────────── */
-function MessageBubble({ msg, showSql, onToggleSql }: {
+function MessageBubble({ msg }: {
   msg: Message
-  showSql: boolean
-  onToggleSql: () => void
 }) {
   const isUser = msg.role === 'user'
 
@@ -165,34 +163,6 @@ function MessageBubble({ msg, showSql, onToggleSql }: {
             <MiniTable rows={msg.rows} />
           )}
 
-          {/* SQL toggle */}
-          {!isUser && msg.sql && (
-            <div style={{ marginTop: 10 }}>
-              <button
-                onClick={onToggleSql}
-                style={{
-                  fontSize: 10, color: 'var(--text-faint)',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0, fontFamily: 'var(--font-sans)',
-                }}
-              >
-                {showSql ? '▲ 收起 SQL' : '▼ 查看 SQL'}
-              </button>
-              {showSql && (
-                <pre style={{
-                  marginTop: 6, padding: '8px 10px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--ink-950)',
-                  border: '1px solid var(--border-control)',
-                  fontSize: 10, color: 'var(--brass-300)',
-                  fontFamily: 'var(--font-mono)',
-                  overflowX: 'auto', whiteSpace: 'pre',
-                }}>
-                  {msg.sql}
-                </pre>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Row count badge */}
@@ -220,7 +190,6 @@ export default function ChatInterface() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showSql, setShowSql] = useState<Record<number, boolean>>({})
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -341,12 +310,7 @@ export default function ChatInterface() {
       {/* ── 訊息列表 ── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {messages.map((msg, i) => (
-          <MessageBubble
-            key={i}
-            msg={msg}
-            showSql={!!showSql[i]}
-            onToggleSql={() => setShowSql(prev => ({ ...prev, [i]: !prev[i] }))}
-          />
+          <MessageBubble key={i} msg={msg} />
         ))}
 
         {/* 載入中（SQL 生成期間） */}
