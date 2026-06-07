@@ -134,7 +134,7 @@ ${historyCtx}使用者問題：「${question}」
 請根據以上資料庫結構，生成一條 PostgreSQL SELECT 查詢語句。
 規則：
 1. 只輸出純 SQL，不要任何說明文字或 markdown
-2. 結果最多回傳 20 筆
+2. 結果最多回傳 100 筆
 3. 金額欄位記得換算（total_price ÷ 10000）
 4. 單價換算：ROUND(unit_price_sqm * 3.3058 / 10000, 1)
 5. 日期範圍預設為近 2 年，除非問題有指定
@@ -175,7 +175,7 @@ ${historyCtx}使用者問題：「${question}」
         const answerPrompt = `使用者問題：「${question}」
 
 SQL 查詢結果（共 ${rows.length} 筆）：
-${JSON.stringify(rows.slice(0, 15), null, 2)}
+${JSON.stringify(rows.slice(0, 50), null, 2)}
 
 ${dbError ? `查詢時發生錯誤：${dbError.message}\n` : ''}
 請用繁體中文、口語化方式回答使用者問題。
