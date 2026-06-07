@@ -45,7 +45,7 @@ function BarCell({ col, value, maxVal }: { col: ColDef; value: unknown; maxVal: 
             style={{ backgroundColor: col.barColor, opacity: 0.7 }}
           />
         )}
-        <span className="relative z-10 text-xs font-medium text-gray-200 px-2 whitespace-nowrap tabular-nums">
+        <span className="relative z-10 px-2 whitespace-nowrap tabular-nums" style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--text-default)', fontFamily: 'var(--font-mono)' }}>
           {display}
         </span>
       </div>
@@ -61,7 +61,7 @@ function PlainCell({ col, value }: { col: ColDef; value: unknown }) {
     col.align === 'center' ? 'text-center' : 'text-right'
   const badgeClass = col.valueColors?.[display]
   return (
-    <td className={`px-3 py-2.5 text-xs text-gray-300 whitespace-nowrap ${align}`}>
+    <td style={{ padding: '10px 12px', fontSize: 'var(--text-xs)', color: 'var(--text-default)', whiteSpace: 'nowrap', textAlign: col.align === 'left' ? 'left' : col.align === 'center' ? 'center' : 'right', fontFamily: 'var(--font-sans)' }}>
       {badgeClass ? (
         <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeClass}`}>
           {display}
@@ -87,32 +87,32 @@ export default function DataTable({
     }, {})
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-white/6 bg-[#0d1420]">
+    <div style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border-card)', background: 'var(--surface-card)', boxShadow: 'var(--shadow-card)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-4 rounded-full bg-gradient-to-b from-violet-400 to-indigo-500 opacity-70" />
-          <span className="text-sm font-semibold text-white">{title}</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', borderBottom: '1px solid var(--border-card)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{ width: 4, height: 16, borderRadius: 'var(--radius-full)', background: 'var(--gradient-accent)', flexShrink: 0, display: 'block' }} />
+          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>{title}</span>
           {data.length > 0 && (
-            <span className="text-[10px] text-gray-600 bg-white/5 rounded-full px-2 py-0.5">
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', background: 'var(--surface-control)', borderRadius: 'var(--radius-full)', padding: '1px 7px', fontFamily: 'var(--font-mono)' }}>
               {data.length}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {extra}
           {totalPages > 1 && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors flex items-center justify-center text-gray-400"
+                style={{ width: 24, height: 24, borderRadius: 'var(--radius-md)', background: 'var(--surface-control)', border: '1px solid var(--border-control)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.3 : 1, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'var(--transition-base)' }}
               >‹</button>
-              <span className="tabular-nums">{page} / {totalPages}</span>
+              <span>{page} / {totalPages}</span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="w-6 h-6 rounded-md bg-white/5 hover:bg-white/10 disabled:opacity-30 transition-colors flex items-center justify-center text-gray-400"
+                style={{ width: 24, height: 24, borderRadius: 'var(--radius-md)', background: 'var(--surface-control)', border: '1px solid var(--border-control)', cursor: page === totalPages ? 'not-allowed' : 'pointer', opacity: page === totalPages ? 0.3 : 1, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'var(--transition-base)' }}
               >›</button>
             </div>
           )}
@@ -120,17 +120,24 @@ export default function DataTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr className="border-b border-white/5">
+            <tr style={{ borderBottom: '1px solid var(--border-card)' }}>
               {columns.map(col => (
                 <th
                   key={col.key}
-                  className={`
-                    px-3 py-2 text-[10px] text-gray-500 font-semibold uppercase tracking-wider whitespace-nowrap
-                    ${col.align === 'left' ? 'text-left' : 'text-right'}
-                  `}
+                  style={{
+                    padding: '8px 12px',
+                    fontSize: 'var(--text-3xs)',
+                    color: 'var(--text-faint)',
+                    fontWeight: 'var(--weight-semibold)',
+                    textTransform: 'uppercase',
+                    letterSpacing: 'var(--tracking-caps)',
+                    whiteSpace: 'nowrap',
+                    textAlign: col.align === 'left' ? 'left' : 'right',
+                    fontFamily: 'var(--font-sans)',
+                  }}
                 >
                   {col.label}
                 </th>
@@ -140,9 +147,9 @@ export default function DataTable({
           <tbody>
             {pageData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="text-center py-12 text-gray-600 text-sm">
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-2xl opacity-30">◌</span>
+                <td colSpan={columns.length} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 24, opacity: 0.3 }}>◌</span>
                     <span>無符合條件的資料</span>
                   </div>
                 </td>
@@ -152,7 +159,9 @@ export default function DataTable({
                 <tr
                   key={i}
                   onClick={() => onRowClick?.(row)}
-                  className={`border-b border-white/[0.03] transition-colors ${onRowClick ? 'cursor-pointer hover:bg-violet-500/[0.06]' : 'hover:bg-white/[0.03]'}`}
+                  style={{ borderBottom: '1px solid var(--border-card)', cursor: onRowClick ? 'pointer' : 'default', transition: 'var(--transition-base)' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = onRowClick ? 'var(--accent-wash)' : 'var(--surface-hover)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
                   {columns.map(col =>
                     col.barColor ? (

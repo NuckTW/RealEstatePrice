@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import ThemeToggle from './ThemeToggle'
 
 function toRocDate(isoDate: string): string {
   const [y, m] = isoDate.split('-')
@@ -20,54 +21,103 @@ export default function Navbar() {
       .catch(() => {})
   }, [])
 
-  return (
-    <header className="sticky top-0 z-[2100] border-b border-white/5 bg-[#080d16]/90 backdrop-blur-xl">
-      <div className="px-6 h-14 flex items-center justify-between">
+  const navItems = [
+    { href: '/',     label: '數據看板', icon: '▦' },
+    { href: '/chat', label: 'AI 問答',  icon: '◇' },
+  ]
 
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-violet-500/30">
-            南
-          </div>
+  return (
+    <header style={{
+      position: 'sticky', top: 0, zIndex: 2100,
+      background: 'var(--chrome-bg)',
+      backdropFilter: 'saturate(140%) blur(16px)',
+      WebkitBackdropFilter: 'saturate(140%) blur(16px)',
+      borderBottom: '1px solid var(--border-card)',
+      height: 'var(--nav-h)',
+    }}>
+      <div style={{
+        maxWidth: 1400, margin: '0 auto',
+        padding: '0 20px', height: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        {/* Brand mark */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+            background: 'var(--gradient-brand)',
+            boxShadow: 'var(--glow-accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 700, color: 'var(--on-accent)',
+            fontFamily: 'var(--font-sans)',
+          }}>南</div>
           <div>
-            <span className="text-sm font-semibold text-white tracking-tight">台南市不動產分析</span>
-            <div className="flex items-center gap-1.5 mt-0">
-              <span className="text-[10px] text-gray-500">民國 110 年至今</span>
+            <div style={{
+              fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)',
+              color: 'var(--text-strong)', letterSpacing: 'var(--tracking-tight)',
+              fontFamily: 'var(--font-sans)',
+            }}>台南市不動產分析</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
+                民國 110 年至今
+              </span>
               {lastDate && (
                 <>
-                  <span className="text-[10px] text-gray-700">·</span>
-                  <span className="text-[10px] text-emerald-500/80">最新 {lastDate}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>·</span>
+                  <span style={{ fontSize: 10, color: 'var(--positive)', fontFamily: 'var(--font-mono)' }}>
+                    最新 {lastDate}
+                  </span>
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex items-center gap-1">
-          {[
-            { href: '/',      label: '數據看板', icon: '▦' },
-            { href: '/chat',  label: 'AI 問答',  icon: '◈' },
-          ].map(({ href, label, icon }) => {
-            const active = pathname === href
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                  ${active
-                    ? 'bg-violet-500/15 text-violet-300 border border-violet-500/25'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'}
-                `}
-              >
-                <span className="opacity-70">{icon}</span>
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* Right: nav + theme toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {navItems.map(({ href, label, icon }) => {
+              const active = pathname === href
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '0 12px', height: 'var(--control-h-sm)',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
+                    fontFamily: 'var(--font-sans)',
+                    textDecoration: 'none',
+                    border: active ? '1px solid var(--accent-wash-border)' : '1px solid transparent',
+                    background: active ? 'var(--accent-wash)' : 'transparent',
+                    color: active ? 'var(--accent-tint)' : 'var(--text-muted)',
+                    transition: 'var(--transition-base)',
+                  }}
+                  onMouseEnter={e => {
+                    if (!active) {
+                      (e.currentTarget as HTMLElement).style.color = 'var(--text-default)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!active) {
+                      (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+                    }
+                  }}
+                >
+                  <span style={{ opacity: 0.75 }}>{icon}</span>
+                  {label}
+                </Link>
+              )
+            })}
+          </nav>
 
+          {/* Divider */}
+          <div style={{ width: 1, height: 20, background: 'var(--border-card)', margin: '0 4px' }} />
+
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   )

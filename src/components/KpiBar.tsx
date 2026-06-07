@@ -9,104 +9,121 @@ interface KpiData {
 const CARDS = [
   {
     key: 'total' as const,
-    label: '成交戶數',
-    icon: '🏠',
-    format: (v: number) => `${v.toLocaleString()}`,
-    unit: '戶',
-    color: 'from-violet-500/10 to-violet-500/5',
-    border: 'border-violet-500/20',
-    accent: 'bg-violet-500',
-    text: 'text-violet-300',
+    label: '成交戶數', icon: '◳',
+    format: (v: number) => v.toLocaleString(),
+    unit: '戶', tone: 'var(--series-1)',
   },
   {
     key: 'avg_unit_price' as const,
-    label: '均單價',
-    icon: '📐',
-    format: (v: number) => `${v}`,
-    unit: '萬/坪',
-    color: 'from-cyan-500/10 to-cyan-500/5',
-    border: 'border-cyan-500/20',
-    accent: 'bg-cyan-500',
-    text: 'text-cyan-300',
+    label: '均單價', icon: '◰',
+    format: (v: number) => String(v),
+    unit: '萬/坪', tone: 'var(--series-3)',
   },
   {
     key: 'avg_area' as const,
-    label: '均坪數',
-    icon: '📏',
-    format: (v: number) => `${v}`,
-    unit: '坪',
-    color: 'from-teal-500/10 to-teal-500/5',
-    border: 'border-teal-500/20',
-    accent: 'bg-teal-500',
-    text: 'text-teal-300',
+    label: '均坪數', icon: '◆',
+    format: (v: number) => String(v),
+    unit: '坪', tone: 'var(--series-6)',
   },
   {
     key: 'avg_total' as const,
-    label: '均總價',
-    icon: '💰',
-    format: (v: number) => `${v.toLocaleString()}`,
-    unit: '萬',
-    color: 'from-amber-500/10 to-amber-500/5',
-    border: 'border-amber-500/20',
-    accent: 'bg-amber-500',
-    text: 'text-amber-300',
+    label: '均總價', icon: '◆',
+    format: (v: number) => v.toLocaleString(),
+    unit: '萬', tone: 'var(--clay-400)',
   },
   {
     key: 'total_sales' as const,
-    label: '總銷售額',
-    icon: '📊',
-    format: (v: number) => `${v.toLocaleString()}`,
-    unit: '億',
-    color: 'from-emerald-500/10 to-emerald-500/5',
-    border: 'border-emerald-500/20',
-    accent: 'bg-emerald-500',
-    text: 'text-emerald-300',
+    label: '總銷售額', icon: '▦',
+    format: (v: number) => v.toLocaleString(),
+    unit: '億', tone: 'var(--series-8)',
   },
 ]
 
 export default function KpiBar({ data, dateRange }: { data: KpiData; dateRange: string }) {
   return (
-    <div className="px-5 py-4 space-y-3">
+    <div style={{ padding: '16px 20px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Date badge */}
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs text-violet-300/80 bg-violet-500/10 border border-violet-500/20 rounded-full px-3 py-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: 'var(--text-xs)', color: 'var(--accent-tint)',
+          background: 'var(--accent-wash)',
+          border: '1px solid var(--accent-wash-border)',
+          borderRadius: 'var(--radius-full)',
+          padding: '3px 12px',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: 'var(--accent)', flexShrink: 0,
+            animation: 'blink 1.8s ease-in-out infinite',
+          }} />
           {dateRange}
         </span>
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 12,
+      }}>
         {CARDS.map(card => {
           const raw = data[card.key]
           const value = raw != null ? raw : 0
           return (
             <div
               key={card.key}
-              className={`
-                relative overflow-hidden rounded-xl border ${card.border}
-                bg-gradient-to-br ${card.color}
-                p-4 flex flex-col gap-2
-              `}
+              style={{
+                position: 'relative', overflow: 'hidden',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border-card)',
+                background: 'var(--surface-card)',
+                padding: '14px 16px',
+                display: 'flex', flexDirection: 'column', gap: 8,
+                boxShadow: 'var(--shadow-card)',
+              }}
             >
-              {/* Left accent bar */}
-              <div className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-r ${card.accent}`} />
+              {/* Left accent rail */}
+              <span style={{
+                position: 'absolute', left: 0, top: 12, bottom: 12,
+                width: 3, borderRadius: '0 3px 3px 0',
+                background: card.tone,
+              }} />
 
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">{card.label}</span>
-                <span className="text-base opacity-60">{card.icon}</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{
+                  fontSize: 'var(--text-3xs)', color: 'var(--text-muted)',
+                  fontWeight: 'var(--weight-medium)',
+                  letterSpacing: 'var(--tracking-caps)',
+                  textTransform: 'uppercase',
+                  fontFamily: 'var(--font-sans)',
+                }}>{card.label}</span>
+                <span style={{ fontSize: 14, opacity: 0.45, color: card.tone }}>{card.icon}</span>
               </div>
 
-              <div className="flex items-baseline gap-1.5">
-                <span className={`text-2xl font-bold tracking-tight ${card.text}`}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                <span style={{
+                  fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)',
+                  letterSpacing: 'var(--tracking-tight)',
+                  fontVariantNumeric: 'tabular-nums',
+                  fontFamily: 'var(--font-mono)',
+                  color: card.tone,
+                  lineHeight: 1.05,
+                }}>
                   {card.format(value)}
                 </span>
-                <span className="text-xs text-gray-500">{card.unit}</span>
+                <span style={{
+                  fontSize: 'var(--text-xs)', color: 'var(--text-faint)',
+                  fontFamily: 'var(--font-sans)',
+                }}>{card.unit}</span>
               </div>
             </div>
           )
         })}
       </div>
+
+      <style>{`@keyframes blink { 0%,100%{opacity:.6} 50%{opacity:1} }`}</style>
     </div>
   )
 }
