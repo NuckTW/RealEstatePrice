@@ -92,6 +92,45 @@ function detectChartConfig(rows: Record<string, unknown>[]): ChartConfig | null 
   return null
 }
 
+// 把全部 rows 壓縮成 Gemini 可讀的摘要，避免 token 爆炸
+function buildRowSummary(rows: Record<string, unknown>[]): string {
+  if (!rows.length) return '（無資料）'
+
+  const keys = Object.keys(rows[0])
+
+  // 數值欄位 → 計算 avg / min / max
+  const numStats: string[] = []
+  for (const k of keys) {
+    const vals = rows
+      .map(r => Number(r[k]))
+      .filter(v => !isNaN(v) && v !== 0)
+    if (!vals.length) continue
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+    const min = Math.min(...vals)
+    const max = Math.max(...vals)
+    numStats.push(`${k}：平均 ${avg.toFixed(1)}，最低 ${min.toFixed(1)}，最高 ${max.toFixed(1)}`)
+  }
+
+  // 文字欄位 → 頻率前5
+  const catStats: string[] = []
+  for (const k of keys) {
+    const vals = rows.map(r => r[k]).filter(v => typeof v === 'string' && v)
+    if (!vals.length) continue
+    const freq: Record<string, number> = {}
+    for (const v of vals) freq[String(v)] = (freq[String(v)] ?? 0) + 1
+    const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    catStats.push(`${k}：${top.map(([v, n]) => `${v}(${n}筆)`).join('、')}`)
+  }
+
+  const sampleRows = rows.slice(0, 20)
+
+  return [
+    numStats.length ? `數值統計：\n${numStats.join('\n')}` : '',
+    catStats.length ? `類別分佈：\n${catStats.join('\n')}` : '',
+    `前 ${sampleRows.length} 筆樣本：\n${JSON.stringify(sampleRows, null, 2)}`,
+  ].filter(Boolean).join('\n\n')
+}
+
 interface HistoryItem {
   role: 'user' | 'assistant'
   content: string
@@ -134,7 +173,7 @@ ${historyCtx}使用者問題：「${question}」
 請根據以上資料庫結構，生成一條 PostgreSQL SELECT 查詢語句。
 規則：
 1. 只輸出純 SQL，不要任何說明文字或 markdown
-2. 結果最多回傳 100 筆
+2. 不要加 LIMIT，除非問題明確要求「前N名」或「最貴N筆」等排名性質查詢
 3. 金額欄位記得換算（total_price ÷ 10000）
 4. 單價換算：ROUND(unit_price_sqm * 3.3058 / 10000, 1)
 5. 日期範圍預設為近 2 年，除非問題有指定
@@ -172,16 +211,18 @@ ${historyCtx}使用者問題：「${question}」
         send({ type: 'rows', rows, chart })
 
         // ── Step 3：Streaming 自然語言回答 ──────────────
+        // 傳給 Gemini 的是「摘要 + 前20筆樣本」，不傳全部（避免 token 爆炸）
+        const rowSummary = buildRowSummary(rows)
         const answerPrompt = `使用者問題：「${question}」
 
-SQL 查詢結果（共 ${rows.length} 筆）：
-${JSON.stringify(rows.slice(0, 50), null, 2)}
+查詢共回傳 ${rows.length} 筆資料。
+${rowSummary}
 
 ${dbError ? `查詢時發生錯誤：${dbError.message}\n` : ''}
 請用繁體中文、口語化方式回答使用者問題。
 - 金額請加「萬元」單位，數量加「筆」或「件」
 - 若結果為空，請說明可能原因
-- 回答簡潔有重點，100-200 字`
+- 回答簡潔有重點，150-250 字`
 
         const answerStream = await model.generateContentStream(answerPrompt)
 
