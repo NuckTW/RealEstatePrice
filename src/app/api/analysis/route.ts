@@ -3,21 +3,53 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
-// 指標定義
 const METRIC_SQL: Record<string, string> = {
-  unit_price: `ROUND(AVG(unit_price_sqm * 3.3058 / 10000), 1)`,
+  unit_price:  `ROUND(AVG(unit_price_sqm * 3.3058 / 10000), 1)`,
   total_price: `ROUND(AVG(total_price / 10000), 0)`,
-  area: `ROUND(AVG(building_area_sqm * 0.3025), 1)`,
-  parking: `ROUND(AVG(CASE WHEN parking_price > 0 THEN parking_price / 10000.0 END), 1)`,
-  count: `COUNT(*)`,
-  sales: `ROUND(SUM(total_price) / 100000000.0, 2)`,
+  area:        `ROUND(AVG(building_area_sqm * 0.3025), 1)`,
+  parking:     `ROUND(AVG(CASE WHEN parking_price > 0 THEN parking_price / 10000.0 END), 1)`,
+  count:       `COUNT(*)`,
+  sales:       `ROUND(SUM(total_price) / 100000000.0, 2)`,
 }
 
-// 時間粒度格式
 const PERIOD_SQL: Record<string, string> = {
   month:   `TO_CHAR(transaction_date, 'YYYY-MM')`,
   quarter: `TO_CHAR(DATE_TRUNC('quarter', transaction_date), 'YYYY') || 'Q' || EXTRACT(QUARTER FROM transaction_date)::int`,
   year:    `TO_CHAR(transaction_date, 'YYYY')`,
+}
+
+async function queryOneSeries(
+  districts: string[],
+  metric: string,
+  granularity: string,
+  extraConds: string[]
+): Promise<{ district: string; period: string; value: number }[]> {
+  const metricExpr = METRIC_SQL[metric]
+  const periodExpr = PERIOD_SQL[granularity]
+  const districtList = districts.map(d => `'${d.replace(/'/g, "''")}'`).join(',')
+
+  const where = [
+    `unit_price_sqm > 0`,
+    `total_price > 0`,
+    `district IN (${districtList})`,
+    ...extraConds,
+  ].join(' AND ')
+
+  const sql = `
+    SELECT district, ${periodExpr} AS period, ${metricExpr} AS value
+    FROM transactions
+    WHERE ${where}
+    GROUP BY district, ${periodExpr}
+    ORDER BY period, district`.trim()
+
+  const { data, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql })
+  if (error) { console.error('[analysis]', error); return [] }
+
+  return (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => ({
+    district: String(r.district),
+    period:   String(r.period),
+    value:    Number(r.value) || 0,
+  }))
 }
 
 export async function GET(req: NextRequest) {
@@ -25,90 +57,84 @@ export async function GET(req: NextRequest) {
 
   const metric      = p.get('metric')      ?? 'unit_price'
   const granularity = p.get('granularity') ?? 'quarter'
-  const presale     = p.get('presale')     ?? 'all'
-  const yearFrom    = parseInt(p.get('yearFrom') ?? '110') + 1911
-  const yearTo      = parseInt(p.get('yearTo')   ?? '115') + 1911
-  const rawDistricts = p.get('districts') ?? ''
+  const splitType   = p.get('splitType')   === 'true'   // true → 分開預售/成屋
+  const yearFrom    = parseInt(p.get('yearFrom')  ?? '110') + 1911
+  const monthFrom   = parseInt(p.get('monthFrom') ?? '1')
+  const yearTo      = parseInt(p.get('yearTo')    ?? '115') + 1911
+  const monthTo     = parseInt(p.get('monthTo')   ?? '12')
 
   if (!METRIC_SQL[metric] || !PERIOD_SQL[granularity]) {
     return NextResponse.json({ error: 'invalid params' }, { status: 400 })
   }
 
-  // 行政區清單：若未傳入，自動查前5大
-  let districts: string[] = rawDistricts
-    .split(',').map(s => s.trim()).filter(Boolean)
+  // 日期範圍 condition
+  const dateFrom = `${yearFrom}-${String(monthFrom).padStart(2, '0')}-01`
+  const nextM    = monthTo === 12 ? 1 : monthTo + 1
+  const nextY    = monthTo === 12 ? yearTo + 1 : yearTo
+  const dateTo   = `${nextY}-${String(nextM).padStart(2, '0')}-01`
+  const dateCond = `transaction_date >= '${dateFrom}' AND transaction_date < '${dateTo}'`
+
+  // 行政區清單
+  let districts: string[] = (p.get('districts') ?? '').split(',').map(s => s.trim()).filter(Boolean)
 
   if (!districts.length) {
     const topSql = `
       SELECT district, COUNT(*) AS cnt
       FROM transactions
       WHERE unit_price_sqm > 0 AND total_price > 0
-        AND transaction_date >= '${yearFrom}-01-01'
-        AND transaction_date < '${yearTo + 1}-01-01'
+        AND ${dateCond}
         AND district IS NOT NULL
-      GROUP BY district
-      ORDER BY cnt DESC
-      LIMIT 5`
+      GROUP BY district ORDER BY cnt DESC LIMIT 5`.trim()
 
-    const { data: topData } = await supabaseAdmin.rpc('execute_query', { query_text: topSql.trim() })
+    const { data: topData } = await supabaseAdmin.rpc('execute_query', { query_text: topSql })
     districts = (Array.isArray(topData) ? topData : [])
-      .map((r: Record<string, unknown>) => String(r.district))
-      .filter(Boolean)
+      .map((r: Record<string, unknown>) => String(r.district)).filter(Boolean)
   }
 
-  if (!districts.length) {
-    return NextResponse.json({ periods: [], series: [] })
-  }
+  if (!districts.length) return NextResponse.json({ periods: [], series: [], districts: [] })
 
-  // WHERE 條件
-  const conditions: string[] = [
-    `unit_price_sqm > 0`,
-    `total_price > 0`,
-    `transaction_date >= '${yearFrom}-01-01'`,
-    `transaction_date < '${yearTo + 1}-01-01'`,
-    `district IN (${districts.map(d => `'${d.replace(/'/g, "''")}'`).join(',')})`,
-  ]
-  if (presale === 'true')  conditions.push(`is_presale = true`)
-  if (presale === 'false') conditions.push(`is_presale = false`)
+  if (splitType) {
+    // ── 分開模式：預售 + 成屋各自一條線 ────────────────
+    const [presaleRows, existingRows] = await Promise.all([
+      queryOneSeries(districts, metric, granularity, [dateCond, `is_presale = true`]),
+      queryOneSeries(districts, metric, granularity, [dateCond, `is_presale = false`]),
+    ])
 
-  // 主查詢
-  const metricExpr  = METRIC_SQL[metric]
-  const periodExpr  = PERIOD_SQL[granularity]
-  const whereClause = conditions.join(' AND ')
+    const allPeriods = Array.from(new Set([
+      ...presaleRows.map(r => r.period),
+      ...existingRows.map(r => r.period),
+    ])).sort()
 
-  const sql = `
-    SELECT
+    // 每個行政區產生兩條線：「東區（預售）」和「東區（成屋）」
+    const series = districts.flatMap(district => [
+      {
+        district: `${district}（預售）`,
+        data: allPeriods.map(period => {
+          const found = presaleRows.find(r => r.district === district && r.period === period)
+          return { period, value: found ? found.value : null }
+        }),
+      },
+      {
+        district: `${district}（成屋）`,
+        data: allPeriods.map(period => {
+          const found = existingRows.find(r => r.district === district && r.period === period)
+          return { period, value: found ? found.value : null }
+        }),
+      },
+    ])
+
+    return NextResponse.json({ periods: allPeriods, series, districts })
+  } else {
+    // ── 合計模式 ────────────────────────────────────────
+    const rows = await queryOneSeries(districts, metric, granularity, [dateCond])
+    const periodSet = Array.from(new Set(rows.map(r => r.period))).sort()
+    const series = districts.map(district => ({
       district,
-      ${periodExpr} AS period,
-      ${metricExpr} AS value
-    FROM transactions
-    WHERE ${whereClause}
-    GROUP BY district, ${periodExpr}
-    ORDER BY period, district`
-
-  const { data: raw, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql.trim() })
-
-  if (error) {
-    console.error('[analysis]', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  const rows: { district: string; period: string; value: number }[] =
-    (Array.isArray(raw) ? raw : []).map((r: Record<string, unknown>) => ({
-      district: String(r.district),
-      period:   String(r.period),
-      value:    Number(r.value) || 0,
+      data: periodSet.map(period => {
+        const found = rows.find(r => r.district === district && r.period === period)
+        return { period, value: found ? found.value : null }
+      }),
     }))
-
-  // 整理成 { periods, series } 格式
-  const periodSet = Array.from(new Set(rows.map(r => r.period))).sort()
-  const series = districts.map(district => ({
-    district,
-    data: periodSet.map(period => {
-      const found = rows.find(r => r.district === district && r.period === period)
-      return { period, value: found ? found.value : null }
-    }),
-  }))
-
-  return NextResponse.json({ periods: periodSet, series, districts })
+    return NextResponse.json({ periods: periodSet, series, districts })
+  }
 }

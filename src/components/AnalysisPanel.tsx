@@ -6,13 +6,10 @@ import { SERIES_COLORS } from './AnalysisChart'
 
 const AnalysisChart = dynamic(() => import('./AnalysisChart'), {
   ssr: false,
-  loading: () => (
-    <div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }}>
-      圖表載入中…
-    </div>
-  ),
+  loading: () => <div style={centerStyle(380)}>圖表載入中…</div>,
 })
 
+/* ── Constants ──────────────────────────────────────────── */
 const ALL_DISTRICTS = [
   '東區','西區','南區','北區','中西區','安平區','安南區',
   '永康區','歸仁區','新化區','左鎮區','玉井區','楠西區','南化區',
@@ -31,52 +28,44 @@ const METRICS = [
   { key: 'sales',       label: '總銷(億)'    },
 ]
 
-const GRANULARITIES = [
-  { key: 'month',   label: '月' },
-  { key: 'quarter', label: '季' },
-  { key: 'year',    label: '年' },
-]
-
 const CHART_TYPES = [
   { key: 'line',    label: '〜 折線' },
   { key: 'bar',     label: '▦ 長條' },
   { key: 'scatter', label: '· 點圖' },
 ]
 
-interface SeriesData {
-  district: string
-  data: { period: string; value: number | null }[]
-}
-interface AnalysisData {
-  periods: string[]
-  series: SeriesData[]
-  districts: string[]
-}
+const YEARS  = Array.from({ length: 21 }, (_, i) => 100 + i) // 民國100~120
+const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
+
+/* ── Types ──────────────────────────────────────────────── */
+interface SeriesData { district: string; data: { period: string; value: number | null }[] }
+interface AnalysisData { periods: string[]; series: SeriesData[]; districts: string[] }
 type ChartType = 'line' | 'bar' | 'scatter'
 
-function pill(active: boolean, onClick: () => void, label: string, color?: string) {
-  return (
-    <button key={label} onClick={onClick} style={{
-      height: 28, padding: '0 12px', borderRadius: 'var(--radius-full)',
-      fontSize: 'var(--text-xs)', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-sans)',
-      background: active ? (color ?? 'var(--accent-wash)') : 'transparent',
-      color: active ? (color ? '#fff' : 'var(--accent-tint)') : 'var(--text-muted)',
-      border: active ? `1px solid ${color ?? 'var(--accent-wash-border)'}` : '1px solid var(--border-control)',
-      cursor: 'pointer', transition: 'var(--transition-base)', whiteSpace: 'nowrap' as const,
-    }}>{label}</button>
-  )
+/* ── Style Helpers ───────────────────────────────────────── */
+function centerStyle(h: number): React.CSSProperties {
+  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
 }
 
-function sectionLabel(text: string) {
-  return <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', marginBottom: 6 }}>{text}</div>
-}
-
-function numInput(value: number | string, onChange: (v: string) => void, extra?: Partial<React.InputHTMLAttributes<HTMLInputElement>>, width = 64): React.ReactElement {
-  return <input value={value} onChange={e => onChange(e.target.value)} style={{ width, height: 32, padding: '0 10px', background: 'var(--surface-control)', color: 'var(--text-default)', border: '1px solid var(--border-control)', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', outline: 'none' }} {...extra} />
+function selectStyle(): React.CSSProperties {
+  return {
+    height: 32, padding: '0 10px', paddingRight: 28,
+    background: 'var(--surface-control)', color: 'var(--text-default)',
+    border: '1px solid var(--border-control)', borderRadius: 'var(--radius-md)',
+    fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)',
+    outline: 'none', cursor: 'pointer',
+    appearance: 'none' as const, WebkitAppearance: 'none' as const,
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+  }
 }
 
 function ghostBtn(): React.CSSProperties {
   return { height: 26, padding: '0 10px', borderRadius: 'var(--radius-md)', fontSize: 11, fontFamily: 'var(--font-sans)', background: 'var(--surface-control)', color: 'var(--text-muted)', border: '1px solid var(--border-control)', cursor: 'pointer' }
+}
+
+function label(text: string) {
+  return <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', marginBottom: 5 }}>{text}</div>
 }
 
 async function saveChartAsPng(ref: React.RefObject<HTMLDivElement | null>, filename: string) {
@@ -100,16 +89,143 @@ async function saveChartAsPng(ref: React.RefObject<HTMLDivElement | null>, filen
   img.src = url
 }
 
+/* ── District Dropdown ───────────────────────────────────── */
+function DistrictDropdown({ selected, onChange }: { selected: string[]; onChange: (d: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const toggle = (d: string) => {
+    if (selected.includes(d)) onChange(selected.filter(x => x !== d))
+    else if (selected.length < 8) onChange([...selected, d])
+  }
+
+  const btnLabel = selected.length === 0 ? '選擇行政區（最多8區）'
+    : selected.length <= 3 ? selected.join('、')
+    : `${selected.slice(0, 3).join('、')} 等 ${selected.length} 區`
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        height: 32, padding: '0 28px 0 10px', minWidth: 200,
+        background: 'var(--surface-control)', color: selected.length ? 'var(--text-default)' : 'var(--text-faint)',
+        border: `1px solid ${open ? 'var(--accent)' : 'var(--border-control)'}`,
+        borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)',
+        fontFamily: 'var(--font-sans)', cursor: 'pointer', textAlign: 'left' as const,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E")`,
+        backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
+      }}>
+        {btnLabel}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: 4,
+          background: 'var(--surface-card)', border: '1px solid var(--border-card)',
+          borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-pop)',
+          padding: 8, width: 320, maxHeight: 320, overflowY: 'auto',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 4px 8px', borderBottom: '1px solid var(--border-card)', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)' }}>已選 {selected.length} / 8 區</span>
+            <button onClick={() => onChange([])} style={{ ...ghostBtn(), height: 22, fontSize: 10 }}>清除全部</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {ALL_DISTRICTS.map(d => {
+              const idx = selected.indexOf(d)
+              const isSelected = idx >= 0
+              const color = isSelected ? SERIES_COLORS[idx % SERIES_COLORS.length] : undefined
+              return (
+                <button key={d} onClick={() => toggle(d)} style={{
+                  height: 26, padding: '0 10px', borderRadius: 'var(--radius-full)',
+                  fontSize: 11, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                  background: isSelected ? (color ?? 'var(--accent)') : 'transparent',
+                  color: isSelected ? '#fff' : 'var(--text-muted)',
+                  border: isSelected ? `1px solid ${color ?? 'var(--accent)'}` : '1px solid var(--border-control)',
+                  opacity: !isSelected && selected.length >= 8 ? 0.4 : 1,
+                }}>
+                  {d}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Metric Dropdown ─────────────────────────────────────── */
+function MetricSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} style={selectStyle()}>
+      {METRICS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+    </select>
+  )
+}
+
+/* ── Chart Type Pills ────────────────────────────────────── */
+function ChartTypePills({ value, onChange }: { value: ChartType; onChange: (v: ChartType) => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 4 }}>
+      {CHART_TYPES.map(c => (
+        <button key={c.key} onClick={() => onChange(c.key as ChartType)} style={{
+          height: 28, padding: '0 10px', borderRadius: 'var(--radius-full)',
+          fontSize: 11, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+          background: value === c.key ? 'var(--accent-wash)' : 'transparent',
+          color: value === c.key ? 'var(--accent-tint)' : 'var(--text-muted)',
+          border: value === c.key ? '1px solid var(--accent-wash-border)' : '1px solid var(--border-control)',
+        }}>{c.label}</button>
+      ))}
+    </div>
+  )
+}
+
+/* ── Year-Month Range ────────────────────────────────────── */
+function YearMonthRange({
+  yearFrom, monthFrom, yearTo, monthTo,
+  onYearFrom, onMonthFrom, onYearTo, onMonthTo,
+}: {
+  yearFrom: number; monthFrom: number; yearTo: number; monthTo: number
+  onYearFrom: (v: number) => void; onMonthFrom: (v: number) => void
+  onYearTo: (v: number) => void; onMonthTo: (v: number) => void
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <select value={yearFrom} onChange={e => onYearFrom(Number(e.target.value))} style={{ ...selectStyle(), width: 80 }}>
+        {YEARS.map(y => <option key={y} value={y}>{y}年</option>)}
+      </select>
+      <select value={monthFrom} onChange={e => onMonthFrom(Number(e.target.value))} style={{ ...selectStyle(), width: 64 }}>
+        {MONTHS.map(m => <option key={m} value={m}>{m}月</option>)}
+      </select>
+      <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>～</span>
+      <select value={yearTo} onChange={e => onYearTo(Number(e.target.value))} style={{ ...selectStyle(), width: 80 }}>
+        {YEARS.map(y => <option key={y} value={y}>{y}年</option>)}
+      </select>
+      <select value={monthTo} onChange={e => onMonthTo(Number(e.target.value))} style={{ ...selectStyle(), width: 64 }}>
+        {MONTHS.map(m => <option key={m} value={m}>{m}月</option>)}
+      </select>
+    </div>
+  )
+}
+
+/* ── Main ────────────────────────────────────────────────── */
 export default function AnalysisPanel() {
-  const [metric,            setMetric]            = useState('unit_price')
-  const [granularity,       setGranularity]       = useState('quarter')
-  const [chartType,         setChartType]         = useState<ChartType>('line')
-  const [presale,           setPresale]           = useState('all')
-  const [yearFrom,          setYearFrom]          = useState(110)
-  const [yearTo,            setYearTo]            = useState(115)
+  const [metric,      setMetric]      = useState('unit_price')
+  const [granularity, setGranularity] = useState('quarter')
+  const [chartType,   setChartType]   = useState<ChartType>('line')
+  const [splitType,   setSplitType]   = useState(false)
+  const [yearFrom,    setYearFrom]    = useState(110)
+  const [monthFrom,   setMonthFrom]   = useState(1)
+  const [yearTo,      setYearTo]      = useState(115)
+  const [monthTo,     setMonthTo]     = useState(12)
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
-  const [yMin,  setYMin]  = useState('')
-  const [yMax,  setYMax]  = useState('')
+  const [yMin, setYMin] = useState('')
+  const [yMax, setYMax] = useState('')
   const [data,    setData]    = useState<AnalysisData | null>(null)
   const [loading, setLoading] = useState(false)
   const [saved,   setSaved]   = useState<{ label: string; data: AnalysisData; metric: string }[]>([])
@@ -118,29 +234,28 @@ export default function AnalysisPanel() {
   const fetchData = useCallback(async (overrideDistricts?: string[]) => {
     setLoading(true)
     try {
-      const p = new URLSearchParams({ metric, granularity, presale, yearFrom: String(yearFrom), yearTo: String(yearTo) })
       const dists = overrideDistricts ?? selectedDistricts
+      const p = new URLSearchParams({
+        metric, granularity, splitType: String(splitType),
+        yearFrom: String(yearFrom), monthFrom: String(monthFrom),
+        yearTo:   String(yearTo),   monthTo:   String(monthTo),
+      })
       if (dists.length > 0) p.set('districts', dists.join(','))
       const json = await fetch(`/api/analysis?${p}`).then(r => r.json())
       setData(json)
       if (!selectedDistricts.length && json.districts?.length) setSelectedDistricts(json.districts)
     } finally { setLoading(false) }
-  }, [metric, granularity, presale, yearFrom, yearTo, selectedDistricts])
+  }, [metric, granularity, splitType, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData() }, [])
 
-  const toggleDistrict = (d: string) => setSelectedDistricts(prev => {
-    if (prev.includes(d)) return prev.filter(x => x !== d)
-    if (prev.length >= 8) return prev
-    return [...prev, d]
-  })
-
   const handleSave = () => {
     if (!data) return
     const ml = METRICS.find(m => m.key === metric)?.label ?? metric
-    const gl = GRANULARITIES.find(g => g.key === granularity)?.label
-    setSaved(prev => [{ label: `${ml} · ${gl} · ${yearFrom}～${yearTo}`, data, metric }, ...prev.slice(0, 4)])
+    const gl = granularity === 'month' ? '月' : granularity === 'quarter' ? '季' : '年'
+    const range = `${yearFrom}年${monthFrom}月～${yearTo}年${monthTo}月`
+    setSaved(prev => [{ label: `${ml} · ${gl} · ${range}`, data, metric }, ...prev.slice(0, 4)])
   }
 
   const chartRows = (data?.periods ?? []).map(period => {
@@ -155,76 +270,110 @@ export default function AnalysisPanel() {
   return (
     <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* 控制列 */}
-      <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-xl)', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14, boxShadow: 'var(--shadow-card)' }}>
+      {/* ── 控制列 ── */}
+      <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-xl)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 16, boxShadow: 'var(--shadow-card)' }}>
 
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          <div>{sectionLabel('指標')}<div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{METRICS.map(m => pill(metric === m.key, () => setMetric(m.key), m.label))}</div></div>
-          <div>{sectionLabel('時間粒度')}<div style={{ display: 'flex', gap: 6 }}>{GRANULARITIES.map(g => pill(granularity === g.key, () => setGranularity(g.key), g.label))}</div></div>
-          <div>{sectionLabel('圖表類型')}<div style={{ display: 'flex', gap: 6 }}>{CHART_TYPES.map(c => pill(chartType === c.key, () => setChartType(c.key as ChartType), c.label))}</div></div>
-          <div>{sectionLabel('類型')}<div style={{ display: 'flex', gap: 6 }}>{([['all','全部'],['true','預售'],['false','成屋']] as [string,string][]).map(([v,l]) => pill(presale === v, () => setPresale(v), l))}</div></div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        {/* Row 1: 指標 + 時間粒度 + 圖表類型 */}
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
-            {sectionLabel('時間範圍（民國）')}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {numInput(yearFrom, v => setYearFrom(Number(v)), { type: 'number', min: 100, max: yearTo })}
-              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>～</span>
-              {numInput(yearTo, v => setYearTo(Number(v)), { type: 'number', min: yearFrom, max: 120 })}
-              <span style={{ color: 'var(--text-faint)', fontSize: 11, fontFamily: 'var(--font-sans)' }}>年</span>
-            </div>
+            {label('指標')}
+            <MetricSelect value={metric} onChange={setMetric} />
           </div>
           <div>
-            {sectionLabel('Y 軸範圍（留空=自動）')}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {numInput(yMin, setYMin, { placeholder: '最小' }, 80)}
-              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>～</span>
-              {numInput(yMax, setYMax, { placeholder: '最大' }, 80)}
+            {label('時間粒度')}
+            <select value={granularity} onChange={e => setGranularity(e.target.value)} style={selectStyle()}>
+              <option value="month">月</option>
+              <option value="quarter">季</option>
+              <option value="year">年</option>
+            </select>
+          </div>
+          <div>
+            {label('圖表類型')}
+            <ChartTypePills value={chartType} onChange={setChartType} />
+          </div>
+          <div>
+            {label('預售 / 成屋')}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[false, true].map(v => (
+                <button key={String(v)} onClick={() => setSplitType(v)} style={{
+                  height: 28, padding: '0 12px', borderRadius: 'var(--radius-full)',
+                  fontSize: 11, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                  background: splitType === v ? 'var(--accent-wash)' : 'transparent',
+                  color: splitType === v ? 'var(--accent-tint)' : 'var(--text-muted)',
+                  border: splitType === v ? '1px solid var(--accent-wash-border)' : '1px solid var(--border-control)',
+                }}>{v ? '分開顯示' : '合計'}</button>
+              ))}
             </div>
           </div>
-          <button onClick={() => fetchData()} disabled={loading} style={{ height: 32, padding: '0 20px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-sans)', background: 'var(--gradient-accent)', color: 'var(--on-accent)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, boxShadow: 'var(--glow-accent)' }}>
-            {loading ? '載入中…' : '套用'}
-          </button>
         </div>
 
-        <div>
-          {sectionLabel(`行政區（最多 8 區，已選 ${selectedDistricts.length}）`)}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {ALL_DISTRICTS.map(d => {
-              const idx = selectedDistricts.indexOf(d)
-              return pill(idx >= 0, () => toggleDistrict(d), d, idx >= 0 ? SERIES_COLORS[idx % SERIES_COLORS.length] : undefined)
-            })}
+        {/* Row 2: 行政區 + 時間範圍 */}
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            {label('行政區')}
+            <DistrictDropdown selected={selectedDistricts} onChange={setSelectedDistricts} />
           </div>
+          <div>
+            {label('時間範圍（民國）')}
+            <YearMonthRange
+              yearFrom={yearFrom} monthFrom={monthFrom}
+              yearTo={yearTo}     monthTo={monthTo}
+              onYearFrom={setYearFrom} onMonthFrom={setMonthFrom}
+              onYearTo={setYearTo}     onMonthTo={setMonthTo}
+            />
+          </div>
+          <div>
+            {label('Y 軸（留空=自動）')}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input placeholder="最小" value={yMin} onChange={e => setYMin(e.target.value)}
+                style={{ ...selectStyle(), width: 72, padding: '0 8px', backgroundImage: 'none', appearance: 'none' }} />
+              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>～</span>
+              <input placeholder="最大" value={yMax} onChange={e => setYMax(e.target.value)}
+                style={{ ...selectStyle(), width: 72, padding: '0 8px', backgroundImage: 'none', appearance: 'none' }} />
+            </div>
+          </div>
+          <button onClick={() => fetchData()} disabled={loading} style={{
+            height: 32, padding: '0 24px', borderRadius: 'var(--radius-md)',
+            fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-sans)',
+            background: 'var(--gradient-accent)', color: 'var(--on-accent)',
+            border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+            opacity: loading ? 0.6 : 1, boxShadow: 'var(--glow-accent)',
+          }}>{loading ? '載入中…' : '套用'}</button>
         </div>
       </div>
 
-      {/* 圖表 */}
+      {/* ── 圖表 ── */}
       <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-xl)', padding: '16px 20px', boxShadow: 'var(--shadow-card)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>
-            {metricLabel}<span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>{districts.join(' · ')}</span>
+            {metricLabel}
+            {selectedDistricts.length > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
+                {selectedDistricts.join(' · ')}
+                {splitType && ' · 分開顯示'}
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={handleSave} style={ghostBtn()}>◎ 記錄</button>
-            <button onClick={() => saveChartAsPng(chartDivRef, `台南不動產_${metricLabel}_${new Date().toISOString().slice(0,10)}`)} style={ghostBtn()}>↓ 儲存 PNG</button>
+            <button onClick={() => saveChartAsPng(chartDivRef, `台南不動產_${metricLabel}`)} style={ghostBtn()}>↓ PNG</button>
           </div>
         </div>
-        <div ref={chartDivRef} style={{ width: '100%', height: 380 }}>
+        <div ref={chartDivRef} style={{ width: '100%', height: 400 }}>
           {loading ? (
-            <div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }}>載入中…</div>
+            <div style={centerStyle(400)}>載入中…</div>
           ) : chartRows.length === 0 ? (
-            <div style={{ height: 380, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }}>無資料，請調整篩選條件後按「套用」</div>
+            <div style={centerStyle(400)}>無資料，請選擇行政區後按「套用」</div>
           ) : (
-            <AnalysisChart chartRows={chartRows} districts={districts} chartType={chartType} yDomain={yDomain} metricLabel={metricLabel} height={380} />
+            <AnalysisChart chartRows={chartRows} districts={districts} chartType={chartType} yDomain={yDomain} metricLabel={metricLabel} height={400} />
           )}
         </div>
       </div>
 
-      {/* 已記錄 */}
+      {/* ── 已記錄 ── */}
       {saved.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>已記錄的圖（{saved.length}）</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>已記錄（{saved.length}）</div>
           {saved.map((s, si) => <SavedChart key={si} saved={s} onRemove={() => setSaved(prev => prev.filter((_, i) => i !== si))} />)}
         </div>
       )}
@@ -232,9 +381,10 @@ export default function AnalysisPanel() {
   )
 }
 
+/* ── Saved Chart ─────────────────────────────────────────── */
 function SavedChart({ saved, onRemove }: { saved: { label: string; data: AnalysisData; metric: string }; onRemove: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
-  const ml  = METRICS.find(m => m.key === saved.metric)?.label ?? saved.metric
+  const ml = METRICS.find(m => m.key === saved.metric)?.label ?? saved.metric
   const chartRows = (saved.data.periods ?? []).map(period => {
     const row: Record<string, unknown> = { period }
     saved.data.series.forEach(s => { row[s.district] = s.data.find(d => d.period === period)?.value ?? null })
@@ -245,7 +395,7 @@ function SavedChart({ saved, onRemove }: { saved: { label: string; data: Analysi
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{saved.label}</div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => saveChartAsPng(ref, `記錄_${saved.label}`)} style={ghostBtn()}>↓ PNG</button>
+          <button onClick={() => saveChartAsPng(ref, saved.label)} style={ghostBtn()}>↓ PNG</button>
           <button onClick={onRemove} style={{ ...ghostBtn(), color: 'var(--negative)' }}>✕</button>
         </div>
       </div>
