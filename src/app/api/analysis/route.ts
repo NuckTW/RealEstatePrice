@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       ORDER BY cnt DESC
       LIMIT 5`
 
-    const { data: topData } = await supabaseAdmin.rpc('execute_query', { query_text: topSql })
+    const { data: topData } = await supabaseAdmin.rpc('execute_query', { query_text: topSql.trim() })
     districts = (Array.isArray(topData) ? topData : [])
       .map((r: Record<string, unknown>) => String(r.district))
       .filter(Boolean)
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
     GROUP BY district, ${periodExpr}
     ORDER BY period, district`
 
-  const { data: raw, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql })
+  const { data: raw, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql.trim() })
 
   if (error) {
     console.error('[analysis]', error)
