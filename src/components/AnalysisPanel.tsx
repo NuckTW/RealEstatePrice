@@ -28,6 +28,15 @@ const METRICS = [
   { key: 'sales',       label: '總銷(億)'    },
 ]
 
+// 支援「最高 / 最低」統計的指標（需有單筆交易數值可比較）
+const STAT_SUPPORTED = new Set(['unit_price', 'total_price', 'area', 'parking'])
+
+const STATS = [
+  { key: 'avg', label: '平均' },
+  { key: 'max', label: '最高' },
+  { key: 'min', label: '最低' },
+]
+
 const CHART_TYPES = [
   { key: 'line',    label: '〜 折線' },
   { key: 'bar',     label: '▦ 長條' },
@@ -38,8 +47,14 @@ const YEARS  = Array.from({ length: 21 }, (_, i) => 100 + i) // 民國100~120
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1)
 
 /* ── Types ──────────────────────────────────────────────── */
-interface SeriesData { district: string; data: { period: string; value: number | null }[] }
-interface AnalysisData { periods: string[]; series: SeriesData[]; districts: string[] }
+interface RecordInfo {
+  project_name: string | null
+  address: string | null
+  transaction_date: string | null
+  is_presale: boolean | null
+}
+interface SeriesData { district: string; data: { period: string; value: number | null; record?: RecordInfo | null }[] }
+interface AnalysisData { periods: string[]; series: SeriesData[]; districts: string[]; stat?: 'avg' | 'max' | 'min' }
 type ChartType = 'line' | 'bar' | 'scatter'
 
 /* ── Style Helpers ───────────────────────────────────────── */
@@ -216,6 +231,7 @@ function YearMonthRange({
 /* ── Main ────────────────────────────────────────────────── */
 export default function AnalysisPanel() {
   const [metric,      setMetric]      = useState('unit_price')
+  const [stat,        setStat]        = useState<'avg' | 'max' | 'min'>('avg')
   const [granularity, setGranularity] = useState('quarter')
   const [chartType,   setChartType]   = useState<ChartType>('line')
   const [mode, setMode] = useState('all')  // 'all' | 'presale' | 'existing'
@@ -237,6 +253,7 @@ export default function AnalysisPanel() {
       const dists = overrideDistricts ?? selectedDistricts
       const p = new URLSearchParams({
         metric, granularity, mode,
+        stat: STAT_SUPPORTED.has(metric) ? stat : 'avg',
         yearFrom: String(yearFrom), monthFrom: String(monthFrom),
         yearTo:   String(yearTo),   monthTo:   String(monthTo),
       })
@@ -245,7 +262,12 @@ export default function AnalysisPanel() {
       setData(json)
       if (!selectedDistricts.length && json.districts?.length) setSelectedDistricts(json.districts)
     } finally { setLoading(false) }
-  }, [metric, granularity, mode, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
+  }, [metric, stat, granularity, mode, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
+
+  // 指標切換到不支援最高/最低統計時，自動回到「平均」
+  useEffect(() => {
+    if (!STAT_SUPPORTED.has(metric) && stat !== 'avg') setStat('avg')
+  }, [metric, stat])
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData() }, [])
@@ -258,12 +280,18 @@ export default function AnalysisPanel() {
     setSaved(prev => [{ label: `${ml} · ${gl} · ${range}`, data, metric }, ...prev.slice(0, 4)])
   }
 
+  const showRecord = data?.stat === 'max' || data?.stat === 'min'
   const chartRows = (data?.periods ?? []).map(period => {
     const row: Record<string, unknown> = { period }
-    data?.series.forEach(s => { row[s.district] = s.data.find(d => d.period === period)?.value ?? null })
+    data?.series.forEach(s => {
+      const found = s.data.find(d => d.period === period)
+      row[s.district] = found?.value ?? null
+      if (showRecord) row[`${s.district}__rec`] = found?.record ?? null
+    })
     return row
   })
   const yDomain: [number | string, number | string] = [yMin !== '' ? Number(yMin) : 'auto', yMax !== '' ? Number(yMax) : 'auto']
+  const statLabel = STATS.find(s => s.key === (data?.stat ?? 'avg'))?.label ?? ''
   const metricLabel = METRICS.find(m => m.key === metric)?.label ?? ''
   const districts = data?.series.map(s => s.district) ?? []
 
@@ -279,6 +307,14 @@ export default function AnalysisPanel() {
             {label('指標')}
             <MetricSelect value={metric} onChange={setMetric} />
           </div>
+          {STAT_SUPPORTED.has(metric) && (
+            <div>
+              {label('統計方式')}
+              <select value={stat} onChange={e => setStat(e.target.value as 'avg' | 'max' | 'min')} style={selectStyle()}>
+                {STATS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             {label('時間粒度')}
             <select value={granularity} onChange={e => setGranularity(e.target.value)} style={selectStyle()}>
@@ -341,6 +377,13 @@ export default function AnalysisPanel() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>
             {metricLabel}
+            {showRecord && (
+              <span style={{
+                fontSize: 10, fontWeight: 600, marginLeft: 8, padding: '2px 8px',
+                borderRadius: 'var(--radius-full)', background: 'var(--accent-wash)',
+                color: 'var(--accent-tint)', border: '1px solid var(--accent-wash-border)',
+              }}>{statLabel}</span>
+            )}
             {selectedDistricts.length > 0 && (
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
                 {selectedDistricts.join(' · ')}
@@ -359,7 +402,7 @@ export default function AnalysisPanel() {
           ) : chartRows.length === 0 ? (
             <div style={centerStyle(400)}>無資料，請選擇行政區後按「套用」</div>
           ) : (
-            <AnalysisChart chartRows={chartRows} districts={districts} chartType={chartType} yDomain={yDomain} metricLabel={metricLabel} height={400} />
+            <AnalysisChart chartRows={chartRows} districts={districts} chartType={chartType} yDomain={yDomain} metricLabel={metricLabel} height={400} showRecord={showRecord} />
           )}
         </div>
       </div>
@@ -379,9 +422,14 @@ export default function AnalysisPanel() {
 function SavedChart({ saved, onRemove }: { saved: { label: string; data: AnalysisData; metric: string }; onRemove: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const ml = METRICS.find(m => m.key === saved.metric)?.label ?? saved.metric
+  const showRecord = saved.data.stat === 'max' || saved.data.stat === 'min'
   const chartRows = (saved.data.periods ?? []).map(period => {
     const row: Record<string, unknown> = { period }
-    saved.data.series.forEach(s => { row[s.district] = s.data.find(d => d.period === period)?.value ?? null })
+    saved.data.series.forEach(s => {
+      const found = s.data.find(d => d.period === period)
+      row[s.district] = found?.value ?? null
+      if (showRecord) row[`${s.district}__rec`] = found?.record ?? null
+    })
     return row
   })
   return (
@@ -394,7 +442,7 @@ function SavedChart({ saved, onRemove }: { saved: { label: string; data: Analysi
         </div>
       </div>
       <div ref={ref} style={{ width: '100%', height: 200 }}>
-        <AnalysisChart chartRows={chartRows} districts={saved.data.series.map(s => s.district)} chartType="line" yDomain={['auto','auto']} metricLabel={ml} height={200} compact />
+        <AnalysisChart chartRows={chartRows} districts={saved.data.series.map(s => s.district)} chartType="line" yDomain={['auto','auto']} metricLabel={ml} height={200} compact showRecord={showRecord} />
       </div>
     </div>
   )

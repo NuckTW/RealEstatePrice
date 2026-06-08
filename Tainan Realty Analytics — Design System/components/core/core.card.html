@@ -1,0 +1,65 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Buttons · Badges · Tags" subtitle="Core actions and status pills — primary brass gradient, semantic badges, removable filter tags." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { padding: 26px; }
+  .group { margin-bottom: 22px; }
+  .lbl { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); margin-bottom: 11px; }
+  .rowf { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Button, Badge, Tag } = window.TainanRealtyAnalyticsDesignSystem_e1be47;
+    function Demo() {
+      const [tags, setTags] = React.useState(['永康區', '透天厝', '3房']);
+      return (
+        <div>
+          <div className="group">
+            <div className="lbl">Buttons</div>
+            <div className="rowf">
+              <Button variant="primary">套用篩選</Button>
+              <Button variant="secondary">清除</Button>
+              <Button variant="ghost">取消</Button>
+              <Button variant="danger">刪除</Button>
+              <Button variant="primary" loading>載入中</Button>
+              <Button variant="secondary" size="sm">小</Button>
+              <Button variant="primary" disabled>停用</Button>
+            </div>
+          </div>
+          <div className="group">
+            <div className="lbl">Badges</div>
+            <div className="rowf">
+              <Badge tone="positive">成屋</Badge>
+              <Badge tone="info">預售</Badge>
+              <Badge tone="clay">熱門</Badge>
+              <Badge tone="warning">屋齡 30+</Badge>
+              <Badge tone="negative">下跌</Badge>
+              <Badge tone="brass" dot pulse>最新 115年6月</Badge>
+              <Badge variant="count">37</Badge>
+            </div>
+          </div>
+          <div className="group" style={{marginBottom:0}}>
+            <div className="lbl">Filter tags (click to remove)</div>
+            <div className="rowf">
+              {tags.map(t => (
+                <Tag key={t} onRemove={() => setTags(tags.filter(x => x !== t))}>{t}</Tag>
+              ))}
+              {tags.length === 0 && <span style={{font:'12px var(--font-sans)',color:'var(--text-faint)'}}>已清除全部條件</span>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+/* ============================================================
+   Tainan Realty Analytics — Spacing, Radii & Sizing
+   ------------------------------------------------------------
+   Derived from the product's Tailwind usage: a 4px base step,
+   compact control padding (10/6), 12–16px card padding, and a
+   radius ladder of 6 / 8 / 12 / 16 / full. The dashboard packs a
+   lot in, so the rhythm stays tight.
+   ============================================================ */
+
+:root {
+  /* ── Space scale (4px base) ──────────────────────────────── */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Common semantic gaps */
+  --gap-control: 10px;    /* between controls in the filter bar  */
+  --gap-card: 16px;       /* between cards / panels              */
+  --pad-control-x: 10px;  /* select / button inner padding       */
+  --pad-control-y: 6px;
+  --pad-card: 16px;       /* panel body padding                  */
+  --pad-section-x: 20px;  /* page gutters (px-5)                 */
+  --pad-section-y: 16px;
+
+  /* ── Radii ───────────────────────────────────────────────── */
+  --radius-sm: 6px;    /* bar cells, small chips      */
+  --radius-md: 8px;    /* buttons, selects, inputs    */
+  --radius-lg: 12px;   /* KPI cards                   */
+  --radius-xl: 16px;   /* data panels                 */
+  --radius-2xl: 20px;  /* dialogs                     */
+  --radius-full: 999px;/* pills, tags, avatars        */
+
+  /* ── Control sizing ──────────────────────────────────────── */
+  --control-h-sm: 28px;   /* filter selects / pill tabs */
+  --control-h-md: 32px;   /* buttons                    */
+  --control-h-lg: 40px;   /* search / chat input        */
+  --nav-h: 56px;          /* top bar height (h-14)      */
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  --content-max: 1400px;
+  --hairline: 1px;
+}

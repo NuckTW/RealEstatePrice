@@ -1,0 +1,37 @@
+<!-- @dsCard group="Brand" viewport="700x190" name="Brand mark & lockup" subtitle="The 南 (Tainan) glyph mark, re-skinned to the brass→clay brand gradient, with its horizontal lockup." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 28px; display: flex; align-items: center; gap: 40px; }
+  .mark-xl { width: 64px; height: 64px; border-radius: var(--radius-lg); background: var(--gradient-brand); display: flex; align-items: center; justify-content: center; color: #fff; font: var(--weight-bold) 30px var(--font-cjk); box-shadow: var(--glow-accent); }
+  .lockup { display: flex; align-items: center; gap: 12px; }
+  .mark { width: 30px; height: 30px; border-radius: var(--radius-md); background: var(--gradient-brand); display: flex; align-items: center; justify-content: center; color: #fff; font: var(--weight-bold) 14px var(--font-cjk); box-shadow: var(--glow-accent); }
+  .wm { line-height: 1.1; }
+  .title { font: var(--weight-semibold) 15px var(--font-sans); color: var(--text-strong); letter-spacing: var(--tracking-tight); }
+  .sub { font: 10px var(--font-sans); color: var(--text-muted); margin-top: 2px; }
+  .dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--positive); margin-right:5px; vertical-align: middle; }
+</style>
+</head>
+<body>
+  <div class="mark-xl">南</div>
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div class="lockup">
+      <div class="mark">南</div>
+      <div class="wm">
+        <div class="title">台南市不動產分析</div>
+        <div class="sub"><span class="dot"></span>民國 110 年至今 · 最新 115年6月</div>
+      </div>
+    </div>
+    <div class="lockup">
+      <div class="mark" style="background:var(--surface-control);border:1px solid var(--border-control);box-shadow:none;color:var(--accent-tint)">南</div>
+      <div class="wm">
+        <div class="title" style="color:var(--text-default)">Tainan Realty Analytics</div>
+        <div class="sub">monochrome / on-surface variant</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

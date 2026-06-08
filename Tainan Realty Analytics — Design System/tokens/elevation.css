@@ -1,0 +1,37 @@
+/* ============================================================
+   Tainan Realty Analytics — Elevation, Shadows & Effects
+   ------------------------------------------------------------
+   A dark UI leans on borders + subtle lifts rather than heavy drop
+   shadows. Glows are reserved for the primary action and live
+   status dots. Sticky chrome uses a saturated blur.
+   ============================================================ */
+
+:root {
+  /* ── Shadows ─────────────────────────────────────────────── */
+  --shadow-none: none;
+  --shadow-card: 0 1px 0 rgba(255,255,255,0.02) inset,
+                 0 8px 24px -16px rgba(0,0,0,0.7);
+  --shadow-pop:  0 12px 32px -8px rgba(0,0,0,0.55),
+                 0 0 0 1px rgba(255,255,255,0.04);   /* dropdowns / dialogs */
+  --shadow-overlay: 0 24px 60px -16px rgba(0,0,0,0.7);
+
+  /* Primary-action glow (brass) */
+  --glow-accent: 0 8px 20px -6px rgba(217,145,42,0.40);
+  --glow-accent-sm: 0 0 0 3px var(--accent-wash);
+
+  /* ── Blur / glass (sticky nav + filter bar) ──────────────── */
+  --blur-chrome: saturate(140%) blur(16px); /* @kind other */
+  --chrome-bg: rgba(21, 17, 11, 0.85);     /* --ink-900 (warm) @ 85% */
+
+  /* ── Data-bar fills (inline table bars) ──────────────────── */
+  --bar-fill-opacity: 0.18; /* @kind other */
+  --bar-edge-opacity: 0.75; /* @kind other */
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 180ms; /* @kind other */
+  --dur-slow: 260ms; /* @kind other */
+  --transition-base: all var(--dur-base) var(--ease-standard);
+}

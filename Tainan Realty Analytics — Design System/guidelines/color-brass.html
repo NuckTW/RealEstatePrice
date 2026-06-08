@@ -1,0 +1,29 @@
+<!-- @dsCard group="Colors" viewport="700x180" name="Brass — Primary" subtitle="The accent family (amber / temple brass). --accent maps to brass-500; --accent-tint flips brass-400↔700 by theme." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 22px; }
+  .row { display: flex; gap: 10px; }
+  .sw { flex: 1; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--border-card); }
+  .chip { height: 56px; }
+  .meta { padding: 8px 10px; background: var(--surface-card); }
+  .name { font: var(--weight-semibold) 12px var(--font-mono); color: var(--text-default); }
+  .hex { font: 11px var(--font-mono); color: var(--text-faint); margin-top: 2px; }
+  .star { color: var(--accent-tint); font-size: 10px; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="sw"><div class="chip" style="background:var(--brass-200)"></div><div class="meta"><div class="name">brass-200</div><div class="hex">#f7dca2</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brass-300)"></div><div class="meta"><div class="name">brass-300</div><div class="hex">#f0c86e</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brass-400)"></div><div class="meta"><div class="name">brass-400 <span class="star">tint ★</span></div><div class="hex">#e8ad3f</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brass-500)"></div><div class="meta"><div class="name">brass-500 <span class="star">accent ★</span></div><div class="hex">#d9912a</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brass-600)"></div><div class="meta"><div class="name">brass-600</div><div class="hex">#b9761d</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brass-700)"></div><div class="meta"><div class="name">brass-700</div><div class="hex">#8f5a16</div></div></div>
+    <div class="sw"><div class="chip" style="background:var(--brass-900)"></div><div class="meta"><div class="name">brass-900</div><div class="hex">#43290c</div></div></div>
+  </div>
+</body>
+</html>

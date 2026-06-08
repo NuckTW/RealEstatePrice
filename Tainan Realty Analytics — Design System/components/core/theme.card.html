@@ -1,0 +1,59 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Theme switch (明亮 / 暗色)" subtitle="The light/dark toggle flips data-theme on <html> — every token re-themes. Click it to preview both grounds." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { padding: 26px; background: var(--bg-app); transition: background var(--dur-base) var(--ease-standard); }
+  .lbl { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); margin: 0 0 11px; }
+  .preview { margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .pcard { background: var(--surface-card); border: 1px solid var(--border-card); border-radius: var(--radius-lg); padding: 14px; box-shadow: var(--shadow-card); }
+  .pk-label { font: var(--weight-medium) 11px var(--font-sans); color: var(--text-muted); }
+  .pk-val { font: var(--weight-bold) 22px var(--font-mono); color: var(--accent-tint); letter-spacing: -.02em; margin-top: 6px; }
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { ThemeToggle, Button, KpiCard, Badge } = window.TainanRealtyAnalyticsDesignSystem_e1be47;
+    function Demo() {
+      return (
+        <div>
+          <p className="lbl">Switch — drives &lt;html data-theme&gt; + localStorage</p>
+          <div className="row">
+            <ThemeToggle />
+            <ThemeToggle labels={false} />
+            <span style={{font:'12px var(--font-sans)',color:'var(--text-faint)'}}>← icon-only variant for tight chrome</span>
+          </div>
+          <p className="lbl" style={{marginTop:24}}>Live preview — surfaces & accents re-theme</p>
+          <div className="preview">
+            <div className="pcard"><div className="pk-label">成交戶數</div><div className="pk-val">22,430</div></div>
+            <div className="pcard">
+              <div className="pk-label">操作</div>
+              <div style={{display:'flex',gap:8,marginTop:10}}>
+                <Button variant="primary" size="sm">套用</Button>
+                <Button variant="secondary" size="sm">清除</Button>
+              </div>
+            </div>
+            <div className="pcard">
+              <div className="pk-label">狀態</div>
+              <div style={{display:'flex',gap:6,marginTop:10,flexWrap:'wrap'}}>
+                <Badge tone="positive">成屋</Badge>
+                <Badge tone="info">預售</Badge>
+                <Badge tone="brass" dot pulse>最新</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

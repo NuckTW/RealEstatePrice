@@ -1,0 +1,34 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Chat: bubbles & typing" subtitle="The Gemini Q&A surface — user / assistant bubbles, a generated-SQL disclosure, and the typing indicator." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { padding: 24px; }
+  .feed { display: flex; flex-direction: column; gap: 14px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { ChatBubble, TypingDots } = window.TainanRealtyAnalyticsDesignSystem_e1be47;
+    function Demo() {
+      return (
+        <div className="feed">
+          <ChatBubble role="user">東區最近一年的平均房價是多少？</ChatBubble>
+          <ChatBubble role="assistant" sql={"SELECT AVG(unit_price) AS avg_price\nFROM deals\nWHERE district = '東區'\n  AND deal_date >= '2025-06-01';"}>
+            東區最近一年（114年6月～115年6月）的平均單價約為 48.2 萬／坪，較全市均價高出約 15%。點選下方可查看產生的 SQL。
+          </ChatBubble>
+          <TypingDots />
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+/* ============================================================
+   Tainan Realty Analytics — Typography
+   ------------------------------------------------------------
+   Geist for Latin UI, Noto Sans TC for 中文 (declared first in the
+   stack so CJK glyphs never fall to a system face), Geist Mono for
+   numbers, ROC dates, SQL and any tabular figure. The product is
+   number-dense, so tabular-nums is the default for data.
+   ============================================================ */
+
+:root {
+  /* ── Families ────────────────────────────────────────────── */
+  --font-sans: 'Geist', 'Noto Sans TC', -apple-system, 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  --font-mono: 'Geist Mono', 'Noto Sans TC', ui-monospace, 'SFMono-Regular',
+               monospace;
+  /* Pure-CJK contexts (large headings) can lead with the TC face */
+  --font-cjk:  'Noto Sans TC', 'Geist', 'PingFang TC', sans-serif;
+
+  /* ── Type scale (px) — dashboard is compact & data-forward ── */
+  --text-3xl: 30px;   /* hero / page lead numbers      */
+  --text-2xl: 24px;   /* KPI values                    */
+  --text-xl:  20px;   /* section / panel titles (lg)   */
+  --text-lg:  16px;   /* card titles, emphasis         */
+  --text-base: 14px;  /* body, table cells, controls   */
+  --text-sm:  13px;   /* dense body                    */
+  --text-xs:  12px;   /* secondary, chips              */
+  --text-2xs: 11px;   /* labels                        */
+  --text-3xs: 10px;   /* column heads, micro-captions  */
+
+  /* ── Weights ─────────────────────────────────────────────── */
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ── Line heights ────────────────────────────────────────── */
+  --leading-tight: 1.15;   /* numbers, headings   */
+  --leading-snug: 1.35;    /* titles              */
+  --leading-normal: 1.6;   /* prose, chat answers */
+
+  /* ── Letter spacing ──────────────────────────────────────── */
+  --tracking-tight: -0.02em;  /* large numbers & headings */
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-caps: 0.08em;    /* UPPERCASE micro-labels   */
+
+  /* ── Semantic roles ──────────────────────────────────────── */
+  --type-kpi: var(--weight-bold) var(--text-2xl)/var(--leading-tight) var(--font-mono);
+  --type-page-title: var(--weight-semibold) var(--text-base)/var(--leading-snug) var(--font-sans);
+  --type-panel-title: var(--weight-semibold) var(--text-lg)/var(--leading-snug) var(--font-sans);
+  --type-body: var(--weight-regular) var(--text-base)/var(--leading-normal) var(--font-sans);
+  --type-cell: var(--weight-medium) var(--text-xs)/var(--leading-snug) var(--font-mono);
+  --type-label: var(--weight-medium) var(--text-3xs)/1.2 var(--font-sans);
+}
+
+/* Micro-label helper used across data UI (column heads, field labels) */
+.t-label {
+  font: var(--type-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-faint);
+}
+.tabular { font-variant-numeric: tabular-nums; }

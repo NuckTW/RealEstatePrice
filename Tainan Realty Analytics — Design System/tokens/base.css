@@ -1,0 +1,46 @@
+/* ============================================================
+   Tainan Realty Analytics — Base layer
+   ------------------------------------------------------------
+   Minimal element defaults so a raw consumer page (or a specimen
+   card) inherits the dark ground, type, and selection styling.
+   Tokens come from the files imported ahead of this one.
+   ============================================================ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg-app);
+  color: var(--text-default);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--accent-tint);
+}
+
+/* Slim dark scrollbars to match the dashboard chrome */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-600) transparent;
+}
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--ink-600);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-700); }
+
+a { color: var(--accent-tint); text-decoration: none; }
+a:hover { color: var(--accent-tint); }
+
+::placeholder { color: var(--text-faint); }

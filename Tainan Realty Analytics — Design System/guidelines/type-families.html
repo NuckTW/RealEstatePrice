@@ -1,0 +1,31 @@
+<!-- @dsCard group="Type" viewport="700x230" name="Font families" subtitle="Geist for Latin UI, Noto Sans TC for 中文, Geist Mono for numbers / ROC dates / SQL." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .fam { display: flex; flex-direction: column; gap: 4px; }
+  .tag { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); }
+  .spec { color: var(--text-strong); }
+  .geist { font-family: var(--font-sans); font-size: 26px; font-weight: 600; letter-spacing: var(--tracking-tight); }
+  .cjk { font-family: var(--font-cjk); font-size: 26px; font-weight: 500; }
+  .mono { font-family: var(--font-mono); font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <div class="fam">
+    <span class="tag">Geist · UI sans</span>
+    <span class="spec geist">Tainan Realty Analytics 2026</span>
+  </div>
+  <div class="fam">
+    <span class="tag">Noto Sans TC · 中文</span>
+    <span class="spec cjk">台南市不動產實價登錄分析</span>
+  </div>
+  <div class="fam">
+    <span class="tag">Geist Mono · numerals & SQL</span>
+    <span class="spec mono">28,431 戶 · 41.6 萬/坪 · 民國 115 年</span>
+  </div>
+</body>
+</html>

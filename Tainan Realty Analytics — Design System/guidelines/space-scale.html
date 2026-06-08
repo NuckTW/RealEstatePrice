@@ -1,0 +1,27 @@
+<!-- @dsCard group="Spacing" viewport="700x150" name="Space scale" subtitle="4px base step. Tight control gaps (10), 16px card gaps, 20px page gutters." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 24px; }
+  .row { display: flex; align-items: flex-end; gap: 16px; }
+  .col { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .bar { background: var(--accent); border-radius: 3px 3px 0 0; height: 56px; }
+  .lab { font: 11px var(--font-mono); color: var(--text-faint); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="col"><div class="bar" style="width:4px"></div><span class="lab">1·4</span></div>
+    <div class="col"><div class="bar" style="width:8px"></div><span class="lab">2·8</span></div>
+    <div class="col"><div class="bar" style="width:12px"></div><span class="lab">3·12</span></div>
+    <div class="col"><div class="bar" style="width:16px"></div><span class="lab">4·16</span></div>
+    <div class="col"><div class="bar" style="width:20px"></div><span class="lab">5·20</span></div>
+    <div class="col"><div class="bar" style="width:24px"></div><span class="lab">6·24</span></div>
+    <div class="col"><div class="bar" style="width:32px"></div><span class="lab">8·32</span></div>
+    <div class="col"><div class="bar" style="width:48px"></div><span class="lab">12·48</span></div>
+  </div>
+</body>
+</html>

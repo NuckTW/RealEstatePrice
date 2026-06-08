@@ -1,0 +1,15 @@
+/* ============================================================
+   Tainan Realty Analytics — Webfonts
+   ------------------------------------------------------------
+   Geist (sans)  + Geist Mono (numbers / SQL) carry over from the
+   original product. Noto Sans TC is added as the canonical
+   Traditional-Chinese face so 中文 renders with the same weight
+   rhythm as the Latin UI.
+
+   NOTE: Loaded from Google Fonts CDN rather than shipped binaries
+   — the full Noto Sans TC glyph set is megabytes per weight, so a
+   CDN link is the practical choice. Swap to self-hosted @font-face
+   here if you need a fully offline bundle.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400..600&family=Noto+Sans+TC:wght@300..700&display=swap');

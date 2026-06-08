@@ -1,0 +1,60 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Form controls" subtitle="Filter-bar selects, the chat/search input, and brass-fill checkboxes from the multi-select menus." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { padding: 26px; }
+  .group { margin-bottom: 20px; }
+  .lbl { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); margin-bottom: 11px; }
+  .rowf { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Select, TextInput, Checkbox } = window.TainanRealtyAnalyticsDesignSystem_e1be47;
+    function Demo() {
+      const [year, setYear] = React.useState('115');
+      const [age, setAge] = React.useState('all');
+      const [dists, setDists] = React.useState(['永康區']);
+      const toggle = d => setDists(dists.includes(d) ? dists.filter(x=>x!==d) : [...dists, d]);
+      return (
+        <div>
+          <div className="group">
+            <div className="lbl">Selects</div>
+            <div className="rowf">
+              <Select label="結束" value={year} onChange={setYear}
+                options={[{label:'114年',value:'114'},{label:'115年',value:'115'}]} />
+              <Select label="成／預售" value="all" onChange={()=>{}}
+                options={[{label:'成屋 + 預售',value:'all'},{label:'成屋',value:'false'},{label:'預售屋',value:'true'}]} />
+              <Select label="屋齡" value={age} onChange={setAge}
+                options={[{label:'不限屋齡',value:'all'},{label:'5年以內',value:'5'},{label:'10年以內',value:'10'}]} />
+            </div>
+          </div>
+          <div className="group">
+            <div className="lbl">Text input</div>
+            <div className="rowf" style={{maxWidth:460}}>
+              <TextInput placeholder="輸入問題，例如：東區今年平均單價是多少？" />
+            </div>
+          </div>
+          <div className="group" style={{marginBottom:0}}>
+            <div className="lbl">Checkboxes (multi-select)</div>
+            <div className="rowf" style={{gap:4}}>
+              {['永康區','東區','安南區','北區'].map(d => (
+                <Checkbox key={d} checked={dists.includes(d)} onChange={()=>toggle(d)}>{d}</Checkbox>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+  </script>
+</body>
+</html>

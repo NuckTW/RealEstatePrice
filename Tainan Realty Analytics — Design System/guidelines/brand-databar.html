@@ -1,0 +1,33 @@
+<!-- @dsCard group="Brand" viewport="700x200" name="Data-bar anatomy" subtitle="The signature table cell: a translucent value bar (.18) + leading edge tick (.75), right-aligned mono figure." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 24px; }
+  .panel { background: var(--surface-card); border: 1px solid var(--border-card); border-radius: var(--radius-xl); overflow: hidden; }
+  .ph { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line-soft); }
+  .tick { width: 4px; height: 16px; border-radius: var(--radius-full); background: var(--gradient-accent); }
+  .ph-t { font: var(--weight-semibold) 13px var(--font-sans); color: var(--text-strong); }
+  .ct { width: 100%; border-collapse: collapse; }
+  .ct td { padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,.03); }
+  .dist { font: var(--weight-medium) 12px var(--font-sans); color: var(--text-default); }
+  .barcell { text-align: right; }
+  .bar { position: relative; display: inline-flex; align-items: center; justify-content: flex-end; height: 24px; min-width: 120px; border-radius: var(--radius-sm); overflow: hidden; }
+  .fill { position: absolute; inset: 0 auto 0 0; border-radius: var(--radius-sm); }
+  .edge { position: absolute; left: 0; top: 4px; bottom: 4px; width: 2px; border-radius: var(--radius-full); }
+  .val { position: relative; z-index: 1; font: var(--weight-medium) 12px var(--font-mono); color: var(--text-default); padding: 0 8px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <div class="ph"><span class="tick"></span><span class="ph-t">行政區排行</span><span style="font:10px var(--font-mono);color:var(--text-faint);background:var(--surface-control);padding:1px 7px;border-radius:var(--radius-full)">37</span></div>
+    <table class="ct">
+      <tr><td class="dist">永康區</td><td class="barcell"><span class="bar" style="min-width:160px"><span class="fill" style="width:92%;background:var(--series-1);opacity:.18"></span><span class="edge" style="background:var(--series-1);opacity:.75"></span><span class="val">3,184</span></span></td></tr>
+      <tr><td class="dist">安南區</td><td class="barcell"><span class="bar" style="min-width:160px"><span class="fill" style="width:68%;background:var(--series-1);opacity:.18"></span><span class="edge" style="background:var(--series-1);opacity:.75"></span><span class="val">2,351</span></span></td></tr>
+      <tr><td class="dist">東區</td><td class="barcell"><span class="bar" style="min-width:160px"><span class="fill" style="width:44%;background:var(--series-1);opacity:.18"></span><span class="edge" style="background:var(--series-1);opacity:.75"></span><span class="val">1,520</span></span></td></tr>
+    </table>
+  </div>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!-- @dsCard group="Spacing" viewport="700x160" name="Radii" subtitle="6 bar · 8 button/select · 12 KPI · 16 panel · 20 dialog · full pill." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 24px; }
+  .row { display: flex; gap: 16px; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; }
+  .box { width: 100%; height: 60px; background: var(--surface-control); border: 1px solid var(--border-control); border-top: 2px solid var(--accent); }
+  .lab { font: 11px var(--font-mono); color: var(--text-faint); text-align: center; }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="col"><div class="box" style="border-radius:var(--radius-sm)"></div><span class="lab">sm · 6<br>bar</span></div>
+    <div class="col"><div class="box" style="border-radius:var(--radius-md)"></div><span class="lab">md · 8<br>button</span></div>
+    <div class="col"><div class="box" style="border-radius:var(--radius-lg)"></div><span class="lab">lg · 12<br>KPI</span></div>
+    <div class="col"><div class="box" style="border-radius:var(--radius-xl)"></div><span class="lab">xl · 16<br>panel</span></div>
+    <div class="col"><div class="box" style="border-radius:var(--radius-2xl)"></div><span class="lab">2xl · 20<br>dialog</span></div>
+    <div class="col"><div class="box" style="border-radius:var(--radius-full)"></div><span class="lab">full<br>pill</span></div>
+  </div>
+</body>
+</html>

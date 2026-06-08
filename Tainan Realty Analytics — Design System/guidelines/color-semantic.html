@@ -1,0 +1,41 @@
+<!-- @dsCard group="Colors" viewport="700x170" name="Semantic & text" subtitle="Status colours (positive=成屋 teal, info=預售 sky, warning, negative) and the four-step text ramp." -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { padding: 22px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .sub { font: var(--type-label); text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--text-faint); margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; }
+  .pill { flex: 1; height: 34px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font: var(--weight-semibold) 11px var(--font-sans); }
+  .text-row { display: flex; flex-direction: column; gap: 5px; }
+  .tline { font: var(--weight-semibold) 15px var(--font-sans); }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div>
+      <div class="sub">Status</div>
+      <div class="row">
+        <div class="pill" style="background:rgba(43,179,163,.16);color:var(--positive)">positive</div>
+        <div class="pill" style="background:rgba(76,168,224,.16);color:var(--info)">info</div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div class="pill" style="background:rgba(232,162,59,.16);color:var(--warning)">warning</div>
+        <div class="pill" style="background:rgba(224,87,63,.16);color:var(--negative)">negative</div>
+      </div>
+    </div>
+    <div>
+      <div class="sub">Text on surface</div>
+      <div class="text-row">
+        <div class="tline" style="color:var(--text-strong)">text-strong · 標題</div>
+        <div class="tline" style="color:var(--text-default)">text-default · 內文</div>
+        <div class="tline" style="color:var(--text-muted)">text-muted · 次要</div>
+        <div class="tline" style="color:var(--text-faint)">text-faint · 說明</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

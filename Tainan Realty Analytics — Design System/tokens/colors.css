@@ -1,0 +1,149 @@
+/* ============================================================
+   台南市不動產分析 — Colour System  ·  "Brass & Clay"
+   ------------------------------------------------------------
+   History:
+     v1 source : navy ground + violet/indigo primary.
+     (我要改變色系)        → re-skinned.
+     (不要綠色主題)        → NO green theme.
+   This palette is anchored to Tainan's temple heritage: a warm,
+   brown-tinted INK ground, a BRASS (amber) primary, and a
+   terracotta CLAY secondary. Confident, financial, and warm —
+   with no leafy green anywhere in the brand.
+
+   Two layers:
+   1. Raw scales (--ink-* --brass-* --clay-* --series-*) — fixed.
+   2. Semantic aliases (--surface-* --text-* --accent-* …) — what
+      components reference. These FLIP between dark (default) and
+      light (:root[data-theme="light"]). Re-skin by editing scales;
+      re-theme by editing the semantic blocks.
+   ============================================================ */
+
+:root {
+  /* ── Ink ground (warm, brown-tinted near-blacks) ─────────── */
+  --ink-950: #0c0a06;   /* deepest — app letterbox / code wells     */
+  --ink-900: #15110b;   /* page background                          */
+  --ink-850: #1b160e;   /* sunken wells, table stripes              */
+  --ink-800: #211b12;   /* card / panel surface                     */
+  --ink-750: #29221a;   /* control surface (selects, inputs)        */
+  --ink-700: #342b20;   /* hover surface                            */
+  --ink-600: #463b2c;   /* strong divider / pressed                 */
+
+  /* Hairline borders — translucent over the ground (dark default) */
+  --line-soft:   rgba(255, 255, 255, 0.06);
+  --line-mid:    rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.14);
+
+  /* ── Brass — primary accent (amber / temple brass) ───────── */
+  --brass-200: #f7dca2;
+  --brass-300: #f0c86e;
+  --brass-400: #e8ad3f;   /* tint on dark                             */
+  --brass-500: #d9912a;   /* primary solid fill                       */
+  --brass-600: #b9761d;   /* primary hover / accent text on light     */
+  --brass-700: #8f5a16;   /* gradient end / strong text on light      */
+  --brass-800: #6a4312;
+  --brass-900: #43290c;
+
+  /* ── Clay — warm secondary (terracotta / 赤崁 brick) ──────── */
+  --clay-200: #f1c5af;
+  --clay-300: #e3a081;
+  --clay-400: #d57a54;   /* secondary tint                           */
+  --clay-500: #c0613d;   /* secondary solid                          */
+  --clay-600: #9c4a2c;
+
+  /* ── Categorical data-viz series (8, warm-led, no leaf green) */
+  --series-1: #d9912a;   /* brass      */
+  --series-2: #c0613d;   /* clay       */
+  --series-3: #4ca8e0;   /* sky        */
+  --series-4: #9b7bd4;   /* plum       */
+  --series-5: #e0739e;   /* rose       */
+  --series-6: #2bb3a3;   /* teal       */
+  --series-7: #6e8ab0;   /* slate-blue */
+  --series-8: #cda86a;   /* sand       */
+
+  /* ── Semantic status ─────────────────────────────────────── */
+  --positive: #2bb3a3;   /* up / gain / 成屋  (teal, not leaf-green) */
+  --negative: #e0573f;   /* down / loss / danger                    */
+  --warning:  #e8a23b;   /* caution                                 */
+  --info:     #4ca8e0;   /* neutral info / 預售                      */
+
+  /* ── Text on warm ink (dark default) ─────────────────────── */
+  --text-strong: #f6f1e8;   /* headings, KPI values                 */
+  --text-default: #d6ccbb;  /* body, table cells                    */
+  --text-muted:  #9c9282;   /* labels, secondary                    */
+  --text-faint:  #6e6556;   /* captions, column heads, disabled     */
+
+  /* ════════════════════════════════════════════════════════
+     SEMANTIC ALIASES — DARK (default).  Components use these.
+     ════════════════════════════════════════════════════════ */
+  --bg-app:        var(--ink-900);
+  --bg-sunken:     var(--ink-850);
+  --surface-card:  var(--ink-800);
+  --surface-control: var(--ink-750);
+  --surface-hover: var(--ink-700);
+  --surface-overlay: #1d1810;          /* dropdowns / dialogs (opaque) */
+
+  --border-card:   var(--line-soft);
+  --border-control: var(--line-mid);
+  --border-strong: var(--line-strong);
+
+  --accent:        var(--brass-500);
+  --accent-hover:  var(--brass-600);
+  --accent-tint:   var(--brass-400);          /* text/icon accent          */
+  --accent-wash:   rgba(217, 145, 42, 0.12);  /* faint accent fill         */
+  --accent-wash-border: rgba(217, 145, 42, 0.26);
+
+  --secondary:     var(--clay-500);
+  --secondary-tint: var(--clay-400);
+
+  /* Dark text that sits on the brass fill (button / checkbox check) */
+  --on-accent:     #241606;
+
+  /* Action gradients */
+  --gradient-accent: linear-gradient(135deg, var(--brass-500) 0%, var(--brass-700) 100%);
+  --gradient-brand:  linear-gradient(135deg, var(--brass-400) 0%, var(--clay-500) 120%);
+
+  --focus-ring: rgba(217, 145, 42, 0.45);
+}
+
+/* ════════════════════════════════════════════════════════════
+   LIGHT THEME  —  :root[data-theme="light"]
+   Flips surfaces, text, borders, chrome and shadow tokens. Raw
+   scales (brass/clay/series) stay fixed; accent-tint darkens so
+   amber text reads on light surfaces. Toggle via <ThemeToggle/>.
+   ════════════════════════════════════════════════════════════ */
+:root[data-theme="light"] {
+  --line-soft:   rgba(45, 33, 15, 0.07);
+  --line-mid:    rgba(45, 33, 15, 0.11);
+  --line-strong: rgba(45, 33, 15, 0.20);
+
+  --text-strong: #2a1f10;
+  --text-default: #4a4030;
+  --text-muted:  #6f6555;
+  --text-faint:  #9a9082;
+
+  --bg-app:        #faf6ee;
+  --bg-sunken:     #f1ebdf;
+  --surface-card:  #ffffff;
+  --surface-control: #f3eee3;
+  --surface-hover: #ebe4d6;
+  --surface-overlay: #ffffff;
+
+  --border-card:   rgba(45, 33, 15, 0.09);
+  --border-control: rgba(45, 33, 15, 0.14);
+  --border-strong: rgba(45, 33, 15, 0.22);
+
+  --accent:        var(--brass-500);
+  --accent-hover:  var(--brass-600);
+  --accent-tint:   var(--brass-700);          /* darker amber for light bg */
+  --accent-wash:   rgba(217, 145, 42, 0.16);
+  --accent-wash-border: rgba(217, 145, 42, 0.34);
+
+  --on-accent:     #241606;
+
+  /* chrome + elevation re-tuned for light (override elevation.css) */
+  --chrome-bg:     rgba(250, 246, 238, 0.82);
+  --shadow-card:   0 1px 2px rgba(45,33,15,0.05), 0 10px 26px -18px rgba(45,33,15,0.22);
+  --shadow-pop:    0 12px 32px -8px rgba(45,33,15,0.18), 0 0 0 1px rgba(45,33,15,0.06);
+  --shadow-overlay: 0 24px 60px -16px rgba(45,33,15,0.24);
+  --glow-accent:   0 8px 20px -6px rgba(217,145,42,0.32);
+}
