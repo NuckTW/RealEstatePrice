@@ -28,6 +28,24 @@ const METRICS = [
   { key: 'sales',       label: '總銷(億)'    },
 ]
 
+const BUILDING_TYPES = [
+  { key: '', label: '全部類型' },
+  { key: '住宅大樓(11層含以上有電梯)', label: '住宅大樓' },
+  { key: '華廈(10層含以下有電梯)',     label: '華廈'    },
+  { key: '透天厝',                     label: '透天厝'  },
+  { key: '公寓(5樓含以下無電梯)',       label: '公寓'    },
+  { key: '店面(店鋪)',                 label: '店面'    },
+]
+
+const ROOM_TYPES = [
+  { key: '',   label: '全部房型' },
+  { key: '1',  label: '1房' },
+  { key: '2',  label: '2房' },
+  { key: '3',  label: '3房' },
+  { key: '4',  label: '4房' },
+  { key: '5+', label: '5房以上' },
+]
+
 // 支援「最高 / 最低」統計的指標（需有單筆交易數值可比較）
 const STAT_SUPPORTED = new Set(['unit_price', 'total_price', 'area', 'parking'])
 
@@ -235,6 +253,8 @@ export default function AnalysisPanel() {
   const [granularity, setGranularity] = useState('quarter')
   const [chartType,   setChartType]   = useState<ChartType>('line')
   const [mode, setMode] = useState('all')  // 'all' | 'presale' | 'existing'
+  const [buildingType, setBuildingType] = useState('')
+  const [roomType,     setRoomType]     = useState('')
   const [yearFrom,    setYearFrom]    = useState(110)
   const [monthFrom,   setMonthFrom]   = useState(1)
   const [yearTo,      setYearTo]      = useState(115)
@@ -254,6 +274,7 @@ export default function AnalysisPanel() {
       const p = new URLSearchParams({
         metric, granularity, mode,
         stat: STAT_SUPPORTED.has(metric) ? stat : 'avg',
+        buildingType, roomType,
         yearFrom: String(yearFrom), monthFrom: String(monthFrom),
         yearTo:   String(yearTo),   monthTo:   String(monthTo),
       })
@@ -262,7 +283,7 @@ export default function AnalysisPanel() {
       setData(json)
       if (!selectedDistricts.length && json.districts?.length) setSelectedDistricts(json.districts)
     } finally { setLoading(false) }
-  }, [metric, stat, granularity, mode, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
+  }, [metric, stat, granularity, mode, buildingType, roomType, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
 
   // 指標切換到不支援最高/最低統計時，自動回到「平均」
   useEffect(() => {
@@ -335,6 +356,18 @@ export default function AnalysisPanel() {
               <option value="existing">成屋</option>
             </select>
           </div>
+          <div>
+            {label('建物型態')}
+            <select value={buildingType} onChange={e => setBuildingType(e.target.value)} style={selectStyle()}>
+              {BUILDING_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            {label('房型')}
+            <select value={roomType} onChange={e => setRoomType(e.target.value)} style={selectStyle()}>
+              {ROOM_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+          </div>
         </div>
 
         {/* Row 2: 行政區 + 時間範圍 */}
@@ -388,6 +421,8 @@ export default function AnalysisPanel() {
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
                 {selectedDistricts.join(' · ')}
                 {mode !== 'all' && ` · ${mode === 'presale' ? '預售屋' : '成屋'}`}
+                {buildingType && ` · ${BUILDING_TYPES.find(t => t.key === buildingType)?.label}`}
+                {roomType && ` · ${ROOM_TYPES.find(t => t.key === roomType)?.label}`}
               </span>
             )}
           </div>

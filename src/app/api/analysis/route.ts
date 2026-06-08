@@ -140,6 +140,15 @@ export async function GET(req: NextRequest) {
   const dateTo   = `${nextY}-${String(nextM).padStart(2, '0')}-01`
   const dateCond = `transaction_date >= '${dateFrom}' AND transaction_date < '${dateTo}'`
 
+  // 建物型態 / 房型 篩選
+  const buildingType = (p.get('buildingType') ?? '').trim()
+  const roomType     = (p.get('roomType') ?? '').trim()
+
+  const filterConds: string[] = [dateCond]
+  if (buildingType) filterConds.push(`building_type = '${buildingType.replace(/'/g, "''")}'`)
+  if (roomType === '5+') filterConds.push(`rooms >= 5`)
+  else if (/^[1-4]$/.test(roomType)) filterConds.push(`rooms = ${roomType}`)
+
   // 行政區清單
   let districts: string[] = (p.get('districts') ?? '').split(',').map(s => s.trim()).filter(Boolean)
 
@@ -148,7 +157,7 @@ export async function GET(req: NextRequest) {
       SELECT district, COUNT(*) AS cnt
       FROM transactions
       WHERE unit_price_sqm > 0 AND total_price > 0
-        AND ${dateCond}
+        AND ${filterConds.join(' AND ')}
         AND district IS NOT NULL
       GROUP BY district ORDER BY cnt DESC LIMIT 5`.trim()
 
@@ -188,7 +197,7 @@ export async function GET(req: NextRequest) {
   if (mode === 'presale' || mode === 'existing') {
     // ── 單一類型：只看預售 or 只看成屋 ─────────────────
     const cond = mode === 'presale' ? `is_presale = true` : `is_presale = false`
-    const rows = await runSeries([dateCond, cond])
+    const rows = await runSeries([...filterConds, cond])
     const periodSet = Array.from(new Set(rows.map(r => r.period))).sort()
     const series = buildSeries(rows, periodSet, districts)
     return NextResponse.json({ periods: periodSet, series, districts, stat: useExtreme ? stat : 'avg' })
@@ -196,8 +205,8 @@ export async function GET(req: NextRequest) {
   } else if (mode === 'split') {
     // ── 分開模式：每區兩條線（預售 + 成屋） ─────────────
     const [presaleRows, existingRows] = await Promise.all([
-      runSeries([dateCond, `is_presale = true`]),
-      runSeries([dateCond, `is_presale = false`]),
+      runSeries([...filterConds, `is_presale = true`]),
+      runSeries([...filterConds, `is_presale = false`]),
     ])
     const allPeriods = Array.from(new Set([
       ...presaleRows.map(r => r.period),
@@ -211,7 +220,7 @@ export async function GET(req: NextRequest) {
 
   } else {
     // ── 合計模式（預設） ─────────────────────────────────
-    const rows = await runSeries([dateCond])
+    const rows = await runSeries(filterConds)
     const periodSet = Array.from(new Set(rows.map(r => r.period))).sort()
     const series = buildSeries(rows, periodSet, districts)
     return NextResponse.json({ periods: periodSet, series, districts, stat: useExtreme ? stat : 'avg' })
