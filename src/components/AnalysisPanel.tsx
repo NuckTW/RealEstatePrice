@@ -21,7 +21,7 @@ const ALL_DISTRICTS = [
 
 const METRICS = [
   { key: 'unit_price',  label: '單價(萬/坪)' },
-  { key: 'total_price', label: '均總價(萬)'  },
+  { key: 'total_price', label: '總價(萬)'  },
   { key: 'area',        label: '坪數'        },
   { key: 'parking',     label: '車位(萬)'    },
   { key: 'count',       label: '交易量(筆)'  },
