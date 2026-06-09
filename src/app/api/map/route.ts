@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
         AND t.project_name IS NOT NULL AND t.project_name != ''
         AND bl.lat IS NOT NULL
       GROUP BY t.project_name, t.district, bl.lat, bl.lon
+      HAVING MAX(t.transaction_date) >= CURRENT_DATE - INTERVAL '36 months'
       ORDER BY count DESC
       LIMIT 2000
     `) : []
