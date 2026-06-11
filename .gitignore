@@ -53,3 +53,4 @@ data/*.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!data/housing_price_index.csv
