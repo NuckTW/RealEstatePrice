@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { supabaseAdmin } from '@/lib/supabase'
+import { runQueryRaw } from '@/lib/queries/client'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -195,8 +195,7 @@ ${historyCtx}使用者問題：「${question}」
         send({ type: 'sql', sql })
 
         // ── Step 2：執行 SQL ─────────────────────────────
-        const { data: rpcResult, error: dbError } = await supabaseAdmin
-          .rpc('execute_query', { query_text: sql })
+        const { rows: queryRows, error: dbError } = await runQueryRaw(sql)
 
         let rows: Record<string, unknown>[] = []
         if (dbError) {
@@ -204,7 +203,7 @@ ${historyCtx}使用者問題：「${question}」
           send({ type: 'db_error', message: dbError.message })
           // 繼續讓 AI 說明
         } else {
-          rows = Array.isArray(rpcResult) ? rpcResult : (rpcResult ? [rpcResult] : [])
+          rows = queryRows
         }
 
         const chart = detectChartConfig(rows)
