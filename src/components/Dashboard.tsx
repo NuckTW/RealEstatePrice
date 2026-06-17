@@ -13,6 +13,7 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => 
     <span className="text-gray-600 text-sm">地圖載入中…</span>
   </div>
 ) })
+const AreaAnalysisTab = dynamic(() => import('./AreaAnalysisTab'), { ssr: false })
 
 /* ── Column definitions ────────────────────────────────────── */
 // Brass & Clay series colours
@@ -127,7 +128,7 @@ export default function Dashboard() {
   const [data, setData]       = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS)
-  const [activeTab, setActiveTab] = useState<'data' | 'map'>('data')
+  const [activeTab, setActiveTab] = useState<'data' | 'map' | 'area'>('data')
 
   // Case detail panel state
   const [panelOpen, setPanelOpen]         = useState(false)
@@ -190,6 +191,7 @@ export default function Dashboard() {
         {([
           { id: 'data', label: '▦ 數據看板' },
           { id: 'map',  label: '◵ 地圖' },
+          { id: 'area', label: '⬡ 框選分析' },
         ] as const).map(tab => {
           const active = activeTab === tab.id
           return (
@@ -238,6 +240,11 @@ export default function Dashboard() {
             }}
           />
         </div>
+      )}
+
+      {/* ── 框選分析 tab ── */}
+      {activeTab === 'area' && (
+        <AreaAnalysisTab filters={filters} />
       )}
 
       {/* ── 數據 tab ── */}

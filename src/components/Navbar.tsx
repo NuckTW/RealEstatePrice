@@ -26,8 +26,7 @@ export default function Navbar() {
     { href: '/analysis',    label: '數據分析', icon: '◈' },
     { href: '/price-index', label: '價格指數', icon: '◉' },
     { href: '/supply',      label: '市場供給', icon: '▤' },
-    { href: '/area-analysis', label: '框選分析', icon: '⬡' },
-    { href: '/chat',          label: 'AI 問答',  icon: '◇' },
+    { href: '/chat', label: 'AI 問答', icon: '◇' },
   ]
 
   return (
