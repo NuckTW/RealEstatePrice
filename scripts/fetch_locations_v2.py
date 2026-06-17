@@ -61,11 +61,13 @@ def nom_get(session: requests.Session, q: str) -> list:
             time.sleep(wait)
     return []
 
-def geocode_road(session: requests.Session, road: str) -> tuple:
-    """查 road + 台南 的座標，回傳 (lat, lon) 或 (None, None)"""
+def geocode_road(session: requests.Session, road: str, district: str = '') -> tuple:
+    """查路名座標，先帶行政區再 fallback 到只帶台南，回傳 (lat, lon) 或 (None, None)"""
     if not road or len(road) < 2:
         return None, None
-    for q in [f'{road} 台南', road]:
+    # 優先查「路名 + 行政區 + 台南」以區分跨區同名路（中山路、三民路等）
+    queries = [f'{road} 台南市{district}', f'{road} 台南'] if district else [f'{road} 台南', road]
+    for q in queries:
         data = nom_get(session, q)
         time.sleep(DELAY)
         for item in data:
@@ -185,7 +187,7 @@ def main():
     print(f'  需補: {len(presale_needed)} 個')
 
     # 按路名去重：同一路名只查一次，結果共享
-    road_cache: dict[str, tuple] = {}   # road → (lat, lon) or (None, None)
+    road_cache: dict[tuple, tuple] = {}   # (road, district) → (lat, lon) or (None, None)
 
     hit, miss = 0, 0
     for i, (name, district, addr) in enumerate(presale_needed, 1):
@@ -194,12 +196,13 @@ def main():
             miss += 1
             continue
 
-        if road not in road_cache:
-            lat, lon = geocode_road(nom, road)
-            road_cache[road] = (lat, lon)
+        cache_key = (road, district)
+        if cache_key not in road_cache:
+            lat, lon = geocode_road(nom, road, district)
+            road_cache[cache_key] = (lat, lon)
             time.sleep(DELAY)
         else:
-            lat, lon = road_cache[road]
+            lat, lon = road_cache[cache_key]
 
         if lat and lon:
             upsert_location(name, 'presale', district, lat, lon)
@@ -242,11 +245,12 @@ def main():
         print(f'  [{di}/{len(DISTRICTS)}] {district}: {len(addrs)} 地址 → {len(unique_roads)} 條路', end='  ', flush=True)
         district_hit = 0
         for road in unique_roads:
-            if road in road_cache:
-                lat, lon = road_cache[road]
+            cache_key = (road, district)
+            if cache_key in road_cache:
+                lat, lon = road_cache[cache_key]
             else:
-                lat, lon = geocode_road(nom, road)
-                road_cache[road] = (lat, lon)
+                lat, lon = geocode_road(nom, road, district)
+                road_cache[cache_key] = (lat, lon)
 
             if lat and lon:
                 for loc_key, dist in road_to_keys[road]:
