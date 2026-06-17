@@ -41,6 +41,25 @@ export async function fetchProjectTrend(projects: string[]): Promise<Row[]> {
   `)
 }
 
+/** 框選分析：各建案建物型態分布 */
+export async function fetchProjectBuildingTypes(projects: string[]): Promise<Row[]> {
+  if (!projects.length) return []
+  const list = projects.map(p => `'${p.replace(/'/g, "''")}'`).join(',')
+  return runQuery(`
+    SELECT
+      t.project_name,
+      t.building_type,
+      COUNT(*)::int AS count
+    FROM transactions t
+    WHERE t.is_presale = true
+      AND t.project_name IN (${list})
+      AND t.transaction_target LIKE '%建物%'
+      AND t.building_type IS NOT NULL AND t.building_type != ''
+    GROUP BY t.project_name, t.building_type
+    ORDER BY t.project_name, count DESC
+  `)
+}
+
 /** 搜尋建案名稱（供手動加入） */
 export async function searchPresaleProjects(q: string): Promise<Row[]> {
   const safe = q.replace(/'/g, "''")

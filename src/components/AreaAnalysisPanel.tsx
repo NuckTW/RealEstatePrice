@@ -29,6 +29,12 @@ interface SearchResult {
   count: number
 }
 
+interface BuildingTypeRow {
+  project_name: string
+  building_type: string
+  count: number
+}
+
 const COLORS = [
   '#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6',
   '#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa',
@@ -43,9 +49,10 @@ interface Props {
 }
 
 export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) {
-  const [stats,   setStats]   = useState<ProjectStat[]>([])
-  const [trend,   setTrend]   = useState<TrendRow[]>([])
-  const [loading, setLoading] = useState(false)
+  const [stats,         setStats]         = useState<ProjectStat[]>([])
+  const [trend,         setTrend]         = useState<TrendRow[]>([])
+  const [buildingTypes, setBuildingTypes] = useState<BuildingTypeRow[]>([])
+  const [loading,       setLoading]       = useState(false)
   const [search,  setSearch]  = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [showDrop, setShowDrop] = useState(false)
@@ -57,7 +64,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
     setLoading(true)
     fetch(`/api/area-analysis?projects=${selected.map(encodeURIComponent).join(',')}`)
       .then(r => r.json())
-      .then(d => { setStats(d.stats ?? []); setTrend(d.trend ?? []) })
+      .then(d => { setStats(d.stats ?? []); setTrend(d.trend ?? []); setBuildingTypes(d.buildingTypes ?? []) })
       .finally(() => setLoading(false))
   }, [selected])
 
@@ -161,6 +168,40 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
               </div>
             ))}
           </div>
+
+          {/* 房屋類型分布 */}
+          {buildingTypes.length > 0 && (() => {
+            // 彙總各型態總戶數
+            const typeMap: Record<string, number> = {}
+            buildingTypes.forEach(r => { typeMap[r.building_type] = (typeMap[r.building_type] ?? 0) + r.count })
+            const total = Object.values(typeMap).reduce((a, b) => a + b, 0)
+            const sorted = Object.entries(typeMap).sort((a, b) => b[1] - a[1])
+            const TYPE_COLORS = ['#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4']
+            return (
+              <div>
+                <div className="text-[10px] text-gray-500 mb-1.5">房屋類型分布</div>
+                {/* 堆疊進度條 */}
+                <div className="flex rounded-full overflow-hidden h-3 mb-2">
+                  {sorted.map(([type, cnt], i) => (
+                    <div
+                      key={type}
+                      style={{ width: `${cnt / total * 100}%`, background: TYPE_COLORS[i % TYPE_COLORS.length] }}
+                      title={`${type}: ${cnt} 戶`}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {sorted.map(([type, cnt], i) => (
+                    <span key={type} className="flex items-center gap-1 text-[10px] text-gray-400">
+                      <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
+                      {type}
+                      <span className="text-gray-500">{cnt}戶 ({Math.round(cnt / total * 100)}%)</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* 均單價長條圖 */}
           <div>
