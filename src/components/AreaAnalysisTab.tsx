@@ -47,13 +47,13 @@ export default function AreaAnalysisTab({ filters }: Props) {
     setSelected(prev => {
       const next = [...prev]
       keys.forEach(k => { if (!next.includes(k)) next.push(k) })
-      return next.slice(0, 10)
+      return next.slice(0, 15)
     })
   }, [])
 
   const handleMarkerToggle = useCallback((key: string) => {
     setSelected(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key].slice(0, 10)
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key].slice(0, 15)
     )
   }, [])
 
@@ -62,7 +62,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
   }, [])
 
   const handleAdd = useCallback((key: string) => {
-    setSelected(prev => prev.includes(key) ? prev : [...prev, key].slice(0, 10))
+    setSelected(prev => prev.includes(key) ? prev : [...prev, key].slice(0, 15))
   }, [])
 
   return (
@@ -70,7 +70,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
       {/* 說明列 + 清除按鈕 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <p style={{ fontSize: 11, color: 'var(--text-faint)' }}>
-          在地圖右上角點「矩形」工具框選範圍，或直接點擊建案標記加入分析（最多 10 個）
+          在地圖右上角點「矩形」工具框選範圍，或直接點擊建案標記加入分析（最多 15 個）
         </p>
         {selected.length > 0 && (
           <button

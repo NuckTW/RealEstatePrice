@@ -24,6 +24,7 @@ interface Props {
 const COLORS = [
   '#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6',
   '#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa',
+  '#facc15','#38bdf8','#4ade80','#fb923c','#c084fc',
 ]
 
 export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onMarkerToggle }: Props) {

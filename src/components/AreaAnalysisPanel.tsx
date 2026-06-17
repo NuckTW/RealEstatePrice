@@ -38,9 +38,10 @@ interface BuildingTypeRow {
 const COLORS = [
   '#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6',
   '#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa',
+  '#facc15','#38bdf8','#4ade80','#fb923c','#c084fc',
 ]
 
-const MAX_SELECT = 10
+const MAX_SELECT = 15
 
 interface Props {
   selected: string[]
@@ -146,7 +147,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-500 text-center py-4">在地圖上框選建案或搜尋加入</p>
+        <p className="text-xs text-gray-500 text-center py-1.5">在地圖上框選建案或搜尋加入</p>
       )}
 
       {loading && (
@@ -206,12 +207,12 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           {/* 均單價長條圖 */}
           <div>
             <div className="text-[10px] text-gray-500 mb-1">均單價對比（萬/坪）</div>
-            <ResponsiveContainer width="100%" height={160}>
+            <ResponsiveContainer width="100%" height={Math.max(160, stats.length * 22)}>
               <BarChart data={stats} layout="vertical" margin={{ left: 4, right: 24, top: 0, bottom: 0 }}>
                 <XAxis type="number" tick={{ fontSize: 9, fill: '#6b7280' }} />
                 <YAxis type="category" dataKey="project_name" tick={{ fontSize: 9, fill: '#9ca3af' }} width={72} />
                 <Tooltip
-                  contentStyle={{ background: '#0d1420', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, fontSize: 11 }}
+                  contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
                   formatter={(v: unknown) => [`${v} 萬/坪`, '均單價']}
                 />
                 <Bar dataKey="unit_price" radius={[0, 4, 4, 0]}>
@@ -233,7 +234,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                   <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#6b7280' }} minTickGap={20} />
                   <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} width={32} />
                   <Tooltip
-                    contentStyle={{ background: '#0d1420', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, fontSize: 11 }}
+                    contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
                     formatter={(v: unknown, name: unknown) => [`${v} 萬/坪`, String(name)]}
                   />
                   <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
