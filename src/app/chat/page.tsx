@@ -1,5 +1,4 @@
 import Navbar from '@/components/Navbar'
-import ChatInterface from '@/components/ChatInterface'
 
 export default function ChatPage() {
   return (
@@ -7,27 +6,23 @@ export default function ChatPage() {
       <Navbar />
 
       <div style={{ maxWidth: 896, margin: '0 auto', padding: '32px 24px' }}>
-        <div style={{ marginBottom: 24 }}>
+        <div style={{
+          textAlign: 'center', padding: '64px 24px',
+          border: '1px solid var(--border-card)', borderRadius: 'var(--radius-xl)',
+          background: 'var(--surface-card)',
+        }}>
+          <div style={{ fontSize: 32, opacity: 0.4, marginBottom: 12 }}>◇</div>
           <h2 style={{
             margin: 0,
-            fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)',
-            color: 'var(--text-strong)', fontFamily: 'var(--font-sans)',
-          }}>
-            AI 問答助手
-            <span style={{
-              fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-regular)',
-              color: 'var(--text-muted)', marginLeft: 12,
-            }}>用自然語言查詢實價登錄資料</span>
-          </h2>
+            fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)',
+            color: 'var(--text-muted)', fontFamily: 'var(--font-sans)',
+          }}>AI 問答功能暫停中</h2>
           <p style={{
             margin: '8px 0 0',
-            fontSize: 'var(--text-sm)', color: 'var(--text-muted)',
+            fontSize: 'var(--text-sm)', color: 'var(--text-faint)',
             fontFamily: 'var(--font-sans)',
-          }}>
-            直接用中文提問，AI 會自動轉換為資料庫查詢並回覆結果
-          </p>
+          }}>此功能目前暫停服務，敬請期待後續更新</p>
         </div>
-        <ChatInterface />
       </div>
 
       <footer style={{

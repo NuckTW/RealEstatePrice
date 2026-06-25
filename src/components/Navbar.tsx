@@ -26,7 +26,7 @@ export default function Navbar() {
     { href: '/analysis',    label: '數據分析', icon: '◈' },
     { href: '/price-index', label: '價格指數', icon: '◉' },
     { href: '/supply',      label: '市場供給', icon: '▤' },
-    { href: '/chat', label: 'AI 問答', icon: '◇' },
+    { href: '/chat',        label: 'AI 問答', icon: '◇', disabled: true },
   ]
 
   return (
@@ -78,8 +78,33 @@ export default function Navbar() {
         {/* Right: nav + theme toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {navItems.map(({ href, label, icon }) => {
+            {navItems.map(({ href, label, icon, disabled }) => {
               const active = pathname === href
+
+              if (disabled) {
+                return (
+                  <span
+                    key={href}
+                    title="功能暫停中"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '0 12px', height: 'var(--control-h-sm)',
+                      borderRadius: 'var(--radius-full)',
+                      fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
+                      fontFamily: 'var(--font-sans)',
+                      border: '1px solid transparent',
+                      color: 'var(--text-faint)',
+                      opacity: 0.4,
+                      cursor: 'not-allowed',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <span style={{ opacity: 0.75 }}>{icon}</span>
+                    {label}
+                  </span>
+                )
+              }
+
               return (
                 <Link
                   key={href}
