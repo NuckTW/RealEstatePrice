@@ -170,7 +170,7 @@ def log_scrape(season, status, inserted, skipped, error=None):
     try:
         supabase.table('scrape_logs').insert({
             'season': season, 'status': status,
-            'rows_inserted': inserted, 'rows_skipped': skipped,
+            'records_added': inserted,
             'error_message': error,
         }).execute()
     except Exception as e:
@@ -223,10 +223,11 @@ def process_season(session: requests.Session, season: str):
     if total_ins == 0 and total_skip == 0:
         log_scrape(season, 'failed', 0, 0, '無資料或下載失敗')
         print('無資料')
-        return
+        return 0, 0
 
     log_scrape(season, 'success', total_ins, total_skip)
     print(f'寫入 {total_ins} 筆，跳過 {total_skip} 筆')
+    return total_ins, total_skip
 
 
 def get_season_from_iso(iso_date: str):

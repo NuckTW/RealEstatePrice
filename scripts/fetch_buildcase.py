@@ -132,6 +132,7 @@ def main():
             print(f'  [寫入錯誤] {e}')
 
     print(f'✅ 寫入 {inserted} 筆備查建案到 presale_projects')
+    return inserted
 
 
 if __name__ == '__main__':

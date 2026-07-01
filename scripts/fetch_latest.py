@@ -144,6 +144,15 @@ def process_dfs(dfs: list, label: str):
 
 # ── 主流程 ────────────────────────────────────────────────────────
 
+def write_github_summary(lines: list):
+    """把更新摘要寫進 GitHub Actions 的 Step Summary（本機執行時 env 不存在，直接跳過）。"""
+    path = os.environ.get('GITHUB_STEP_SUMMARY')
+    if not path:
+        return
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
 def main():
     today = date.today()
     season = get_latest_season()
@@ -154,7 +163,7 @@ def main():
 
     # ── 1. 嘗試季批次 ────────────────────────────────────────────
     print(f'\n[1/3] 季批次 {season}')
-    process_season(session, season)
+    season_ins, season_skip = process_season(session, season)
 
     # ── 2. 前期批次（補缺）──────────────────────────────────────
     print('\n[2/3] 前期批次補缺')
@@ -171,6 +180,7 @@ def main():
     missing = [b for b in all_batches if batch_to_iso(b) > last_date]
     print(f'  需補缺批次：{missing}')
 
+    missing_ins = missing_skip = 0
     for batch_date in missing:
         print(f'  ▶ 批次 {batch_date}', end='  ', flush=True)
         dfs = fetch_history_batch(session, batch_date)
@@ -178,23 +188,41 @@ def main():
             print('無資料')
         else:
             ins, skip = process_dfs(dfs, batch_date)
+            missing_ins += ins; missing_skip += skip
             print(f'寫入 {ins} 筆，跳過 {skip} 筆')
         time.sleep(DELAY_SEC)
 
     # ── 3. 本期（最新10天）──────────────────────────────────────
     print('\n[3/3] 本期下載（最新10天）')
+    current_ins = current_skip = 0
     dfs = fetch_current_period(session)
     if not dfs:
         print('  本期無資料或下載失敗')
     else:
-        ins, skip = process_dfs(dfs, 'current')
-        print(f'  寫入 {ins} 筆，跳過 {skip} 筆')
+        current_ins, current_skip = process_dfs(dfs, 'current')
+        print(f'  寫入 {current_ins} 筆，跳過 {current_skip} 筆')
 
     # ── 4. 更新備查建案核准戶數 ────────────────────────────────
     print('\n[4/4] 備查建案（核准總戶數）')
-    update_buildcase()
+    buildcase_ins = update_buildcase() or 0
 
     print('\n✅ 月度更新完成！')
+
+    # ── 5. 彙總摘要（寫入 GitHub Actions Step Summary）───────────
+    total_ins = season_ins + missing_ins + current_ins
+    final_date = get_last_db_date()
+    write_github_summary([
+        f'## 📅 台南實價登錄更新 — {today}',
+        '',
+        '| 項目 | 筆數 |',
+        '|---|---|',
+        f'| 季批次 {season} | {season_ins} 筆（跳過 {season_skip}）|',
+        f'| 前期補缺（{len(missing)} 批） | {missing_ins} 筆（跳過 {missing_skip}）|',
+        f'| 本期（最新10天） | {current_ins} 筆（跳過 {current_skip}）|',
+        f'| 備查建案 | {buildcase_ins} 筆 |',
+        f'| **本次新增/更新合計** | **{total_ins} 筆** |',
+        f'| 資料庫最新交易日期 | {final_date} |',
+    ])
 
 
 if __name__ == '__main__':
