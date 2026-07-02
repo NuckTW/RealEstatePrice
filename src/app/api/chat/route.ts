@@ -136,7 +136,14 @@ interface HistoryItem {
   content: string
 }
 
+// AI 問答功能暫停中（UI 已反白）；直接擋掉 endpoint 避免 Gemini quota 被外部呼叫消耗。
+// 要復原：刪除下面這行 return 即可。
+const CHAT_DISABLED = true
+
 export async function POST(req: NextRequest) {
+  if (CHAT_DISABLED) {
+    return Response.json({ error: 'AI 問答功能暫停中' }, { status: 503 })
+  }
   const body = await req.json()
   const question: string = body.question ?? ''
   const history: HistoryItem[] = body.history ?? []

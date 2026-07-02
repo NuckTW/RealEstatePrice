@@ -23,7 +23,8 @@ const themeScript = `
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-Hant" className={`${geistSans.variable} ${geistMono.variable} ${notoSansTC.variable} h-full`}>
+    // suppressHydrationWarning：themeScript 在 hydration 前就會改 data-theme，屬預期差異
+    <html lang="zh-Hant" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${notoSansTC.variable} h-full`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

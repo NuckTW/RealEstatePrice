@@ -35,13 +35,7 @@ interface BuildingTypeRow {
   count: number
 }
 
-const COLORS = [
-  '#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6',
-  '#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa',
-  '#facc15','#38bdf8','#4ade80','#fb923c','#c084fc',
-]
-
-const MAX_SELECT = 15
+import { MAX_SELECT, seriesColor } from '@/lib/areaSelection'
 
 interface Props {
   selected: string[]
@@ -139,7 +133,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
             <span
               key={key}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-              style={{ background: COLORS[i % COLORS.length] + '22', color: COLORS[i % COLORS.length], border: `1px solid ${COLORS[i % COLORS.length]}44` }}
+              style={{ background: seriesColor(i) + '22', color: seriesColor(i), border: `1px solid ${seriesColor(i)}44` }}
             >
               {key}
               <button onClick={() => onRemove(key)} className="ml-0.5 opacity-60 hover:opacity-100">✕</button>
@@ -208,7 +202,8 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           <div>
             <div className="text-[10px] text-gray-500 mb-1">均單價對比（萬/坪）</div>
             <ResponsiveContainer width="100%" height={Math.max(160, stats.length * 22)}>
-              <BarChart data={stats} layout="vertical" margin={{ left: 4, right: 24, top: 0, bottom: 0 }}>
+              {/* key：子元素數量隨選取數改變，remount 避免 Recharts 內部 hook deps 大小變化 */}
+              <BarChart key={stats.length} data={stats} layout="vertical" margin={{ left: 4, right: 24, top: 0, bottom: 0 }}>
                 <XAxis type="number" tick={{ fontSize: 9, fill: '#6b7280' }} />
                 <YAxis type="category" dataKey="project_name" tick={{ fontSize: 9, fill: '#9ca3af' }} width={72} />
                 <Tooltip
@@ -217,7 +212,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                 />
                 <Bar dataKey="unit_price" radius={[0, 4, 4, 0]}>
                   {stats.map((r, i) => (
-                    <Cell key={i} fill={COLORS[selected.indexOf(r.project_name) % COLORS.length]} />
+                    <Cell key={i} fill={seriesColor(selected.indexOf(r.project_name))} />
                   ))}
                 </Bar>
               </BarChart>
@@ -229,7 +224,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
             <div>
               <div className="text-[10px] text-gray-500 mb-1">月度成交均單價走勢（萬/坪）</div>
               <ResponsiveContainer width="100%" height={180}>
-                <LineChart data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
+                <LineChart key={selected.join('|')} data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
                   <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#6b7280' }} minTickGap={20} />
                   <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} width={32} />
@@ -243,7 +238,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                       key={key}
                       type="monotone"
                       dataKey={key}
-                      stroke={COLORS[i % COLORS.length]}
+                      stroke={seriesColor(i)}
                       strokeWidth={1.5}
                       dot={false}
                       connectNulls
@@ -273,7 +268,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                     <tr key={r.project_name} className="border-b border-white/5 hover:bg-white/[0.02]">
                       <td className="py-1.5 pr-2">
                         <span className="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0"
-                          style={{ background: COLORS[selected.indexOf(r.project_name) % COLORS.length], display: 'inline-block' }} />
+                          style={{ background: seriesColor(selected.indexOf(r.project_name)), display: 'inline-block' }} />
                         {r.project_name}
                       </td>
                       <td className="text-right text-gray-400">{r.district}</td>

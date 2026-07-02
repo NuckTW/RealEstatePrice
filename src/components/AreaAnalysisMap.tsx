@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type * as L from 'leaflet'
+import { seriesColor } from '@/lib/areaSelection'
 
 export interface PresaleMarker {
   location_key: string
@@ -21,18 +22,20 @@ interface Props {
   onMarkerToggle: (key: string) => void
 }
 
-const COLORS = [
-  '#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6',
-  '#ec4899','#06b6d4','#84cc16','#f97316','#a78bfa',
-  '#facc15','#38bdf8','#4ade80','#fb923c','#c084fc',
-]
-
 export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onMarkerToggle }: Props) {
   const mapRef    = useRef<HTMLDivElement>(null)
   const mapInst   = useRef<L.Map | null>(null)
   const layerRef  = useRef<L.LayerGroup | null>(null)
   const drawRef   = useRef<L.LayerGroup | null>(null)
   const [mapReady, setMapReady] = useState(false)
+
+  // Leaflet 事件 handler 在地圖初始化時綁定一次，透過 ref 讀最新值（避免 closure 過期）
+  const markersRef  = useRef<PresaleMarker[]>(markers)
+  const onBoundsRef = useRef(onBoundsSelect)
+  const onToggleRef = useRef(onMarkerToggle)
+  markersRef.current  = markers
+  onBoundsRef.current = onBoundsSelect
+  onToggleRef.current = onMarkerToggle
 
   /* 初始化地圖 */
   useEffect(() => {
@@ -98,16 +101,14 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
         drawnItems.clearLayers()
         drawnItems.addLayer(layer)
         const bounds = layer.getBounds()
-        // 暫存 markers 透過 window 傳遞（避免 closure 過期）
-        const inBounds = (window as unknown as Record<string, unknown>).__areaMarkers as PresaleMarker[] ?? []
-        const keys = inBounds
+        const keys = markersRef.current
           .filter(m => bounds.contains([m.lat, m.lon]))
           .map(m => m.location_key)
-        onBoundsSelect(keys)
+        onBoundsRef.current(keys)
       })
 
       // 框刪除時清空選取
-      map.on(Lx.Draw.Event.DELETED, () => onBoundsSelect([]))
+      map.on(Lx.Draw.Event.DELETED, () => onBoundsRef.current([]))
 
       layerRef.current = Lx.layerGroup().addTo(map)
       setMapReady(true)
@@ -120,8 +121,6 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
   /* markers 或 selected 變更時重繪標記（mapReady 確保 Leaflet 已初始化） */
   useEffect(() => {
     if (!mapReady || !mapInst.current || !layerRef.current) return
-    ;(window as unknown as Record<string, unknown>).__areaMarkers = markers
-    ;(window as unknown as Record<string, unknown>).__areaToggle = onMarkerToggle
 
     import('leaflet').then(mod => {
       const Lx = mod.default as typeof L
@@ -130,7 +129,7 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
       markers.forEach(m => {
         const idx     = selected.indexOf(m.location_key)
         const isSelec = idx >= 0
-        const color   = isSelec ? COLORS[idx % COLORS.length] : '#6b7280'
+        const color   = isSelec ? seriesColor(idx) : '#6b7280'
         const opacity = isSelec ? 1 : 0.45
 
         Lx.circleMarker([m.lat, m.lon], {
@@ -141,14 +140,11 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
           weight: isSelec ? 2 : 1,
         })
           .bindTooltip(m.display_name, { permanent: false, direction: 'top' })
-          .on('click', () => {
-            const fn = (window as unknown as Record<string, unknown>).__areaToggle as (k: string) => void
-            fn?.(m.location_key)
-          })
+          .on('click', () => onToggleRef.current(m.location_key))
           .addTo(layerRef.current!)
       })
     })
-  }, [markers, selected, onMarkerToggle, mapReady])
+  }, [markers, selected, mapReady])
 
   return (
     <div className="relative w-full h-full">

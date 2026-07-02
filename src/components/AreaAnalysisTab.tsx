@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useState, useCallback, useEffect } from 'react'
 import type { PresaleMarker } from '@/components/AreaAnalysisMap'
 import type { FilterValues } from './FilterBar'
+import { MAX_SELECT } from '@/lib/areaSelection'
 
 const AreaAnalysisMap   = dynamic(() => import('./AreaAnalysisMap'),   { ssr: false })
 const AreaAnalysisPanel = dynamic(() => import('./AreaAnalysisPanel'), { ssr: false })
@@ -47,13 +48,13 @@ export default function AreaAnalysisTab({ filters }: Props) {
     setSelected(prev => {
       const next = [...prev]
       keys.forEach(k => { if (!next.includes(k)) next.push(k) })
-      return next.slice(0, 15)
+      return next.slice(0, MAX_SELECT)
     })
   }, [])
 
   const handleMarkerToggle = useCallback((key: string) => {
     setSelected(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key].slice(0, 15)
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key].slice(0, MAX_SELECT)
     )
   }, [])
 
@@ -62,7 +63,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
   }, [])
 
   const handleAdd = useCallback((key: string) => {
-    setSelected(prev => prev.includes(key) ? prev : [...prev, key].slice(0, 15))
+    setSelected(prev => prev.includes(key) ? prev : [...prev, key].slice(0, MAX_SELECT))
   }, [])
 
   return (
@@ -70,7 +71,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
       {/* 說明列 + 清除按鈕 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <p style={{ fontSize: 11, color: 'var(--text-faint)' }}>
-          在地圖右上角點「矩形」工具框選範圍，或直接點擊建案標記加入分析（最多 15 個）
+          在地圖右上角點「矩形」工具框選範圍，或直接點擊建案標記加入分析（最多 {MAX_SELECT} 個）
         </p>
         {selected.length > 0 && (
           <button
