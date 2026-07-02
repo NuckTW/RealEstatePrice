@@ -44,7 +44,7 @@ export default function Navbar() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         {/* Brand mark */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8, flexShrink: 0,
             background: 'var(--gradient-brand)',
@@ -53,13 +53,14 @@ export default function Navbar() {
             fontSize: 13, fontWeight: 700, color: 'var(--on-accent)',
             fontFamily: 'var(--font-sans)',
           }}>南</div>
-          <div>
+          {/* 窄螢幕只留 logo，文字資訊全部隱藏 */}
+          <div className="hidden md:block">
             <div style={{
               fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)',
               color: 'var(--text-strong)', letterSpacing: 'var(--tracking-tight)',
-              fontFamily: 'var(--font-sans)',
+              fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap',
             }}>台南市不動產分析</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1, whiteSpace: 'nowrap' }}>
               <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
                 民國 110 年至今
               </span>
@@ -75,9 +76,9 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Right: nav + theme toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {/* Right: nav + theme toggle（窄螢幕 nav 可橫向捲動，不折行） */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <nav className="overflow-x-auto" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {navItems.map(({ href, label, icon, disabled }) => {
               const active = pathname === href
 
@@ -97,6 +98,7 @@ export default function Navbar() {
                       opacity: 0.4,
                       cursor: 'not-allowed',
                       userSelect: 'none',
+                      whiteSpace: 'nowrap', flexShrink: 0,
                     }}
                   >
                     <span style={{ opacity: 0.75 }}>{icon}</span>
@@ -120,6 +122,7 @@ export default function Navbar() {
                     background: active ? 'var(--accent-wash)' : 'transparent',
                     color: active ? 'var(--accent-tint)' : 'var(--text-muted)',
                     transition: 'var(--transition-base)',
+                    whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                   onMouseEnter={e => {
                     if (!active) {

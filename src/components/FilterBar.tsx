@@ -321,12 +321,29 @@ export function ActiveFilterTags({ filters, onRemove }: {
 }
 
 /* ── FilterBar ─────────────────────────────────────────────────── */
-export default function FilterBar({ onApply, loading }: { onApply: (f: FilterValues) => void; loading?: boolean }) {
-  const [f, setF] = useState<FilterValues>(DEFAULT_FILTERS)
-  const set = <K extends keyof FilterValues>(key: K, val: FilterValues[K]) =>
-    setF(prev => ({ ...prev, [key]: val }))
+export default function FilterBar({ onApply, loading, autoApply, value }: {
+  onApply: (f: FilterValues) => void
+  loading?: boolean
+  /** true 時任何改動立即套用（地圖／框選模式用），不需按「套用篩選」 */
+  autoApply?: boolean
+  /** 外部 filters 狀態（刪除標籤、URL 還原時同步回篩選列） */
+  value?: FilterValues
+}) {
+  const [f, setF] = useState<FilterValues>(value ?? DEFAULT_FILTERS)
+  const [expanded, setExpanded] = useState(false)  // 手機版展開狀態
+
+  useEffect(() => { if (value) setF(value) }, [value])
+
+  const set = <K extends keyof FilterValues>(key: K, val: FilterValues[K]) => {
+    const next = { ...f, [key]: val }
+    setF(next)
+    if (autoApply) onApply(next)
+  }
 
   const handleClear = () => { setF(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS) }
+
+  const activeCount = f.districts.length + f.types.length + f.rooms.length
+    + (f.presale !== 'all' ? 1 : 0) + (f.buildingAge !== 'all' ? 1 : 0)
 
   return (
     <div style={{
@@ -337,7 +354,36 @@ export default function FilterBar({ onApply, loading }: { onApply: (f: FilterVal
       borderBottom: '1px solid var(--border-card)',
       padding: '10px 20px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+      {/* 手機版：摺疊列（桌機隱藏） */}
+      <button
+        className="flex sm:hidden"
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          width: '100%', alignItems: 'center', justifyContent: 'space-between',
+          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+          fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', color: 'var(--text-default)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 'var(--weight-semibold)' }}>▾ 篩選條件</span>
+          <span style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
+            {f.dateFromYear}/{f.dateFromMonth}～{f.dateToYear}/{f.dateToMonth}
+          </span>
+          {activeCount > 0 && (
+            <span style={{
+              padding: '1px 8px', borderRadius: 'var(--radius-full)',
+              background: 'var(--accent-wash)', color: 'var(--accent-tint)',
+              border: '1px solid var(--accent-wash-border)', fontSize: 10,
+            }}>{activeCount}</span>
+          )}
+        </span>
+        <span style={{ color: 'var(--text-faint)', transform: expanded ? 'rotate(180deg)' : 'none', transition: 'var(--transition-base)' }}>⌄</span>
+      </button>
+
+      <div
+        className={`${expanded ? 'flex' : 'hidden'} sm:flex`}
+        style={{ alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', paddingTop: expanded ? 10 : 0 }}
+      >
 
         {/* Date range */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -367,8 +413,9 @@ export default function FilterBar({ onApply, loading }: { onApply: (f: FilterVal
           options={PRESALE_OPTIONS}
           value={f.presale}
           onChange={v => {
-            const reset = v === 'true' ? { presale: v, buildingAge: 'all' } : { presale: v }
-            setF(prev => ({ ...prev, ...reset }))
+            const next = { ...f, presale: v, ...(v === 'true' ? { buildingAge: 'all' } : {}) }
+            setF(next)
+            if (autoApply) onApply(next)
           }}
         />
 
@@ -378,9 +425,9 @@ export default function FilterBar({ onApply, loading }: { onApply: (f: FilterVal
 
         <div style={{ width: 1, height: 28, background: 'var(--border-card)', alignSelf: 'flex-end' }} />
 
-        {/* Action buttons */}
+        {/* Action buttons（autoApply 模式下改動即生效，不需套用鈕） */}
         <div style={{ display: 'flex', gap: 6, alignSelf: 'flex-end' }}>
-          <button
+          {!autoApply && <button
             onClick={() => onApply(f)}
             disabled={loading}
             style={{
@@ -403,7 +450,7 @@ export default function FilterBar({ onApply, loading }: { onApply: (f: FilterVal
                 載入中
               </>
             ) : '套用篩選'}
-          </button>
+          </button>}
 
           <button
             onClick={handleClear}

@@ -18,6 +18,50 @@ interface Marker {
   avg_total: number
   lat: number
   lon: number
+  // 預售屋專屬（成屋為 null）
+  total_units?: number | null
+  sold_total?: number | null
+  sales_ratio?: number | null
+  last_tx_month?: string | null   // 'YYYY-MM'
+}
+
+/** 熱力圖單價標籤只在此 zoom 以上顯示（縮遠時 1,500+ 標籤會疊成一團） */
+const HEAT_LABEL_MIN_ZOOM = 13
+
+/** 'YYYY-MM' → '115/05'（民國年月） */
+function rocMonth(ym?: string | null): string {
+  if (!ym || ym.length < 7) return ''
+  return `${parseInt(ym.slice(0, 4)) - 1911}/${ym.slice(5, 7)}`
+}
+
+/** popup HTML（標記模式與熱力圖模式共用） */
+function buildPopup(m: Marker, color: string): string {
+  const price = m.unit_price ? `${m.unit_price}萬/坪` : '—'
+  // 預售屋：銷售成數 + 最新成交月（建商/房仲判斷去化速度的關鍵）
+  const salesRow = m.case_type === '預售' && (m.total_units || m.last_tx_month) ? `
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#9ca3af">
+      ${m.total_units
+        ? `銷售 <span style="color:#e2e8f0;font-weight:600">${m.sold_total ?? '—'}/${m.total_units}</span> 戶${m.sales_ratio != null ? `（<span style="color:${color};font-weight:600">${m.sales_ratio}%</span>）` : ''}`
+        : ''}
+      ${m.last_tx_month ? `${m.total_units ? ' · ' : ''}最新成交 <span style="color:#e2e8f0">${rocMonth(m.last_tx_month)}</span>` : ''}
+    </div>` : ''
+
+  return `
+    <div style="font-family:sans-serif;font-size:12px;min-width:170px">
+      <div style="font-weight:600;margin-bottom:4px">${m.display_name}</div>
+      <div style="color:#888;margin-bottom:6px">${m.district} · ${m.case_type}</div>
+      <div style="display:flex;gap:12px">
+        <div><div style="color:#888;font-size:10px">均單價</div><div style="color:${color};font-weight:600">${price}</div></div>
+        <div><div style="color:#888;font-size:10px">均總價</div><div style="font-weight:600">${m.avg_total ? m.avg_total.toLocaleString()+'萬' : '—'}</div></div>
+        <div><div style="color:#888;font-size:10px">戶數</div><div style="font-weight:600">${m.count}</div></div>
+      </div>
+      ${salesRow}
+      <button
+        onclick="window.__mapClick('${m.location_key.replace(/'/g,"\\'")}','${m.case_type}','${m.district}')"
+        style="margin-top:8px;width:100%;background:#1e293b;color:#e2e8f0;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px">
+        查看交易明細
+      </button>
+    </div>`
 }
 
 interface Props {
@@ -30,6 +74,8 @@ export default function MapView({ filters, onCaseClick }: Props) {
   const mapInst    = useRef<L.Map | null>(null)
   const clusterRef = useRef<L.LayerGroup | null>(null)
   const heatRef    = useRef<HeatLayer | null>(null)
+  const labelRef   = useRef<L.LayerGroup | null>(null)
+  const zoomHandlerRef = useRef<(() => void) | null>(null)
   const [loading, setLoading] = useState(true)
   const [count, setCount]     = useState(0)
   const [presaleRange, setPresaleRange] = useState<[number, number]>([0, 0])
@@ -112,6 +158,14 @@ export default function MapView({ filters, onCaseClick }: Props) {
       map.removeLayer(heatRef.current)
       heatRef.current = null
     }
+    if (labelRef.current) {
+      map.removeLayer(labelRef.current)
+      labelRef.current = null
+    }
+    if (zoomHandlerRef.current) {
+      map.off('zoomend', zoomHandlerRef.current)
+      zoomHandlerRef.current = null
+    }
 
     const p = new URLSearchParams({
       dateFromYear:  f.dateFromYear,
@@ -143,7 +197,7 @@ export default function MapView({ filters, onCaseClick }: Props) {
         // 熱力圖：每個點依「自身單價」決定顏色（藍→黃→紅），而非依密度疊加成單一顏色
         if (!map.getPane('priceHeatPane')) {
           const pane = map.createPane('priceHeatPane')
-          pane.style.filter = 'blur(14px) saturate(1.4)'
+          pane.style.filter = 'blur(10px) saturate(1.3)'
           pane.style.zIndex = '410'
         }
         if (!map.getPane('priceHeatLabelPane')) {
@@ -152,50 +206,46 @@ export default function MapView({ filters, onCaseClick }: Props) {
         }
         const renderer = Lx.canvas({ pane: 'priceHeatPane' })
 
-        const heatGroup = Lx.layerGroup()
+        const heatGroup  = Lx.layerGroup()  // 色塊（永遠顯示）
+        const labelGroup = Lx.layerGroup()  // 單價標籤（拉近才顯示，避免全市視角疊成一團）
         markers
           .filter(m => m.case_type === '預售' && m.unit_price > 0)
           .forEach(m => {
             const color = priceToColor(m.unit_price, presaleMin, presaleMax)
+            const popup = buildPopup(m, color)
 
-            // 色塊（模糊疊色，混合模式讓底圖仍可見）
+            // 色塊（模糊疊色，混合模式讓底圖仍可見）；直接綁 popup，縮遠沒標籤也能點
             Lx.circleMarker([m.lat, m.lon], {
               renderer,
               radius: 36,
               stroke: false,
               fillColor: color,
-              fillOpacity: 0.72,
-            }).addTo(heatGroup)
+              fillOpacity: 0.65,
+            }).bindPopup(popup).addTo(heatGroup)
 
-            // 中心標示單價數值（不顯示單位，畫面更乾淨；點擊可查看該筆資料）
-            const priceText = `${m.unit_price}萬/坪`
-            const popup = `
-              <div style="font-family:sans-serif;font-size:12px;min-width:160px">
-                <div style="font-weight:600;margin-bottom:4px">${m.display_name}</div>
-                <div style="color:#888;margin-bottom:6px">${m.district} · ${m.case_type}</div>
-                <div style="display:flex;gap:12px">
-                  <div><div style="color:#888;font-size:10px">均單價</div><div style="color:${color};font-weight:600">${priceText}</div></div>
-                  <div><div style="color:#888;font-size:10px">均總價</div><div style="font-weight:600">${m.avg_total ? m.avg_total.toLocaleString()+'萬' : '—'}</div></div>
-                  <div><div style="color:#888;font-size:10px">戶數</div><div style="font-weight:600">${m.count}</div></div>
-                </div>
-                <button
-                  onclick="window.__mapClick('${m.location_key.replace(/'/g,"\\'")}','${m.case_type}','${m.district}')"
-                  style="margin-top:8px;width:100%;background:#1e293b;color:#e2e8f0;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px">
-                  查看交易明細
-                </button>
-              </div>`
-
+            // 中心標示單價數值
             Lx.marker([m.lat, m.lon], {
               pane: 'priceHeatLabelPane',
               icon: Lx.divIcon({
                 html: `<div class="map-heat-label">${m.unit_price}</div>`,
                 className: '', iconSize: Lx.point(44, 18), iconAnchor: Lx.point(22, 9),
               }),
-            }).bindPopup(popup).addTo(heatGroup)
+            }).bindPopup(popup).addTo(labelGroup)
           })
 
-        heatRef.current = heatGroup
+        heatRef.current  = heatGroup
+        labelRef.current = labelGroup
         map.addLayer(heatGroup)
+
+        // 標籤依 zoom 顯示／隱藏
+        const syncLabels = () => {
+          const show = map.getZoom() >= HEAT_LABEL_MIN_ZOOM
+          if (show && !map.hasLayer(labelGroup)) map.addLayer(labelGroup)
+          if (!show && map.hasLayer(labelGroup)) map.removeLayer(labelGroup)
+        }
+        syncLabels()
+        map.on('zoomend', syncLabels)
+        zoomHandlerRef.current = syncLabels
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cluster = (Lx as any).markerClusterGroup({
@@ -220,24 +270,8 @@ export default function MapView({ filters, onCaseClick }: Props) {
             className: '', iconSize: Lx.point(72, 28), iconAnchor: Lx.point(36, 14),
           })
 
-          const popup = `
-            <div style="font-family:sans-serif;font-size:12px;min-width:160px">
-              <div style="font-weight:600;margin-bottom:4px">${m.display_name}</div>
-              <div style="color:#888;margin-bottom:6px">${m.district} · ${m.case_type}</div>
-              <div style="display:flex;gap:12px">
-                <div><div style="color:#888;font-size:10px">均單價</div><div style="color:${color};font-weight:600">${price}</div></div>
-                <div><div style="color:#888;font-size:10px">均總價</div><div style="font-weight:600">${m.avg_total ? m.avg_total.toLocaleString()+'萬' : '—'}</div></div>
-                <div><div style="color:#888;font-size:10px">戶數</div><div style="font-weight:600">${m.count}</div></div>
-              </div>
-              <button
-                onclick="window.__mapClick('${m.location_key.replace(/'/g,"\\'")}','${m.case_type}','${m.district}')"
-                style="margin-top:8px;width:100%;background:#1e293b;color:#e2e8f0;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px">
-                查看交易明細
-              </button>
-            </div>`
-
           Lx.marker([m.lat, m.lon], { icon })
-            .bindPopup(popup)
+            .bindPopup(buildPopup(m, color))
             .addTo(cluster)
         })
 
@@ -258,7 +292,7 @@ export default function MapView({ filters, onCaseClick }: Props) {
   }, [onCaseClick])
 
   return (
-    <div className="relative w-full" style={{ height: 'calc(100vh - 140px)', minHeight: 500 }}>
+    <div className="relative w-full" style={{ height: 'calc(100dvh - 260px)', minHeight: 480 }}>
       <div ref={mapRef} className="w-full h-full rounded-2xl overflow-hidden" />
 
       {loading && (
@@ -270,7 +304,8 @@ export default function MapView({ filters, onCaseClick }: Props) {
         </div>
       )}
 
-      <div className="absolute top-3 left-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full p-1 text-xs flex gap-1">
+      {/* left-14 避開 Leaflet zoom 控制鈕（避免蓋住 +/- 造成點不到） */}
+      <div className="absolute top-3 left-14 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full p-1 text-xs flex gap-1">
         <button
           onClick={() => setViewMode('marker')}
           className={`px-3 py-1 rounded-full transition-colors ${viewMode === 'marker' ? 'bg-amber-500/90 text-[#0d1420] font-medium' : 'text-gray-400 hover:text-gray-200'}`}

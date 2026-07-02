@@ -9,7 +9,7 @@ import CaseDetailPanel from './CaseDetailPanel'
 
 // 動態 import 避免 SSR（Leaflet 需要 window）
 const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => (
-  <div className="w-full rounded-2xl bg-[#0d1420] border border-white/6 flex items-center justify-center" style={{height: 'calc(100vh - 140px)'}}>
+  <div className="w-full rounded-2xl bg-[#0d1420] border border-white/6 flex items-center justify-center" style={{height: 'calc(100dvh - 260px)', minHeight: 480}}>
     <span className="text-gray-600 text-sm">地圖載入中…</span>
   </div>
 ) })
@@ -123,12 +123,47 @@ function Skeleton() {
   )
 }
 
+/* ── URL 分享狀態 ──────────────────────────────────────────── */
+type TabId = 'data' | 'map' | 'area'
+
+/** URL query → FilterValues（無參數時回傳預設值） */
+function paramsToFilters(p: URLSearchParams): FilterValues {
+  const f = { ...DEFAULT_FILTERS }
+  const from = p.get('from'), to = p.get('to')
+  if (from?.includes('-')) [f.dateFromYear, f.dateFromMonth] = from.split('-')
+  if (to?.includes('-'))   [f.dateToYear,   f.dateToMonth]   = to.split('-')
+  const csv = (k: string) => (p.get(k) ?? '').split(',').filter(Boolean)
+  if (p.get('districts')) f.districts = csv('districts')
+  if (p.get('types'))     f.types     = csv('types')
+  if (p.get('rooms'))     f.rooms     = csv('rooms')
+  if (p.get('presale'))   f.presale   = p.get('presale')!
+  if (p.get('age'))       f.buildingAge = p.get('age')!
+  return f
+}
+
+/** FilterValues + tab → URL query（只寫非預設值；保留其他頁面的參數如 projects） */
+function syncUrl(f: FilterValues, tab: TabId) {
+  const p = new URLSearchParams(window.location.search)
+  const setOrDel = (k: string, v: string, def: string) => { if (v !== def) p.set(k, v); else p.delete(k) }
+  setOrDel('tab', tab, 'data')
+  setOrDel('from', `${f.dateFromYear}-${f.dateFromMonth}`, `${DEFAULT_FILTERS.dateFromYear}-${DEFAULT_FILTERS.dateFromMonth}`)
+  setOrDel('to',   `${f.dateToYear}-${f.dateToMonth}`,     `${DEFAULT_FILTERS.dateToYear}-${DEFAULT_FILTERS.dateToMonth}`)
+  setOrDel('districts', f.districts.join(','), '')
+  setOrDel('types',     f.types.join(','),     '')
+  setOrDel('rooms',     f.rooms.join(','),     '')
+  setOrDel('presale',   f.presale,     'all')
+  setOrDel('age',       f.buildingAge, 'all')
+  const qs = p.toString()
+  window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
+}
+
 /* ── Dashboard ─────────────────────────────────────────────── */
 export default function Dashboard() {
   const [data, setData]       = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(false)
   const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS)
-  const [activeTab, setActiveTab] = useState<'data' | 'map' | 'area'>('data')
+  const [activeTab, setActiveTab] = useState<TabId>('data')
+  const [restored, setRestored]   = useState(false)  // URL/localStorage 還原完成才開始同步回 URL
 
   // Case detail panel state
   const [panelOpen, setPanelOpen]         = useState(false)
@@ -153,7 +188,25 @@ export default function Dashboard() {
     }
   }, [])
 
-  useEffect(() => { fetchData(DEFAULT_FILTERS) }, [fetchData])
+  /* 首次載入：從 URL（分享連結）與 localStorage（上次 tab）還原狀態 */
+  useEffect(() => {
+    const p  = new URLSearchParams(window.location.search)
+    const f0 = paramsToFilters(p)
+    const urlTab = p.get('tab')
+    const savedTab = typeof localStorage !== 'undefined' ? localStorage.getItem('tra-tab') : null
+    const tab0 = (['data','map','area'].includes(urlTab ?? '') ? urlTab : savedTab) as TabId | null
+    if (tab0 && ['data','map','area'].includes(tab0)) setActiveTab(tab0)
+    setFilters(f0)
+    setRestored(true)
+    fetchData(f0)
+  }, [fetchData])
+
+  /* 狀態變更 → 寫回 URL（可直接複製分享）＋記住 tab */
+  useEffect(() => {
+    if (!restored) return
+    syncUrl(filters, activeTab)
+    try { localStorage.setItem('tra-tab', activeTab) } catch {}
+  }, [filters, activeTab, restored])
 
   const handleApply = (f: FilterValues) => { setFilters(f); fetchData(f) }
 
@@ -184,7 +237,8 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-app)' }}>
-      <FilterBar onApply={handleApply} loading={loading} />
+      {/* 地圖／框選模式改動即套用；value 讓刪標籤與 URL 還原同步回篩選列 */}
+      <FilterBar onApply={handleApply} loading={loading} autoApply={activeTab !== 'data'} value={filters} />
 
       {/* Tab 切換 */}
       <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -229,7 +283,28 @@ export default function Dashboard() {
       {/* ── 地圖 tab ── */}
       {activeTab === 'map' && (
         <div className="px-5 pt-3 pb-6">
-          <div className="px-0 pt-1 pb-2">
+          <div className="px-0 pt-1 pb-2" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* 成／預售快速切換（房仲最常用的篩選，直接放地圖上方） */}
+            <div style={{ display: 'inline-flex', gap: 2, background: 'var(--surface-control)', border: '1px solid var(--border-control)', borderRadius: 'var(--radius-full)', padding: 2 }}>
+              {([
+                { v: 'true',  l: '預售屋' },
+                { v: 'false', l: '成屋' },
+                { v: 'all',   l: '全部' },
+              ] as const).map(o => (
+                <button
+                  key={o.v}
+                  onClick={() => handleApply({ ...filters, presale: o.v })}
+                  style={{
+                    padding: '3px 12px', borderRadius: 'var(--radius-full)', border: 'none',
+                    fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                    fontWeight: filters.presale === o.v ? 'var(--weight-semibold)' : 'var(--weight-regular)',
+                    background: filters.presale === o.v ? 'var(--accent)' : 'transparent',
+                    color: filters.presale === o.v ? 'var(--on-accent)' : 'var(--text-muted)',
+                    transition: 'var(--transition-base)',
+                  }}
+                >{o.l}</button>
+              ))}
+            </div>
             <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
           </div>
           <MapView

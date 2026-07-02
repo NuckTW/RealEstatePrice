@@ -33,9 +33,20 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
   const markersRef  = useRef<PresaleMarker[]>(markers)
   const onBoundsRef = useRef(onBoundsSelect)
   const onToggleRef = useRef(onMarkerToggle)
+  const LxRef       = useRef<typeof L | null>(null)
   markersRef.current  = markers
   onBoundsRef.current = onBoundsSelect
   onToggleRef.current = onMarkerToggle
+
+  /** 「▭ 框選範圍」按鈕：直接啟動矩形繪製模式（不必找地圖角落的小工具列） */
+  const startDraw = () => {
+    const Lx = LxRef.current
+    if (!Lx || !mapInst.current) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    new ((Lx as any).Draw.Rectangle)(mapInst.current, {
+      shapeOptions: { color: '#f59e0b', weight: 2, fillOpacity: 0.08 },
+    }).enable()
+  }
 
   /* 初始化地圖 */
   useEffect(() => {
@@ -111,6 +122,7 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
       map.on(Lx.Draw.Event.DELETED, () => onBoundsRef.current([]))
 
       layerRef.current = Lx.layerGroup().addTo(map)
+      LxRef.current = Lx
       setMapReady(true)
     })()
 
@@ -149,6 +161,19 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full rounded-xl overflow-hidden" />
+      {mapReady && (
+        <button
+          onClick={startDraw}
+          style={{
+            position: 'absolute', top: 12, left: 56, zIndex: 1000,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', borderRadius: 20,
+            background: '#f59e0b', color: '#1c1917', border: 'none',
+            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,.35)',
+          }}
+        >▭ 框選範圍</button>
+      )}
       <style>{`
         .leaflet-draw-toolbar a { background-color: #1e293b !important; color: #e2e8f0 !important; border-color: rgba(255,255,255,.15) !important; }
         .leaflet-draw-toolbar a:hover { background-color: #334155 !important; }
