@@ -220,7 +220,7 @@ export default function MapView({ filters, onCaseClick }: Props) {
               radius: 36,
               stroke: false,
               fillColor: color,
-              fillOpacity: 0.65,
+              fillOpacity: 0.42,   // 透一點讓底圖路名可讀
             }).bindPopup(popup).addTo(heatGroup)
 
             // 中心標示單價數值

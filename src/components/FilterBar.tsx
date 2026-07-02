@@ -54,7 +54,8 @@ export interface FilterValues {
 export const DEFAULT_FILTERS: FilterValues = {
   dateFromYear: '114', dateFromMonth: '1',
   dateToYear:   '115', dateToMonth:   '6',
-  districts: [], types: [], rooms: [], presale: 'all', buildingAge: 'all',
+  // 網站主要受眾為看預售屋的建商/房仲，預設即預售模式
+  districts: [], types: [], rooms: [], presale: 'true', buildingAge: 'all',
 }
 
 /* ── Shared select style ──────────────────────────────────────── */

@@ -151,7 +151,7 @@ function syncUrl(f: FilterValues, tab: TabId) {
   setOrDel('districts', f.districts.join(','), '')
   setOrDel('types',     f.types.join(','),     '')
   setOrDel('rooms',     f.rooms.join(','),     '')
-  setOrDel('presale',   f.presale,     'all')
+  setOrDel('presale',   f.presale,     DEFAULT_FILTERS.presale)
   setOrDel('age',       f.buildingAge, 'all')
   const qs = p.toString()
   window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
