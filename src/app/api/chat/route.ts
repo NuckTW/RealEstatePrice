@@ -137,11 +137,14 @@ interface HistoryItem {
 }
 
 // AI 問答功能暫停中（UI 已反白）；直接擋掉 endpoint 避免 Gemini quota 被外部呼叫消耗。
-// 要復原：刪除下面這行 return 即可。
+// 例外：帶正確 x-api-token（= CHAT_API_TOKEN 環境變數）的請求放行，供 nuck_os 私人使用。
+// 要全面復原：刪除 CHAT_DISABLED 判斷即可。
 const CHAT_DISABLED = true
 
 export async function POST(req: NextRequest) {
-  if (CHAT_DISABLED) {
+  const apiToken = process.env.CHAT_API_TOKEN
+  const authorized = !!apiToken && req.headers.get('x-api-token') === apiToken
+  if (CHAT_DISABLED && !authorized) {
     return Response.json({ error: 'AI 問答功能暫停中' }, { status: 503 })
   }
   const body = await req.json()
