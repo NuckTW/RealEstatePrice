@@ -111,15 +111,15 @@ def get_existing_keys() -> set:
     return {x['location_key'] for x in (r.data or [])}
 
 def get_presale_with_addr() -> list:
-    """取得預售建案 + 代表地址（簡化版，用 MIN 取一個地址）"""
+    """取得預售建案 + 代表地址（簡化版，用 MIN 取一個地址）。
+    無 LIMIT：見 get_existing_by_district 的教訓，建案數已破千且持續成長。"""
     r = supabase.rpc('execute_query', {'query_text':
         "SELECT project_name, district, MIN(address) AS address "
         "FROM transactions "
         "WHERE is_presale=true "
         "  AND project_name IS NOT NULL AND project_name != '' "
         "  AND address IS NOT NULL AND address != '' "
-        "GROUP BY project_name, district "
-        "LIMIT 1200"
+        "GROUP BY project_name, district"
     }).execute()
     return r.data or []
 
@@ -132,13 +132,13 @@ DISTRICTS = [
 ]
 
 def get_existing_by_district(district: str) -> list:
-    """取得單一行政區成屋去樓層地址"""
+    """取得單一行政區成屋去樓層地址（無 LIMIT：永康/安南等大區去重地址數已破萬，
+    先前 LIMIT 5000 曾讓破萬區的多數地址永遠排不到 geocode）"""
     r = supabase.rpc('execute_query', {'query_text':
         f"SELECT DISTINCT address FROM transactions "
         f"WHERE is_presale=false AND district='{district}' "
         f"AND address IS NOT NULL AND address != '' "
-        f"AND transaction_target LIKE '%建物%' "
-        f"LIMIT 5000"
+        f"AND transaction_target LIKE '%建物%'"
     }).execute()
     return [x['address'] for x in (r.data or [])]
 
