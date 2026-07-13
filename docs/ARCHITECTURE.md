@@ -1,6 +1,6 @@
 # 系統架構與資料流程
 
-> 最後更新：2026-06-11
+> 最後更新：2026-07-13
 
 ## 系統架構圖
 
@@ -81,7 +81,8 @@ flowchart TB
     W2 --> STEP3["3/3 下載本期<br/>最新 10 天 → 寫入 transactions"]
     STEP3 --> STEP4["4/4 備查建案<br/>核准總戶數 → presale_projects"]
     STEP4 --> LOG["寫入 scrape_logs 執行紀錄"]
-    LOG --> DONE(["完成<br/>網站於 1 小時內反映（API 快取到期）"])
+    LOG --> STEP5["5/5 補齊新地址座標<br/>fetch_locations_v2.py（增量）"]
+    STEP5 --> DONE(["完成<br/>網站於 1 小時內反映（API 快取到期）"])
 ```
 
 ### 流程說明
@@ -94,6 +95,10 @@ flowchart TB
 - **金鑰輪替注意**：`SUPABASE_SERVICE_ROLE_KEY` 必須同步更新三處——本機 `.env.local`、
   Vercel 環境變數、GitHub repo secrets。漏更新 GitHub secret 時 workflow 仍顯示成功
   （寫入錯誤不會讓 job fail），需查 log 中的「寫入」字樣確認。
+- **座標補齊（`building_locations`）**：新交易帶來的新地址/新建案沒有座標就不會出現在地圖上
+  （個案統計等不需座標的頁面不受影響）。`fetch_locations_v2.py`（Mapbox geocoding）已排進
+  每次月度更新的最後一步，增量模式——已有座標的 `location_key` 自動跳過，只查新地址。
+  需要 `MAPBOX_TOKEN`（repo secret，免費額度 10 萬次/月）。
 
 ---
 
