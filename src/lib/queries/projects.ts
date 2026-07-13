@@ -52,7 +52,7 @@ export function fetchCaseRanking(where: string, whereNoDate: string): Promise<Ro
 
       UNION ALL
 
-      -- 成屋（地址去掉樓層後分組，≥2 筆才顯示）
+      -- 成屋（地址去掉樓層後分組；單筆交易也列出，count DESC 排序讓多筆社區排前面）
       SELECT
         '成屋' AS case_type,
         district,
@@ -83,7 +83,6 @@ export function fetchCaseRanking(where: string, whereNoDate: string): Promise<Ro
         AND transaction_target LIKE '%建物%'
       GROUP BY district,
         REGEXP_REPLACE(address, '[0-9零一二三四五六七八九十百千]+樓.*$', '')
-      HAVING COUNT(*) >= 2
     ) combined
     ORDER BY count DESC LIMIT 500
   `)

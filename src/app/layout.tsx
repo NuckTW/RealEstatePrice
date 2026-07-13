@@ -6,9 +6,28 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 const notoSansTC = Noto_Sans_TC({ variable: "--font-noto-tc", subsets: ["latin"], weight: ["300","400","500","700"] });
 
+const SITE_URL  = "https://tainan-realestate-ai.vercel.app";
+const SITE_DESC = "台南預售屋價格地圖：實價登錄視覺化、建案銷售成數、行政區價格走勢與市場供給，每 10 天自動更新。";
+
 export const metadata: Metadata = {
-  title: "台南市實價登錄 AI 分析助手",
-  description: "台南市實價登錄資料視覺化看板，搭配 AI 自然語言查詢",
+  metadataBase: new URL(SITE_URL),
+  title: "台南市不動產分析｜預售屋價格地圖",
+  description: SITE_DESC,
+  openGraph: {
+    title: "台南預售屋價格地圖",
+    description: SITE_DESC,
+    url: SITE_URL,
+    siteName: "台南市不動產分析",
+    images: [{ url: "/og.png", width: 1200, height: 630 }],
+    locale: "zh_TW",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "台南預售屋價格地圖",
+    description: SITE_DESC,
+    images: ["/og.png"],
+  },
 };
 
 // 在 HTML 解析前套用儲存的主題，避免 flash

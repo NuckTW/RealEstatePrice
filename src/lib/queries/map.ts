@@ -77,7 +77,6 @@ export function fetchExistingMarkers(where: string): Promise<Row[]> {
     GROUP BY
       REGEXP_REPLACE(t.address, '[0-9零一二三四五六七八九十百千]+樓.*$', ''),
       t.district, bl.lat, bl.lon
-    HAVING COUNT(*) >= 2
     ORDER BY count DESC
     LIMIT 3000
   `)
