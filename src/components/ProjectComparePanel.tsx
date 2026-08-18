@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { MultiSelect, StyledSelect } from './FilterBar'
 
@@ -58,8 +58,8 @@ function chipStyle(active: boolean): React.CSSProperties {
 }
 
 export default function ProjectComparePanel() {
-  const [data, setData] = useState<ApiData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<(ApiData & { key: string }) | null>(null)
+  const [failedKey, setFailedKey] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [district, setDistrict] = useState<string>('')
   const [selected, setSelected] = useState<string[]>([])
@@ -67,28 +67,39 @@ export default function ProjectComparePanel() {
   const [types, setTypes] = useState<string[]>([])
   const [rooms, setRooms] = useState<string[]>([])
   const [presale, setPresale] = useState('all')
-  const [firstLoad, setFirstLoad] = useState(true)
+  const firstLoad = useRef(true)
 
-  useEffect(() => {
-    setLoading(true)
+  // 查詢字串同時當作資料的識別鍵，loading 由「手上的資料是否對應當前條件」推導，
+  // 不在 effect 裡同步 setState（會造成串聯 rerender）
+  const query = useMemo(() => {
     const qs = new URLSearchParams()
     if (types.length) qs.set('types', types.join(','))
     if (rooms.length) qs.set('rooms', rooms.join(','))
     if (presale !== 'all') qs.set('presale', presale)
+    return qs.toString()
+  }, [types, rooms, presale])
 
-    fetch(`/api/project-compare?${qs}`)
+  const errored = failedKey === query
+  const loading = !errored && data?.key !== query
+
+  useEffect(() => {
+    // 快速切換篩選時，舊查詢可能較晚回來蓋掉新結果，用 cancelled 擋掉
+    let cancelled = false
+    fetch(`/api/project-compare?${query}`)
       .then(r => r.json())
       .then(d => {
-        if (d.error) return
-        setData(d)
+        if (cancelled) return
+        if (d.error) { setFailedKey(query); return }
+        setData({ ...d, key: query })
         // 首次載入預設帶出成交量最大的 6 案；之後換篩選條件保留使用者的選擇
-        if (firstLoad) {
+        if (firstLoad.current) {
           setSelected(d.projects.slice(0, 6).map((p: ProjectPoint) => p.key))
-          setFirstLoad(false)
+          firstLoad.current = false
         }
       })
-      .finally(() => setLoading(false))
-  }, [types, rooms, presale, firstLoad])
+      .catch(() => { if (!cancelled) setFailedKey(query) })
+    return () => { cancelled = true }
+  }, [query])
 
   const byKey = useMemo(
     () => new Map((data?.projects ?? []).map(p => [p.key, p])),
@@ -118,7 +129,7 @@ export default function ProjectComparePanel() {
   if (!data) {
     return (
       <div style={{ padding: 20 }}>
-        <div style={centerStyle(460)}>{loading ? '載入中…' : '查詢失敗'}</div>
+        <div style={centerStyle(460)}>{errored ? '查詢失敗' : '載入中…'}</div>
       </div>
     )
   }
