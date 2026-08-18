@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import { MultiSelect, StyledSelect } from './FilterBar'
 
 const ProjectCompareChart = dynamic(() => import('./ProjectCompareChart'), {
   ssr: false,
@@ -54,23 +55,6 @@ function chipStyle(active: boolean): React.CSSProperties {
     border: active ? '1px solid var(--accent-wash-border)' : '1px solid var(--border-control)',
     cursor: 'pointer', transition: 'var(--transition-base)', whiteSpace: 'nowrap',
   }
-}
-
-function FilterGroup({ label, options, selected, onToggle }: {
-  label: string
-  options: { label: string; value: string }[]
-  selected: string[]
-  onToggle: (v: string) => void
-}) {
-  return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{label}</span>
-      {options.map(o => (
-        <button key={o.value} onClick={() => onToggle(o.value)}
-          style={chipStyle(selected.includes(o.value))}>{o.label}</button>
-      ))}
-    </div>
-  )
 }
 
 export default function ProjectComparePanel() {
@@ -157,15 +141,10 @@ export default function ProjectComparePanel() {
               background: 'var(--surface-control)', color: 'var(--text-default)',
               border: '1px solid var(--border-control)', fontFamily: 'var(--font-sans)',
             }} />
-          <select value={district} onChange={e => setDistrict(e.target.value)}
-            style={{
-              height: 32, padding: '0 8px', borderRadius: 'var(--radius-md)', fontSize: 13,
-              background: 'var(--surface-control)', color: 'var(--text-default)',
-              border: '1px solid var(--border-control)', fontFamily: 'var(--font-sans)',
-            }}>
-            <option value="">全部行政區</option>
-            {data.districts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <StyledSelect
+            options={[{ label: '全部行政區', value: '' },
+                      ...data.districts.map(d => ({ label: d, value: d }))]}
+            value={district} onChange={setDistrict} />
           <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={hideUnreliable}
               onChange={e => setHideUnreliable(e.target.checked)} />
@@ -182,27 +161,25 @@ export default function ProjectComparePanel() {
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center',
-                      paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border-card)' }}>
-          <FilterGroup label="建築類型" options={TYPE_OPTIONS} selected={types}
-            onToggle={v => setTypes(t => t.includes(v) ? t.filter(x => x !== v) : [...t, v])} />
-          <FilterGroup label="房型" options={ROOM_OPTIONS} selected={rooms}
-            onToggle={v => setRooms(r => r.includes(v) ? r.filter(x => x !== v) : [...r, v])} />
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>成/預售</span>
-            {PRESALE_OPTIONS.map(o => (
-              <button key={o.value} onClick={() => setPresale(o.value)}
-                style={chipStyle(presale === o.value)}>{o.label}</button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end',
+                      paddingBottom: 14, marginBottom: 12, borderBottom: '1px solid var(--border-card)' }}>
+          <MultiSelect label="建築類型" options={TYPE_OPTIONS} selected={types}
+            onChange={setTypes} placeholder="全部類型" />
+          <MultiSelect label="房型" options={ROOM_OPTIONS} selected={rooms}
+            onChange={setRooms} placeholder="全部房型" />
+          <StyledSelect label="成/預售" options={PRESALE_OPTIONS}
+            value={presale} onChange={setPresale} />
           {(types.length > 0 || rooms.length > 0 || presale !== 'all') && (
             <button onClick={() => { setTypes([]); setRooms([]); setPresale('all') }}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted)',
-                       cursor: 'pointer', fontSize: 12 }}>
+                       cursor: 'pointer', fontSize: 12, height: 32 }}>
               重設篩選
             </button>
           )}
-          {loading && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>更新中…</span>}
+          {loading && (
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', height: 32,
+                           display: 'flex', alignItems: 'center' }}>更新中…</span>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxHeight: 132, overflowY: 'auto' }}>
