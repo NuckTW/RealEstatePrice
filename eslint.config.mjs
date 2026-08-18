@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // 非原始碼，lint 它們只會製造雜訊蓋掉 src 的真問題
+    // （實測：全專案 2,751 筆問題中 .vercel 就佔 2,670 筆）
+    ".vercel/**",        // Vercel 建置產物（壓縮過的 chunk）
+    ".claude/**",        // Claude Code 的 worktree 與本機狀態
+    "Tainan Realty Analytics — Design System/**",  // 獨立參考用 UI kit，未被 app 引用
   ]),
 ]);
 
