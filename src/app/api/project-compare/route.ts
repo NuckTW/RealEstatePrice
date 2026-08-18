@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { buildWhere } from '@/lib/filters'
 import { fetchProjectStats } from '@/lib/queries/projectCompare'
 
 /** 低於此筆數的中位數等同少數幾筆的算術結果，前端會標示為僅供參考 */
@@ -9,7 +10,9 @@ export interface ProjectPoint {
   name: string
   district: string
   buildingType: string
+  roomsMode: number | null
   txCount: number
+  txPresale: number
   reliable: boolean
   priceMedian: number
   priceP25: number | null
@@ -20,9 +23,11 @@ export interface ProjectPoint {
   lastTx: string
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const rows = await fetchProjectStats()
+    // skipDate=true：建案比較看的是完整銷售期，不套用預設的 110/1～115/12 區間
+    const where = buildWhere(req.nextUrl.searchParams, '', true)
+    const rows = await fetchProjectStats(where)
 
     const projects: ProjectPoint[] = rows
       .map(r => ({
@@ -30,7 +35,9 @@ export async function GET() {
         name:         String(r.name),
         district:     String(r.district ?? ''),
         buildingType: String(r.building_type ?? ''),
+        roomsMode:    r.rooms_mode != null ? Number(r.rooms_mode) : null,
         txCount:      Number(r.tx_count),
+        txPresale:    Number(r.tx_presale ?? 0),
         reliable:     Number(r.tx_count) >= MIN_RELIABLE_TX,
         priceMedian:  Number(r.price_median),
         priceP25:     r.price_p25 != null ? Number(r.price_p25) : null,

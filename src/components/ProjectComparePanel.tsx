@@ -20,6 +20,25 @@ interface ApiData { projects: ProjectPoint[]; districts: string[]; minReliableTx
 const MAX_SELECTED = 12
 const ISO_LINES = [600, 800, 1000, 1200, 1500, 2000]
 
+// 與 FilterBar 的選項值一致，確保與站上其他頁面篩選邏輯相同
+const TYPE_OPTIONS = [
+  { label: '住宅大樓', value: '住宅大樓' },
+  { label: '華廈', value: '華廈' },
+  { label: '透天厝', value: '透天厝' },
+  { label: '公寓', value: '公寓' },
+  { label: '店面', value: '店面' },
+]
+const ROOM_OPTIONS = [
+  { label: '1房', value: '1' }, { label: '2房', value: '2' },
+  { label: '3房', value: '3' }, { label: '4房', value: '4' },
+  { label: '5房以上', value: '5+' },
+]
+const PRESALE_OPTIONS = [
+  { label: '全部', value: 'all' },
+  { label: '預售', value: 'true' },
+  { label: '成屋', value: 'false' },
+]
+
 function centerStyle(h: number): React.CSSProperties {
   return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
 }
@@ -37,6 +56,23 @@ function chipStyle(active: boolean): React.CSSProperties {
   }
 }
 
+function FilterGroup({ label, options, selected, onToggle }: {
+  label: string
+  options: { label: string; value: string }[]
+  selected: string[]
+  onToggle: (v: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>{label}</span>
+      {options.map(o => (
+        <button key={o.value} onClick={() => onToggle(o.value)}
+          style={chipStyle(selected.includes(o.value))}>{o.label}</button>
+      ))}
+    </div>
+  )
+}
+
 export default function ProjectComparePanel() {
   const [data, setData] = useState<ApiData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -44,13 +80,31 @@ export default function ProjectComparePanel() {
   const [district, setDistrict] = useState<string>('')
   const [selected, setSelected] = useState<string[]>([])
   const [hideUnreliable, setHideUnreliable] = useState(false)
+  const [types, setTypes] = useState<string[]>([])
+  const [rooms, setRooms] = useState<string[]>([])
+  const [presale, setPresale] = useState('all')
+  const [firstLoad, setFirstLoad] = useState(true)
 
   useEffect(() => {
-    fetch('/api/project-compare')
+    setLoading(true)
+    const qs = new URLSearchParams()
+    if (types.length) qs.set('types', types.join(','))
+    if (rooms.length) qs.set('rooms', rooms.join(','))
+    if (presale !== 'all') qs.set('presale', presale)
+
+    fetch(`/api/project-compare?${qs}`)
       .then(r => r.json())
-      .then(d => { if (!d.error) { setData(d); setSelected(d.projects.slice(0, 6).map((p: ProjectPoint) => p.key)) } })
+      .then(d => {
+        if (d.error) return
+        setData(d)
+        // 首次載入預設帶出成交量最大的 6 案；之後換篩選條件保留使用者的選擇
+        if (firstLoad) {
+          setSelected(d.projects.slice(0, 6).map((p: ProjectPoint) => p.key))
+          setFirstLoad(false)
+        }
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, [types, rooms, presale, firstLoad])
 
   const byKey = useMemo(
     () => new Map((data?.projects ?? []).map(p => [p.key, p])),
@@ -70,14 +124,23 @@ export default function ProjectComparePanel() {
     () => selected.map(k => byKey.get(k)).filter((p): p is ProjectPoint => !!p),
     [selected, byKey])
 
+  // 選了但在目前篩選條件下沒有交易的案 —— 要明講，不能讓它默默從圖上消失
+  const droppedCount = selected.length - points.length
+
   const toggle = (key: string) => setSelected(s =>
     s.includes(key) ? s.filter(x => x !== key)
       : s.length >= MAX_SELECTED ? s : [...s, key])
 
-  if (loading) return <div style={{ padding: 20 }}><div style={centerStyle(460)}>載入中…</div></div>
-  if (!data) return <div style={{ padding: 20 }}><div style={centerStyle(200)}>查詢失敗</div></div>
+  if (!data) {
+    return (
+      <div style={{ padding: 20 }}>
+        <div style={centerStyle(460)}>{loading ? '載入中…' : '查詢失敗'}</div>
+      </div>
+    )
+  }
 
   const unreliableCount = points.filter(p => !p.reliable).length
+  const filtersActive = types.length > 0 || rooms.length > 0 || presale !== 'all'
   const districtsInView = [...new Set(points.map(p => p.district))]
 
   return (
@@ -119,6 +182,29 @@ export default function ProjectComparePanel() {
           </span>
         </div>
 
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center',
+                      paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border-card)' }}>
+          <FilterGroup label="建築類型" options={TYPE_OPTIONS} selected={types}
+            onToggle={v => setTypes(t => t.includes(v) ? t.filter(x => x !== v) : [...t, v])} />
+          <FilterGroup label="房型" options={ROOM_OPTIONS} selected={rooms}
+            onToggle={v => setRooms(r => r.includes(v) ? r.filter(x => x !== v) : [...r, v])} />
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>成/預售</span>
+            {PRESALE_OPTIONS.map(o => (
+              <button key={o.value} onClick={() => setPresale(o.value)}
+                style={chipStyle(presale === o.value)}>{o.label}</button>
+            ))}
+          </div>
+          {(types.length > 0 || rooms.length > 0 || presale !== 'all') && (
+            <button onClick={() => { setTypes([]); setRooms([]); setPresale('all') }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)',
+                       cursor: 'pointer', fontSize: 12 }}>
+              重設篩選
+            </button>
+          )}
+          {loading && <span style={{ fontSize: 11, color: 'var(--text-faint)' }}>更新中…</span>}
+        </div>
+
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxHeight: 132, overflowY: 'auto' }}>
           {candidates.map(p => (
             <button key={p.key} onClick={() => toggle(p.key)} style={chipStyle(selected.includes(p.key))}>
@@ -147,8 +233,14 @@ export default function ProjectComparePanel() {
           ? <div style={centerStyle(460)}>請從上方選擇建案</div>
           : <ProjectCompareChart points={points} isoLines={ISO_LINES} />}
 
-        {(unreliableCount > 0 || districtsInView.length > 1) && (
+        {(unreliableCount > 0 || districtsInView.length > 1 || droppedCount > 0 || filtersActive) && (
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.9 }}>
+            {filtersActive && (
+              <div>目前數字是「符合篩選條件的交易」之中位數，不是各案全部交易的中位數。</div>
+            )}
+            {droppedCount > 0 && (
+              <div>已選建案中有 {droppedCount} 案在目前篩選條件下沒有成交，暫時不顯示於圖表。</div>
+            )}
             {unreliableCount > 0 && (
               <div>已選建案中有 {unreliableCount} 案成交筆數不足 {data.minReliableTx} 筆，其中位數等同少數幾筆的算術結果，不宜當作行情。</div>
             )}
