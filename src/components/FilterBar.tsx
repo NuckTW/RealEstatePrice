@@ -61,7 +61,9 @@ export const DEFAULT_FILTERS: FilterValues = {
 /* ── Shared select style ──────────────────────────────────────── */
 const selectStyle: CSSProperties = {
   appearance: 'none',
-  background: 'var(--surface-control)',
+  // 用 backgroundColor 而非 background 簡寫：下方還設了 backgroundImage（下拉箭頭），
+  // 混用簡寫與非簡寫會讓 React 在 rerender 時警告並可能蓋掉箭頭
+  backgroundColor: 'var(--surface-control)',
   border: '1px solid var(--border-control)',
   color: 'var(--text-default)',
   borderRadius: 'var(--radius-md)',
@@ -76,7 +78,7 @@ const selectStyle: CSSProperties = {
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a7a68' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`,
 }
 
-function StyledSelect({ label, options, value, onChange }: {
+export function StyledSelect({ label, options, value, onChange }: {
   label?: string
   options: { label: string; value: string }[]
   value: string
@@ -105,7 +107,7 @@ function StyledSelect({ label, options, value, onChange }: {
 }
 
 /* ── Multi-select dropdown ────────────────────────────────────── */
-function MultiSelect({ label, options, selected, onChange, placeholder }: {
+export function MultiSelect({ label, options, selected, onChange, placeholder }: {
   label: string; options: { label: string; value: string }[]
   selected: string[]; onChange: (v: string[]) => void; placeholder: string
 }) {
@@ -143,7 +145,7 @@ function MultiSelect({ label, options, selected, onChange, placeholder }: {
           gap: 6, minWidth: 110, padding: '0 8px 0 10px',
           color: hasActive ? 'var(--accent-tint)' : 'var(--text-default)',
           borderColor: open ? 'var(--accent)' : hasActive ? 'var(--accent-wash-border)' : 'var(--border-control)',
-          background: hasActive ? 'var(--accent-wash)' : 'var(--surface-control)',
+          backgroundColor: hasActive ? 'var(--accent-wash)' : 'var(--surface-control)',
           backgroundImage: 'none',
         }}
       >
@@ -222,7 +224,7 @@ function DistrictSelect({ selected, onChange }: { selected: string[]; onChange: 
           gap: 6, padding: '0 8px 0 10px', backgroundImage: 'none',
           color: hasActive ? 'var(--accent-tint)' : 'var(--text-default)',
           borderColor: open ? 'var(--accent)' : hasActive ? 'var(--accent-wash-border)' : 'var(--border-control)',
-          background: hasActive ? 'var(--accent-wash)' : 'var(--surface-control)',
+          backgroundColor: hasActive ? 'var(--accent-wash)' : 'var(--surface-control)',
         }}
       >
         <span>{displayText}</span>
