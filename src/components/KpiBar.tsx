@@ -39,7 +39,7 @@ const CARDS = [
   },
 ]
 
-export default function KpiBar({ data, dateRange }: { data: KpiData; dateRange: string }) {
+export default function KpiBar({ data, dateRange, showBackfillWarning }: { data: KpiData; dateRange: string; showBackfillWarning?: boolean }) {
   return (
     <div style={{ padding: '16px 20px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Date badge */}
@@ -118,6 +118,16 @@ export default function KpiBar({ data, dateRange }: { data: KpiData; dateRange: 
                   fontFamily: 'var(--font-sans)',
                 }}>{card.unit}</span>
               </div>
+
+              {/* 補登警示：只在「成交戶數」卡片、且迄月落在最新資料月往前 2 個月內才顯示 */}
+              {card.key === 'total' && showBackfillWarning && (
+                <span style={{
+                  fontSize: 10, color: 'var(--text-faint)',
+                  fontFamily: 'var(--font-sans)', lineHeight: 1.4,
+                }}>
+                  最近 2 個月仍在補登，戶數會被低估
+                </span>
+              )}
             </div>
           )
         })}

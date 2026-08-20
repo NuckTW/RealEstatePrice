@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
 import KpiBar from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
 import CaseDetailPanel from './CaseDetailPanel'
+import TransactionTable from './TransactionTable'
 
 // 動態 import 避免 SSR（Leaflet 需要 window）
 const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => (
@@ -169,6 +170,21 @@ export default function Dashboard() {
   const [panelOpen, setPanelOpen]         = useState(false)
   const [panelCase, setPanelCase]         = useState<{ name: string; district: string; caseType: 'presale' | 'existing' } | null>(null)
 
+  // 個案統計卡片：實價登錄明細（預設）／個案排行 雙 tab；不需寫進 URL
+  const [caseSubTab, setCaseSubTab] = useState<'transactions' | 'ranking'>('transactions')
+
+  // 統計總覽（行政區／類型／房型）可摺疊區塊，預設收合
+  const [statsExpanded, setStatsExpanded] = useState(false)
+
+  // 資料最新交易日（用於 KPI 補登警示），與篩選條件無關，只抓一次
+  const [lastDataDate, setLastDataDate] = useState<string | null>(null)
+  useEffect(() => {
+    fetch('/api/meta')
+      .then(r => r.json())
+      .then(d => { if (d.last_date) setLastDataDate(d.last_date) })
+      .catch(() => {})
+  }, [])
+
   const fetchData = useCallback(async (f: FilterValues) => {
     setLoading(true)
     try {
@@ -234,6 +250,17 @@ export default function Dashboard() {
   }
 
   const dateRange = `${filters.dateFromYear}年${filters.dateFromMonth}月 ～ ${filters.dateToYear}年${filters.dateToMonth}月`
+
+  // 實價登錄申報期為權利移轉後 30 日內，加上揭露作業，最近約 2 個月資料還在補登中；
+  // 使用者選的迄月若落在「資料最新月」往前推 2 個月的範圍內，就提示戶數可能被低估
+  const showBackfillWarning = useMemo(() => {
+    if (!lastDataDate) return false
+    const [ly, lm] = lastDataDate.split('-').map(Number)
+    const latestTotal = ly * 12 + (lm - 1)
+    const toTotal = (parseInt(filters.dateToYear) + 1911) * 12 + (parseInt(filters.dateToMonth) - 1)
+    const diff = latestTotal - toTotal
+    return diff >= 0 && diff <= 2
+  }, [lastDataDate, filters.dateToYear, filters.dateToMonth])
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-app)' }}>
@@ -344,33 +371,97 @@ export default function Dashboard() {
               </div>
 
               {/* KPI */}
-              <KpiBar data={data.kpi} dateRange={dateRange} />
+              <KpiBar data={data.kpi} dateRange={dateRange} showBackfillWarning={showBackfillWarning} />
 
               {/* Divider */}
               <div style={{ margin: '0 20px 16px', height: 1, background: 'var(--border-card)' }} />
 
               <div className="px-5 space-y-4">
-                {/* Row 1: Districts + Types */}
-                <div className="grid grid-cols-1 xl:grid-cols-[3fr_1.6fr] gap-4">
-                  <DataTable title="行政區排行" columns={DIST_COLS}  data={data.districts} pageSize={8} />
-                  <DataTable title="類型統計"   columns={TYPE_COLS}  data={data.types}     pageSize={8} />
+                {/* 實價登錄明細／個案排行：雙 tab 卡片，緊接在 KPI 之下 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {([
+                      { id: 'transactions' as const, label: '實價登錄明細' },
+                      { id: 'ranking'      as const, label: '個案排行' },
+                    ]).map(tab => {
+                      const active = caseSubTab === tab.id
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => setCaseSubTab(tab.id)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            height: 'var(--control-h-sm)', padding: '0 14px',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
+                            fontFamily: 'var(--font-sans)',
+                            background: active ? 'var(--accent-wash)' : 'transparent',
+                            color: active ? 'var(--accent-tint)' : 'var(--text-muted)',
+                            border: active ? '1px solid var(--accent-wash-border)' : '1px solid transparent',
+                            cursor: 'pointer', transition: 'var(--transition-base)',
+                          }}
+                        >
+                          {tab.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {caseSubTab === 'transactions' ? (
+                    <TransactionTable
+                      filters={filters}
+                      onCaseClick={(name, caseType, district) => {
+                        setPanelCase({ name, district, caseType })
+                        setPanelOpen(true)
+                      }}
+                    />
+                  ) : (
+                    <DataTable
+                      title={
+                        filters.presale === 'true' ? '個案排行（預售屋）' :
+                        filters.presale === 'false' ? '個案排行（成屋）' :
+                        '個案排行（成屋 ＋ 預售屋）'
+                      }
+                      columns={getCasesCols(filters.presale)}
+                      data={data.cases}
+                      pageSize={10}
+                      onRowClick={handleCaseClick}
+                    />
+                  )}
                 </div>
 
-                {/* Row 2: Rooms */}
-                <DataTable title="房型統計" columns={ROOMS_COLS} data={data.rooms} pageSize={10} />
+                {/* 統計總覽：行政區／類型／房型，可摺疊、預設收合 */}
+                <div style={{ borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border-card)', background: 'var(--surface-card)' }}>
+                  <button
+                    onClick={() => setStatsExpanded(v => !v)}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '11px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
+                      borderBottom: statsExpanded ? '1px solid var(--border-card)' : 'none',
+                    }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                      <span style={{ width: 4, height: 16, borderRadius: 'var(--radius-full)', background: 'var(--gradient-accent)', flexShrink: 0, display: 'block' }} />
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>
+                        統計總覽（行政區／類型／房型）
+                      </span>
+                    </span>
+                    <span style={{ color: 'var(--text-faint)', fontSize: 12, transform: statsExpanded ? 'rotate(180deg)' : 'none', transition: 'var(--transition-base)' }}>⌄</span>
+                  </button>
 
-                {/* Row 3: Cases */}
-                <DataTable
-                  title={
-                    filters.presale === 'true' ? '個案統計（預售屋）' :
-                    filters.presale === 'false' ? '個案統計（成屋）' :
-                    '個案統計（成屋 ＋ 預售屋）'
-                  }
-                  columns={getCasesCols(filters.presale)}
-                  data={data.cases}
-                  pageSize={10}
-                  onRowClick={handleCaseClick}
-                />
+                  {statsExpanded && (
+                    <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {/* Row 1: Districts + Types */}
+                      <div className="grid grid-cols-1 xl:grid-cols-[3fr_1.6fr] gap-4">
+                        <DataTable title="行政區排行" columns={DIST_COLS}  data={data.districts} pageSize={8} />
+                        <DataTable title="類型統計"   columns={TYPE_COLS}  data={data.types}     pageSize={8} />
+                      </div>
+
+                      {/* Row 2: Rooms */}
+                      <DataTable title="房型統計" columns={ROOMS_COLS} data={data.rooms} pageSize={10} />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
