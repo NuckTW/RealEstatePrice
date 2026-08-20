@@ -112,7 +112,8 @@ const DETAIL_COLS = `
       parking_type,
       ROUND((NULLIF(parking_area_sqm,0) * 0.3025)::numeric, 2)        AS parking_area,
       bathrooms,
-      living_rooms`
+      living_rooms,
+      notes`
 
 /**
  * 單一建案交易明細
@@ -133,7 +134,7 @@ export function fetchCaseDetail(opts: {
       SELECT ${DETAIL_COLS}
       FROM transactions
       WHERE district = '${safeDistrict}'
-        AND project_name = '${safeName}'
+        AND lower(btrim(project_name)) = lower(btrim('${safeName}'))
         AND is_presale = true
         AND unit_price_sqm > 0
       ORDER BY transaction_date DESC

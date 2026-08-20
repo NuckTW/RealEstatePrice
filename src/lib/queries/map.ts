@@ -2,6 +2,7 @@
  * 地圖標記查詢（/api/map）
  * 注意：熱力圖模式僅支援預售屋，不可擴展到成屋。
  */
+import { escapeSqlString } from '@/lib/filters'
 import { cachedQuery, type Row } from './client'
 
 /**
@@ -79,5 +80,25 @@ export function fetchExistingMarkers(where: string): Promise<Row[]> {
       t.district, bl.lat, bl.lon
     ORDER BY count DESC
     LIMIT 3000
+  `)
+}
+
+/**
+ * 單一建案座標（/api/project-location，供「建案搜尋」頁地圖使用）
+ * 只查預售（第一版範圍限定）。
+ *
+ * 比對刻意做成大小寫／前後空白不敏感：來源資料同一個建案會有異寫
+ * （例如「禾震SUPER3」與「禾震Super3」），而 fetchProjectStats 是用
+ * min(project_name) 挑一個寫法回傳，若這裡用完全相等比對，
+ * 挑到的寫法一旦與 building_locations 記錄的不同就會查無座標。
+ */
+export function fetchProjectLocation(projectName: string): Promise<Row[]> {
+  const safeName = escapeSqlString(projectName)
+  return cachedQuery(`
+    SELECT lat, lon
+    FROM building_locations
+    WHERE location_type = 'presale'
+      AND lower(btrim(location_key)) = lower(btrim('${safeName}'))
+    LIMIT 1
   `)
 }

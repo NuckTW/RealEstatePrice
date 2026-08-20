@@ -27,6 +27,7 @@ export default function Navbar() {
     { href: '/price-index', label: '價格指數', icon: '◉' },
     { href: '/supply',      label: '市場供給', icon: '▤' },
     { href: '/project-compare', label: '建案比較', icon: '◎' },
+    { href: '/search',      label: '建案搜尋', icon: '⌕' },
     { href: '/chat',        label: 'AI 問答', icon: '◇', disabled: true },
   ]
 
