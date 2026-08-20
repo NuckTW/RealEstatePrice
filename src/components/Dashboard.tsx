@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo , useRef } from 'react'
 import dynamic from 'next/dynamic'
 import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
 import KpiBar from './KpiBar'
@@ -158,13 +158,46 @@ function syncUrl(f: FilterValues, tab: TabId) {
   window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
 }
 
+/** 篩選條件 → /api/charts 的 query string。
+    同時當作「這份資料對應哪組條件」的識別鍵，兩者一致才不會誤判載入狀態。 */
+function buildChartQuery(f: FilterValues): string {
+  const p = new URLSearchParams({
+    dateFromYear: f.dateFromYear, dateFromMonth: f.dateFromMonth,
+    dateToYear:   f.dateToYear,   dateToMonth:   f.dateToMonth,
+    presale: f.presale, buildingAge: f.buildingAge,
+  })
+  if (f.types.length > 0)     p.set('types', f.types.join(','))
+  if (f.rooms.length > 0)     p.set('rooms', f.rooms.join(','))
+  if (f.districts.length > 0) p.set('districts', f.districts.join(','))
+  return p.toString()
+}
+
+/** 從 URL 讀初始篩選條件。本元件以 ssr:false 掛載，window 必定存在。 */
+function readInitialFilters(): FilterValues {
+  return paramsToFilters(new URLSearchParams(window.location.search))
+}
+
+/** 初始 tab：URL 參數優先，其次 localStorage 記憶的上次選擇 */
+function readInitialTab(): TabId {
+  const urlTab = new URLSearchParams(window.location.search).get('tab')
+  if (urlTab && ['data', 'map', 'area'].includes(urlTab)) return urlTab as TabId
+  try {
+    const saved = localStorage.getItem('tra-tab')
+    if (saved && ['data', 'map', 'area'].includes(saved)) return saved as TabId
+  } catch { /* 隱私模式下 localStorage 可能拋錯，忽略即可 */ }
+  return 'data'
+}
+
 /* ── Dashboard ─────────────────────────────────────────────── */
 export default function Dashboard() {
-  const [data, setData]       = useState<ChartData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS)
-  const [activeTab, setActiveTab] = useState<TabId>('data')
-  const [restored, setRestored]   = useState(false)  // URL/localStorage 還原完成才開始同步回 URL
+  // 資料連同「它對應的查詢條件」一起存，loading 由兩者是否一致推導出來，
+  // 就不需要在 effect 裡同步 setLoading(true)（會造成串聯渲染）
+  const [result, setResult] = useState<{ key: string; data: ChartData | null } | null>(null)
+  const latestKey = useRef('')
+  // 直接以 lazy initializer 取初始值：不需要「先給預設值、再用 effect 還原」，
+  // 也就不需要 restored 旗標來擋住還原完成前的 URL 回寫
+  const [filters, setFilters] = useState<FilterValues>(readInitialFilters)
+  const [activeTab, setActiveTab] = useState<TabId>(readInitialTab)
 
   // Case detail panel state
   const [panelOpen, setPanelOpen]         = useState(false)
@@ -185,44 +218,41 @@ export default function Dashboard() {
       .catch(() => {})
   }, [])
 
-  const fetchData = useCallback(async (f: FilterValues) => {
-    setLoading(true)
-    try {
-      const p = new URLSearchParams({
-        dateFromYear: f.dateFromYear, dateFromMonth: f.dateFromMonth,
-        dateToYear:   f.dateToYear,   dateToMonth:   f.dateToMonth,
-        presale: f.presale, buildingAge: f.buildingAge,
+  // 用 promise 鏈而非 async/await：setState 必須落在巢狀回呼裡，
+  // async 函式中 await 之後的程式碼仍被視為 effect body 的一部分，
+  // 從 effect 呼叫時會觸發 react-hooks/set-state-in-effect。
+  const fetchData = useCallback((f: FilterValues) => {
+    const key = buildChartQuery(f)
+    latestKey.current = key
+    fetch(`/api/charts?${key}`)
+      .then(r => r.json())
+      .then(json => {
+        // 快速切換篩選時舊請求可能較晚回來，只接受最後一次發出的那筆
+        if (latestKey.current !== key) return
+        setResult({ key, data: json.error ? null : json })
       })
-      if (f.types.length > 0)     p.set('types', f.types.join(','))
-      if (f.rooms.length > 0)     p.set('rooms', f.rooms.join(','))
-      if (f.districts.length > 0) p.set('districts', f.districts.join(','))
-      const res  = await fetch(`/api/charts?${p}`)
-      const json = await res.json()
-      if (!json.error) setData(json)
-    } finally {
-      setLoading(false)
-    }
+      .catch(() => {
+        if (latestKey.current !== key) return
+        // 失敗也要記下這組條件已嘗試過，否則 loading 會永遠停在 true
+        setResult(prev => ({ key, data: prev?.data ?? null }))
+      })
   }, [])
 
-  /* 首次載入：從 URL（分享連結）與 localStorage（上次 tab）還原狀態 */
+  const data = result?.data ?? null
+  const loading = result?.key !== buildChartQuery(filters)
+
+  /* 首次載入抓資料。狀態已由 lazy initializer 帶入，這裡只做外部資料同步，
+     不再有同步 setState（避免 react-hooks/set-state-in-effect 的串聯渲染）。
+     重新解析一次 URL 而非引用 filters，是為了不把 filters 放進 deps 而誤觸重抓。 */
   useEffect(() => {
-    const p  = new URLSearchParams(window.location.search)
-    const f0 = paramsToFilters(p)
-    const urlTab = p.get('tab')
-    const savedTab = typeof localStorage !== 'undefined' ? localStorage.getItem('tra-tab') : null
-    const tab0 = (['data','map','area'].includes(urlTab ?? '') ? urlTab : savedTab) as TabId | null
-    if (tab0 && ['data','map','area'].includes(tab0)) setActiveTab(tab0)
-    setFilters(f0)
-    setRestored(true)
-    fetchData(f0)
+    fetchData(readInitialFilters())
   }, [fetchData])
 
   /* 狀態變更 → 寫回 URL（可直接複製分享）＋記住 tab */
   useEffect(() => {
-    if (!restored) return
     syncUrl(filters, activeTab)
     try { localStorage.setItem('tra-tab', activeTab) } catch {}
-  }, [filters, activeTab, restored])
+  }, [filters, activeTab])
 
   const handleApply = (f: FilterValues) => { setFilters(f); fetchData(f) }
 

@@ -39,7 +39,7 @@ function buildPopup(m: Marker, color: string): string {
   const price = m.unit_price ? `${m.unit_price}萬/坪` : '—'
   // 預售屋：銷售成數 + 最新成交月（建商/房仲判斷去化速度的關鍵）
   const salesRow = m.case_type === '預售' && (m.total_units || m.last_tx_month) ? `
-    <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#9ca3af">
+    <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.08);font-size:var(--text-2xs);color:#9ca3af">
       ${m.total_units
         ? `銷售 <span style="color:#e2e8f0;font-weight:600">${m.sold_total ?? '—'}/${m.total_units}</span> 戶${m.sales_ratio != null ? `（<span style="color:${color};font-weight:600">${m.sales_ratio}%</span>）` : ''}`
         : ''}
@@ -47,18 +47,18 @@ function buildPopup(m: Marker, color: string): string {
     </div>` : ''
 
   return `
-    <div style="font-family:sans-serif;font-size:12px;min-width:170px">
+    <div style="font-family:sans-serif;font-size:var(--text-xs);min-width:170px">
       <div style="font-weight:600;margin-bottom:4px">${m.display_name}</div>
       <div style="color:#888;margin-bottom:6px">${m.district} · ${m.case_type}</div>
       <div style="display:flex;gap:12px">
-        <div><div style="color:#888;font-size:10px">均單價</div><div style="color:${color};font-weight:600">${price}</div></div>
-        <div><div style="color:#888;font-size:10px">均總價</div><div style="font-weight:600">${m.avg_total ? m.avg_total.toLocaleString()+'萬' : '—'}</div></div>
-        <div><div style="color:#888;font-size:10px">戶數</div><div style="font-weight:600">${m.count}</div></div>
+        <div><div style="color:#888;font-size:var(--text-3xs)">均單價</div><div style="color:${color};font-weight:600">${price}</div></div>
+        <div><div style="color:#888;font-size:var(--text-3xs)">均總價</div><div style="font-weight:600">${m.avg_total ? m.avg_total.toLocaleString()+'萬' : '—'}</div></div>
+        <div><div style="color:#888;font-size:var(--text-3xs)">戶數</div><div style="font-weight:600">${m.count}</div></div>
       </div>
       ${salesRow}
       <button
         onclick="window.__mapClick('${m.location_key.replace(/'/g,"\\'")}','${m.case_type}','${m.district}')"
-        style="margin-top:8px;width:100%;background:#1e293b;color:#e2e8f0;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:11px">
+        style="margin-top:8px;width:100%;background:#1e293b;color:#e2e8f0;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:var(--text-2xs)">
         查看交易明細
       </button>
     </div>`
@@ -297,7 +297,7 @@ export default function MapView({ filters, onCaseClick }: Props) {
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#080d16]/60 rounded-2xl z-[1000]">
-          <div className="flex items-center gap-2 text-gray-300 text-sm">
+          <div className="flex items-center gap-2 text-gray-300" style={{ fontSize: 'var(--text-sm)' }}>
             <span className="w-4 h-4 border border-gray-600 border-t-violet-400 rounded-full animate-spin" />
             載入地圖資料…
           </div>
@@ -305,7 +305,8 @@ export default function MapView({ filters, onCaseClick }: Props) {
       )}
 
       {/* left-14 避開 Leaflet zoom 控制鈕（避免蓋住 +/- 造成點不到） */}
-      <div className="absolute top-3 left-14 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full p-1 text-xs flex gap-1">
+      <div className="absolute top-3 left-14 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full p-1 flex gap-1"
+        style={{ fontSize: 'var(--text-xs)' }}>
         <button
           onClick={() => setViewMode('marker')}
           className={`px-3 py-1 rounded-full transition-colors ${viewMode === 'marker' ? 'bg-amber-500/90 text-[#0d1420] font-medium' : 'text-gray-400 hover:text-gray-200'}`}
@@ -321,12 +322,14 @@ export default function MapView({ filters, onCaseClick }: Props) {
       </div>
 
       {!loading && (
-        <div className="absolute top-3 right-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full px-3 py-1 text-xs text-gray-400">
+        <div className="absolute top-3 right-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full px-3 py-1 text-gray-400"
+          style={{ fontSize: 'var(--text-xs)' }}>
           {count.toLocaleString()} 棟
         </div>
       )}
 
-      <div className="absolute bottom-6 left-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-400 flex flex-col gap-1.5">
+      <div className="absolute bottom-6 left-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-xl px-3 py-2 text-gray-400 flex flex-col gap-1.5"
+        style={{ fontSize: 'var(--text-xs)' }}>
         <div className="flex flex-col gap-0.5">
           <span>預售屋單價（萬/坪，{viewMode === 'heat' ? '熱力強度' : '標記顏色'}）</span>
           <div className="flex items-center gap-1.5">
@@ -345,6 +348,10 @@ export default function MapView({ filters, onCaseClick }: Props) {
 
       <style>{`
         .map-marker { background:rgba(13,20,32,0.92); border:1.5px solid; border-radius:8px; padding:2px 6px; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+        /* 以下三個是「地圖圖形標記」而非排版文字，字級刻意固定、不跟隨 --font-scale：
+           marker 與 cluster 是固定尺寸的圓形/膠囊，字放大會直接爆出圖形外；
+           heat-label 疊在熱力色塊上，放大會蓋掉相鄰色塊。
+           地圖疊層的 UI（模式切換、棟數、圖例）與 popup 內文則已改用字級 token。 */
         .map-marker-price { font-size:11px; font-weight:600; line-height:1.4; }
         .map-heat-label { color:#f1f5f9; font-size:11px; font-weight:700; text-align:center; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.6); }
         .map-cluster { width:36px; height:36px; background:rgba(139,92,246,.85); border:2px solid rgba(139,92,246,.4); border-radius:50%; color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.4); }

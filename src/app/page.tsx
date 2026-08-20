@@ -1,11 +1,11 @@
 import Navbar from '@/components/Navbar'
-import Dashboard from '@/components/Dashboard'
+import DashboardClient from '@/components/DashboardClient'
 
 export default function Home() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg-app)', color: 'var(--text-default)' }}>
       <Navbar />
-      <Dashboard />
+      <DashboardClient />
       <footer style={{
         borderTop: '1px solid var(--border-card)',
         marginTop: 32,
