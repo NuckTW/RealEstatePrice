@@ -34,9 +34,13 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
   const onBoundsRef = useRef(onBoundsSelect)
   const onToggleRef = useRef(onMarkerToggle)
   const LxRef       = useRef<typeof L | null>(null)
-  markersRef.current  = markers
-  onBoundsRef.current = onBoundsSelect
-  onToggleRef.current = onMarkerToggle
+  // render 階段不能寫 ref.current（react-hooks/refs），改到 effect 裡同步；
+  // 不給 deps array，每次 render 完都會執行，效果等同原本在 render body 裡直接賦值
+  useEffect(() => {
+    markersRef.current  = markers
+    onBoundsRef.current = onBoundsSelect
+    onToggleRef.current = onMarkerToggle
+  })
 
   /** 「▭ 框選範圍」按鈕：直接啟動矩形繪製模式（不必找地圖角落的小工具列） */
   const startDraw = () => {

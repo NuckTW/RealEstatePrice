@@ -335,7 +335,15 @@ export default function FilterBar({ onApply, loading, autoApply, value }: {
   const [f, setF] = useState<FilterValues>(value ?? DEFAULT_FILTERS)
   const [expanded, setExpanded] = useState(false)  // 手機版展開狀態
 
-  useEffect(() => { if (value) setF(value) }, [value])
+  // 外部 value 變更時同步回本地 f：這是 React 官方文件「Adjusting state when a prop
+  // changes」的寫法（render 階段比對＋同步呼叫 setState），不是在 effect 裡做，
+  // 所以不會觸發 react-hooks/set-state-in-effect；語意等同原本的
+  // useEffect(() => { if (value) setF(value) }, [value])。
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== prevValue) {
+    setPrevValue(value)
+    if (value) setF(value)
+  }
 
   const set = <K extends keyof FilterValues>(key: K, val: FilterValues[K]) => {
     const next = { ...f, [key]: val }

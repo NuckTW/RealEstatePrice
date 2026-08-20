@@ -20,7 +20,12 @@ export default function ThemeToggle() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
 
   useEffect(() => {
+    // 與 FontSizeToggle 同一模式：SSR 階段沒有 localStorage，state 先用預設值 'dark'
+    // render 一次以避免 hydration mismatch，掛載後才讀真正的值同步 React state。
+    // 實際頁面主題已由 layout.tsx 的 blocking script 提前套用（不會閃爍），
+    // 這裡只是同步按鈕自身的高亮狀態，此處刻意保留、不改用 useSyncExternalStore。
     const t = getStoredTheme()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(t)
     applyTheme(t)
   }, [])

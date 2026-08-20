@@ -59,18 +59,26 @@ function fmtPct(v: number | null): string {
 export default function PriceIndexPanel() {
   const [selected, setSelected] = useState<string[]>(['全市'])
   const [mode, setMode] = useState<Mode>('index')
-  const [data, setData] = useState<ApiData | null>(null)
-  const [loading, setLoading] = useState(true)
+
+  // 資料連同「對應的查詢識別鍵」一起存，loading 由兩者是否一致推導；不在 effect 裡
+  // 同步呼叫 setState（會被 react-hooks/set-state-in-effect 判違規），並沿用舊資料
+  // 直到新資料回來，避免每次勾選數列都整片閃成「載入中」。
+  const seriesKey = selected.join(',')
+  const [data, setData] = useState<(ApiData & { key: string }) | null>(null)
+  const loading = data?.key !== seriesKey
 
   useEffect(() => {
-    setLoading(true)
-    const p = new URLSearchParams({ series: selected.join(',') })
+    let cancelled = false
+    const p = new URLSearchParams({ series: seriesKey })
     fetch(`/api/price-index?${p}`)
       .then(r => r.json())
-      .then(d => { if (!d.error) setData(d) })
+      .then(d => {
+        if (cancelled || d.error) return
+        setData({ ...d, key: seriesKey })
+      })
       .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [selected])
+    return () => { cancelled = true }
+  }, [seriesKey])
 
   function toggleSeries(name: string) {
     setSelected(prev => {

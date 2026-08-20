@@ -45,10 +45,19 @@ interface Props {
 }
 
 export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) {
-  const [stats,         setStats]         = useState<ProjectStat[]>([])
-  const [trend,         setTrend]         = useState<TrendRow[]>([])
-  const [buildingTypes, setBuildingTypes] = useState<BuildingTypeRow[]>([])
-  const [loading,       setLoading]       = useState(false)
+  // 資料連同「對應的查詢識別鍵」一起存，loading 由兩者是否一致推導，effect 裡不再同步呼叫
+  // setState（會被 react-hooks/set-state-in-effect 判違規）；同時這個 key 比對也順便擋掉
+  // 快速切換 selected 時，舊請求晚回覆蓋新結果的競態問題。
+  const selKey = selected.join('|')
+  const [result, setResult] = useState<{
+    key: string; stats: ProjectStat[]; trend: TrendRow[]; buildingTypes: BuildingTypeRow[]
+  } | null>(null)
+  const matched = result?.key === selKey
+  const stats         = selected.length && matched ? result!.stats         : []
+  const trend          = selected.length && matched ? result!.trend         : []
+  const buildingTypes = selected.length && matched ? result!.buildingTypes : []
+  const loading = selected.length > 0 && !matched
+
   const [search,  setSearch]  = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [showDrop, setShowDrop] = useState(false)
@@ -60,13 +69,16 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
 
   /* 分析資料 */
   useEffect(() => {
-    if (!selected.length) { setStats([]); setTrend([]); return }
-    setLoading(true)
+    if (!selected.length) return
+    let cancelled = false
     fetch(`/api/area-analysis?projects=${selected.map(encodeURIComponent).join(',')}`)
       .then(r => r.json())
-      .then(d => { setStats(d.stats ?? []); setTrend(d.trend ?? []); setBuildingTypes(d.buildingTypes ?? []) })
-      .finally(() => setLoading(false))
-  }, [selected])
+      .then(d => {
+        if (cancelled) return
+        setResult({ key: selKey, stats: d.stats ?? [], trend: d.trend ?? [], buildingTypes: d.buildingTypes ?? [] })
+      })
+    return () => { cancelled = true }
+  }, [selected, selKey])
 
   /* 搜尋 */
   const doSearch = useCallback((q: string) => {

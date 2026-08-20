@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo , useRef } from 'react'
 import dynamic from 'next/dynamic'
 import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
-import KpiBar from './KpiBar'
+import KpiBar, { DateBadge } from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
 import CaseDetailPanel from './CaseDetailPanel'
 import TransactionTable from './TransactionTable'
@@ -395,13 +395,16 @@ export default function Dashboard() {
 
           {data && (
             <div className="pb-10">
-              {/* Active filter tags */}
-              <div className="px-5 pt-3">
+              {/* 期間膠囊與篩選標籤同一列：兩者都是「目前套用的條件」，
+                  分成兩行會被誤讀成不同層級的資訊。標籤多時自動換行。 */}
+              <div className="px-5 pt-3"
+                style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+                <DateBadge dateRange={dateRange} />
                 <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
               </div>
 
               {/* KPI */}
-              <KpiBar data={data.kpi} dateRange={dateRange} showBackfillWarning={showBackfillWarning} />
+              <KpiBar data={data.kpi} showBackfillWarning={showBackfillWarning} />
 
               {/* Divider */}
               <div style={{ margin: '0 20px 16px', height: 1, background: 'var(--border-card)' }} />

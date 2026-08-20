@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FilterValues } from './FilterBar'
 
 interface DetailRow {
@@ -160,13 +160,10 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
 
 /* ── 主元件 ──────────────────────────────────────────────────── */
 export default function CaseDetailPanel({ open, caseName, caseType, district, filters, onClose }: Props) {
-  const [rows, setRows]         = useState<DetailRow[]>([])
-  const [loading, setLoading]   = useState(false)
-  const [expanded, setExpanded] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!open || !caseName) return
-    setRows([]); setExpanded(null); setLoading(true)
+  // query 當作資料的識別鍵；rows/loading 由「手上的資料是否對應目前的 query」推導，
+  // 不在 effect 裡同步呼叫 setState（會被 react-hooks/set-state-in-effect 判違規）
+  const query = useMemo(() => {
+    if (!open || !caseName) return null
     const p = new URLSearchParams({
       name: caseName, district,
       case_type:     caseType === 'presale' ? 'presale' : 'existing',
@@ -175,12 +172,31 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
       dateToYear:    filters.dateToYear,
       dateToMonth:   filters.dateToMonth,
     })
-    fetch(`/api/case-detail?${p}`)
-      .then(r => r.json())
-      .then(j => setRows(j.rows ?? []))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false))
+    return p.toString()
   }, [open, caseName, caseType, district, filters])
+
+  const [result, setResult] = useState<{ query: string; rows: DetailRow[] } | null>(null)
+  const rows = query && result?.query === query ? result.rows : []
+  const loading = !!query && result?.query !== query
+  const [expanded, setExpanded] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!query) return
+    let cancelled = false
+    fetch(`/api/case-detail?${query}`)
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled) return
+        setResult({ query, rows: j.rows ?? [] })
+        setExpanded(null)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setResult({ query, rows: [] })
+        setExpanded(null)
+      })
+    return () => { cancelled = true }
+  }, [query])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }

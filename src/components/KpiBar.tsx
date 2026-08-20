@@ -39,28 +39,36 @@ const CARDS = [
   },
 ]
 
-export default function KpiBar({ data, dateRange, showBackfillWarning }: { data: KpiData; dateRange: string; showBackfillWarning?: boolean }) {
+/**
+ * 期間膠囊。從 KpiBar 抽出來獨立匯出，讓 Dashboard 能把它與
+ * ActiveFilterTags 排在同一列 —— 兩者都是「目前套用的條件」，
+ * 分成兩行閱讀時會被誤認為不同層級的資訊。
+ */
+export function DateBadge({ dateRange }: { dateRange: string }) {
   return (
-    <div style={{ padding: '16px 20px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Date badge */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 'var(--text-xs)', color: 'var(--accent-tint)',
-          background: 'var(--accent-wash)',
-          border: '1px solid var(--accent-wash-border)',
-          borderRadius: 'var(--radius-full)',
-          padding: '3px 12px',
-          fontFamily: 'var(--font-mono)',
-        }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: '50%',
-            background: 'var(--accent)', flexShrink: 0,
-            animation: 'blink 1.8s ease-in-out infinite',
-          }} />
-          {dateRange}
-        </span>
-      </div>
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 'var(--text-xs)', color: 'var(--accent-tint)',
+      background: 'var(--accent-wash)',
+      border: '1px solid var(--accent-wash-border)',
+      borderRadius: 'var(--radius-full)',
+      padding: '3px 12px',
+      fontFamily: 'var(--font-mono)',
+      whiteSpace: 'nowrap',
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: 'var(--accent)', flexShrink: 0,
+        animation: 'blink 1.8s ease-in-out infinite',
+      }} />
+      {dateRange}
+    </span>
+  )
+}
+
+export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; showBackfillWarning?: boolean }) {
+  return (
+    <div style={{ padding: '4px 20px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       {/* KPI cards */}
       {/* 卡片最小寬度跟著字級縮放：大字級時 auto-fit 會自然讓每列排下更少張卡、卡片變寬，

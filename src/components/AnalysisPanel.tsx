@@ -263,35 +263,52 @@ export default function AnalysisPanel() {
   const [yMin, setYMin] = useState('')
   const [yMax, setYMax] = useState('')
   const [data,    setData]    = useState<AnalysisData | null>(null)
-  const [loading, setLoading] = useState(false)
+  // 初始值就是 true：元件掛載後馬上會發第一次請求，loading 從一開始就該是 true，
+  // 避免 mount effect 還要同步呼叫 setLoading(true)（會被 react-hooks/set-state-in-effect 判違規）
+  const [loading, setLoading] = useState(true)
   const [saved,   setSaved]   = useState<{ label: string; data: AnalysisData; metric: string }[]>([])
   const chartDivRef = useRef<HTMLDivElement>(null)
 
-  const fetchData = useCallback(async (overrideDistricts?: string[]) => {
-    setLoading(true)
-    try {
-      const dists = overrideDistricts ?? selectedDistricts
-      const p = new URLSearchParams({
-        metric, granularity, mode,
-        stat: STAT_SUPPORTED.has(metric) ? stat : 'avg',
-        buildingType, roomType,
-        yearFrom: String(yearFrom), monthFrom: String(monthFrom),
-        yearTo:   String(yearTo),   monthTo:   String(monthTo),
+  // 純 promise chain、且不同步呼叫 setState：可以安全地被 effect 直接呼叫（不會觸發
+  // react-hooks/set-state-in-effect）。setData / setSelectedDistricts 都發生在 .then() 回呼裡。
+  const runFetch = useCallback((overrideDistricts?: string[]) => {
+    const dists = overrideDistricts ?? selectedDistricts
+    const p = new URLSearchParams({
+      metric, granularity, mode,
+      stat: STAT_SUPPORTED.has(metric) ? stat : 'avg',
+      buildingType, roomType,
+      yearFrom: String(yearFrom), monthFrom: String(monthFrom),
+      yearTo:   String(yearTo),   monthTo:   String(monthTo),
+    })
+    if (dists.length > 0) p.set('districts', dists.join(','))
+    return fetch(`/api/analysis?${p}`)
+      .then(r => r.json())
+      .then(json => {
+        setData(json)
+        if (!selectedDistricts.length && json.districts?.length) setSelectedDistricts(json.districts)
       })
-      if (dists.length > 0) p.set('districts', dists.join(','))
-      const json = await fetch(`/api/analysis?${p}`).then(r => r.json())
-      setData(json)
-      if (!selectedDistricts.length && json.districts?.length) setSelectedDistricts(json.districts)
-    } finally { setLoading(false) }
   }, [metric, stat, granularity, mode, buildingType, roomType, yearFrom, monthFrom, yearTo, monthTo, selectedDistricts])
 
-  // 指標切換到不支援最高/最低統計時，自動回到「平均」
-  useEffect(() => {
-    if (!STAT_SUPPORTED.has(metric) && stat !== 'avg') setStat('avg')
-  }, [metric, stat])
+  // 「套用」按鈕用：setLoading(true) 發生在 click handler 裡，不受 effect 規則限制
+  const fetchData = useCallback((overrideDistricts?: string[]) => {
+    setLoading(true)
+    runFetch(overrideDistricts).finally(() => setLoading(false))
+  }, [runFetch])
 
+  // 指標切換到不支援最高/最低統計時，直接在切換當下同步回「平均」，
+  // 不再另外用 effect 監看 [metric, stat]（那會在 setState 上被判違規）
+  const handleMetricChange = (next: string) => {
+    setMetric(next)
+    if (!STAT_SUPPORTED.has(next) && stat !== 'avg') setStat('avg')
+  }
+
+  // 初次載入：loading 預設已是 true，這裡只需在資料回來後關閉即可，effect 本身不同步呼叫 setState
+  useEffect(() => {
+    let cancelled = false
+    runFetch().finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData() }, [])
+  }, [])
 
   const handleSave = () => {
     if (!data) return
@@ -326,7 +343,7 @@ export default function AnalysisPanel() {
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
             {label('指標')}
-            <MetricSelect value={metric} onChange={setMetric} />
+            <MetricSelect value={metric} onChange={handleMetricChange} />
           </div>
           {STAT_SUPPORTED.has(metric) && (
             <div>

@@ -81,73 +81,9 @@ export default function MapView({ filters, onCaseClick }: Props) {
   const [presaleRange, setPresaleRange] = useState<[number, number]>([0, 0])
   const [viewMode, setViewMode] = useState<'marker' | 'heat'>('marker')
 
-  /* ── 初始化地圖（只跑一次）── */
-  useEffect(() => {
-    if (!mapRef.current || mapInst.current) return
-
-    let cancelled = false;
-
-    (async () => {
-      const Lx = (await import('leaflet')).default as typeof L
-      await import('leaflet.markercluster')
-      await import('leaflet.heat')
-
-      if (cancelled || !mapRef.current) return
-
-      // CSS
-      const addCss = (id: string, href: string) => {
-        if (!document.querySelector(`#${id}`)) {
-          const l = document.createElement('link')
-          l.id = id; l.rel = 'stylesheet'; l.href = href
-          document.head.appendChild(l)
-        }
-      }
-      addCss('leaflet-css',         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css')
-      addCss('cluster-css',         'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css')
-      addCss('cluster-default-css', 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css')
-
-      // Fix icon paths
-      const Icons = Lx.Icon.Default as unknown as { prototype: Record<string, unknown>; mergeOptions: (o: unknown) => void }
-      delete Icons.prototype._getIconUrl
-      Icons.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      })
-
-      const map = Lx.map(mapRef.current!, { zoomControl: true }).setView([23.0, 120.2], 11)
-      mapInst.current = map
-
-      Lx.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(map)
-
-      await loadMarkers(Lx, map, filters)
-    })()
-
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  /* ── 篩選器或檢視模式變更 → 重新載入 ── */
-  useEffect(() => {
-    if (!mapInst.current) return
-    import('leaflet').then(mod => {
-      const Lx = mod.default as typeof L
-      loadMarkers(Lx, mapInst.current!, filters)
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, viewMode])
-
-  /* ── 清理 ── */
-  useEffect(() => {
-    return () => {
-      mapInst.current?.remove()
-      mapInst.current = null
-    }
-  }, [])
-
+  // loadMarkers 移到兩個會呼叫它的 effect 之前宣告 —— react-hooks 的新規則要求「用到的函式
+  // 必須先於使用處被宣告」（原本放在檔案後段雖然因 function 宣告會 hoist、執行時沒問題，
+  // 但仍會被判 react-hooks/immutability：Cannot access variable before it is declared）。
   async function loadMarkers(Lx: typeof L, map: L.Map, f: FilterValues) {
     setLoading(true)
     if (clusterRef.current) {
@@ -283,6 +219,73 @@ export default function MapView({ filters, onCaseClick }: Props) {
       setLoading(false)
     }
   }
+
+  /* ── 初始化地圖（只跑一次）── */
+  useEffect(() => {
+    if (!mapRef.current || mapInst.current) return
+
+    let cancelled = false;
+
+    (async () => {
+      const Lx = (await import('leaflet')).default as typeof L
+      await import('leaflet.markercluster')
+      await import('leaflet.heat')
+
+      if (cancelled || !mapRef.current) return
+
+      // CSS
+      const addCss = (id: string, href: string) => {
+        if (!document.querySelector(`#${id}`)) {
+          const l = document.createElement('link')
+          l.id = id; l.rel = 'stylesheet'; l.href = href
+          document.head.appendChild(l)
+        }
+      }
+      addCss('leaflet-css',         'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css')
+      addCss('cluster-css',         'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css')
+      addCss('cluster-default-css', 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css')
+
+      // Fix icon paths
+      const Icons = Lx.Icon.Default as unknown as { prototype: Record<string, unknown>; mergeOptions: (o: unknown) => void }
+      delete Icons.prototype._getIconUrl
+      Icons.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      })
+
+      const map = Lx.map(mapRef.current!, { zoomControl: true }).setView([23.0, 120.2], 11)
+      mapInst.current = map
+
+      Lx.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(map)
+
+      await loadMarkers(Lx, map, filters)
+    })()
+
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /* ── 篩選器或檢視模式變更 → 重新載入 ── */
+  useEffect(() => {
+    if (!mapInst.current) return
+    import('leaflet').then(mod => {
+      const Lx = mod.default as typeof L
+      loadMarkers(Lx, mapInst.current!, filters)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, viewMode])
+
+  /* ── 清理 ── */
+  useEffect(() => {
+    return () => {
+      mapInst.current?.remove()
+      mapInst.current = null
+    }
+  }, [])
 
   // 全域 popup callback
   useEffect(() => {

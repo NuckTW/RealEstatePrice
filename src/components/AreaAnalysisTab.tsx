@@ -14,14 +14,20 @@ interface Props {
 }
 
 export default function AreaAnalysisTab({ filters }: Props) {
-  const [markers,  setMarkers]  = useState<PresaleMarker[]>([])
   // 初始選取從 URL ?projects= 還原（分享連結）
   const [selected, setSelected] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
     return (new URLSearchParams(window.location.search).get('projects') ?? '')
       .split(',').filter(Boolean).slice(0, MAX_SELECT)
   })
-  const [loading,  setLoading]  = useState(true)
+
+  // markers 連同「對應的篩選條件識別鍵」一起存，loading 由兩者是否一致推導；
+  // 這樣每次 filters 變動都能重新顯示 loading，且不必在 effect 裡同步呼叫 setState
+  // （會被 react-hooks/set-state-in-effect 判違規）。
+  const filterKey = JSON.stringify(filters)
+  const [result, setResult] = useState<{ key: string; markers: PresaleMarker[] } | null>(null)
+  const markers = result?.key === filterKey ? result.markers : []
+  const loading = result?.key !== filterKey
 
   /* 選取變更 → 寫回 URL（保留 Dashboard 管理的其他參數） */
   useEffect(() => {
@@ -35,7 +41,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
   /* 篩選器變動 → 重新載入預售屋標記（首次載入不清空選取，保留 URL 還原的建案） */
   const isFirstLoad = useRef(true)
   useEffect(() => {
-    setLoading(true)
+    let cancelled = false
     const p = new URLSearchParams({
       dateFromYear:  filters.dateFromYear,
       dateFromMonth: filters.dateFromMonth,
@@ -51,14 +57,16 @@ export default function AreaAnalysisTab({ filters }: Props) {
     fetch(`/api/map?${p}`)
       .then(r => r.json())
       .then(d => {
-        setMarkers((d.markers ?? []).filter(
+        if (cancelled) return
+        const next = (d.markers ?? []).filter(
           (m: PresaleMarker & { case_type: string }) => m.case_type === '預售'
-        ))
+        )
+        setResult({ key: filterKey, markers: next })
         if (isFirstLoad.current) isFirstLoad.current = false
         else setSelected([])
       })
-      .finally(() => setLoading(false))
-  }, [filters])
+    return () => { cancelled = true }
+  }, [filters, filterKey])
 
   const handleBoundsSelect = useCallback((keys: string[]) => {
     setSelected(prev => {
