@@ -234,7 +234,19 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                 <LineChart key={selected.join('|')} data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
                   <XAxis dataKey="month" tick={{ fontSize: axisFontSize, fill: '#6b7280' }} minTickGap={20} />
-                  <YAxis tick={{ fontSize: axisFontSize, fill: '#6b7280' }} width={32} />
+                  {/* 單價走勢不從 0 起算：Recharts 預設 domain 是 [0, 'auto']，
+                      而台南單價多落在 20–40 萬/坪，從 0 畫會讓所有線擠在頂端 1/3，
+                      完全看不出漲跌。上下各留至少 1 萬/坪（或 4%）的空間。
+                      註：建照／餘屋那種「數量」圖表仍應從 0 起算，截斷會誇大變化幅度。 */}
+                  <YAxis
+                    tick={{ fontSize: axisFontSize, fill: '#6b7280' }}
+                    width={32}
+                    domain={[
+                      (dataMin: number) => Math.max(0, Math.floor(dataMin - Math.max(1, dataMin * 0.04))),
+                      (dataMax: number) => Math.ceil(dataMax + Math.max(1, dataMax * 0.04)),
+                    ]}
+                    allowDecimals={false}
+                  />
                   <Tooltip
                     contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 'var(--text-2xs)', color: '#f1f5f9' }}
                     formatter={(v: unknown, name: unknown) => [`${v} 萬/坪`, String(name)]}
