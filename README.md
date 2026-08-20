@@ -39,7 +39,7 @@
 | 前端 | Next.js 16 App Router + Tailwind CSS |
 | 後端 | Next.js API Routes (Server) |
 | 資料庫 | Supabase PostgreSQL |
-| AI 問答 | Google Gemini 2.5 Flash |
+| AI 問答 | Google Gemini 2.5 Flash（尚未公開） |
 | 部署 | Vercel |
 | 資料抓取 | Python + GitHub Actions |
 
@@ -68,7 +68,7 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=       # Supabase 專案網址
 NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Supabase 公開金鑰
 SUPABASE_SERVICE_ROLE_KEY=      # Supabase 服務金鑰（伺服器端專用）
-GEMINI_API_KEY=                 # Google Gemini API 金鑰
+GEMINI_API_KEY=                 # Google Gemini API 金鑰（AI 問答尚未公開）
 ```
 
 ---
