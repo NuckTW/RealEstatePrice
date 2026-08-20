@@ -169,7 +169,7 @@ export default function AreaAnalysisMap({ markers, selected, onBoundsSelect, onM
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', borderRadius: 20,
             background: '#f59e0b', color: '#1c1917', border: 'none',
-            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            fontSize: 'var(--text-xs)', fontWeight: 700, cursor: 'pointer',
             boxShadow: '0 2px 8px rgba(0,0,0,.35)',
           }}
         >▭ 框選範圍</button>

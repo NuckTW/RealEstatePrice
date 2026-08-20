@@ -9,6 +9,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import type { ChartConfig } from '@/app/api/chat/route'
+import { useCssPx } from '@/hooks/useCssPx'
 
 // Brass & Clay 系列色
 const SERIES_COLORS = [
@@ -31,17 +32,12 @@ const FRIENDLY: Record<string, string> = {
   total_sales:       '總銷(億)',
 }
 
-const axisStyle = {
-  fontSize: 10,
-  fill: 'var(--text-muted)',
-  fontFamily: 'var(--font-sans)',
-}
-
+// tooltip 是 Recharts 內建 contentStyle，套用在 HTML div 上，可以直接吃 CSS var()
 const tooltipContentStyle = {
   background: 'var(--surface-card)',
   border: '1px solid var(--border-card)',
   borderRadius: 8,
-  fontSize: 11,
+  fontSize: 'var(--text-2xs)',
   color: 'var(--text-default)',
 }
 
@@ -64,6 +60,15 @@ interface Props {
 
 export default function ChatChart({ rows, chart }: Props) {
   const { type, xKey, yKeys } = chart
+
+  // tick 是畫在 SVG 座標系裡，Recharts 內部用 canvas 量測文字寬度，吃不了 CSS var()，
+  // 必須傳真正的數字 px；用 useCssPx 讀取換算後的實際值，字級切換時會自動重讀。
+  const axisFontSize = useCssPx('--text-3xs', 10)
+  const axisStyle = {
+    fontSize: axisFontSize,
+    fill: 'var(--text-muted)',
+    fontFamily: 'var(--font-sans)',
+  }
 
   const data = rows.map(r => {
     const entry: Record<string, unknown> = { [xKey]: fmtXLabel(r[xKey]) }
@@ -94,7 +99,7 @@ export default function ChatChart({ rows, chart }: Props) {
             <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
             <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={52} />
             <Tooltip contentStyle={tooltipContentStyle} />
-            {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
+            {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)' }} />}
             {yKeys.map((k, i) => (
               <Bar
                 key={k} dataKey={k}
@@ -110,7 +115,7 @@ export default function ChatChart({ rows, chart }: Props) {
             <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
             <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={52} />
             <Tooltip contentStyle={tooltipContentStyle} />
-            {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
+            {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)' }} />}
             {yKeys.map((k, i) => (
               <Line
                 key={k} type="monotone" dataKey={k}

@@ -62,7 +62,7 @@ function Badge({ text, tone }: { text: string; tone: 'negative' | 'warning' | 'n
   return (
     <span style={{
       display: 'inline-block', padding: '1px 7px', borderRadius: 'var(--radius-full)',
-      fontSize: 10, fontWeight: 600, fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap',
+      fontSize: 'var(--text-3xs)', fontWeight: 600, fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap',
       ...styles,
     }}>{text}</span>
   )
@@ -134,13 +134,13 @@ export default function TransactionTable({ filters, onCaseClick }: Props) {
           <span style={{ width: 4, height: 16, borderRadius: 'var(--radius-full)', background: 'var(--gradient-accent)', flexShrink: 0, display: 'block' }} />
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>實價登錄明細</span>
           {data && data.rows.length > 0 && (
-            <span style={{ fontSize: 10, color: 'var(--text-faint)', background: 'var(--surface-control)', borderRadius: 'var(--radius-full)', padding: '1px 7px', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', background: 'var(--surface-control)', borderRadius: 'var(--radius-full)', padding: '1px 7px', fontFamily: 'var(--font-mono)' }}>
               {data.rows.length}{data.hasMore ? '+' : ''}
             </span>
           )}
         </div>
         {loading && (
-          <span style={{ fontSize: 11, color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 12, height: 12, border: '1.5px solid var(--border-strong)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'tra-spin .6s linear infinite', display: 'inline-block' }} />
             載入中…
           </span>
@@ -176,7 +176,7 @@ export default function TransactionTable({ filters, onCaseClick }: Props) {
               <tr>
                 <td colSpan={10} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 24, opacity: 0.3 }}>◌</span>
+                    <span style={{ fontSize: 'var(--text-2xl)', opacity: 0.3 }}>◌</span>
                     <span>無符合條件的資料</span>
                   </div>
                 </td>
@@ -199,7 +199,8 @@ export default function TransactionTable({ filters, onCaseClick }: Props) {
                   </td>
                   <td style={tdStyle}>
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${row.is_presale ? 'bg-sky-500/20 text-sky-300' : 'bg-teal-500/20 text-teal-300'}`}
+                      className={`inline-block px-2 py-0.5 rounded-full font-semibold ${row.is_presale ? 'bg-sky-500/20 text-sky-300' : 'bg-teal-500/20 text-teal-300'}`}
+                      style={{ fontSize: 'var(--text-3xs)' }}
                     >
                       {row.is_presale ? '預售' : '成屋'}
                     </span>

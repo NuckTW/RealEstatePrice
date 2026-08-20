@@ -77,7 +77,7 @@ type ChartType = 'line' | 'bar' | 'scatter'
 
 /* ── Style Helpers ───────────────────────────────────────── */
 function centerStyle(h: number): React.CSSProperties {
-  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
+  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }
 }
 
 function selectStyle(): React.CSSProperties {
@@ -94,11 +94,11 @@ function selectStyle(): React.CSSProperties {
 }
 
 function ghostBtn(): React.CSSProperties {
-  return { height: 26, padding: '0 10px', borderRadius: 'var(--radius-md)', fontSize: 11, fontFamily: 'var(--font-sans)', background: 'var(--surface-control)', color: 'var(--text-muted)', border: '1px solid var(--border-control)', cursor: 'pointer' }
+  return { height: 26, padding: '0 10px', borderRadius: 'var(--radius-md)', fontSize: 'var(--text-2xs)', fontFamily: 'var(--font-sans)', background: 'var(--surface-control)', color: 'var(--text-muted)', border: '1px solid var(--border-control)', cursor: 'pointer' }
 }
 
 function label(text: string) {
-  return <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', marginBottom: 5 }}>{text}</div>
+  return <div style={{ fontSize: 'var(--text-3xs)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', marginBottom: 5 }}>{text}</div>
 }
 
 async function saveChartAsPng(ref: React.RefObject<HTMLDivElement | null>, filename: string) {
@@ -164,8 +164,8 @@ function DistrictDropdown({ selected, onChange }: { selected: string[]; onChange
           padding: 8, width: 320, maxHeight: 320, overflowY: 'auto',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 4px 8px', borderBottom: '1px solid var(--border-card)', marginBottom: 8 }}>
-            <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)' }}>已選 {selected.length} / 8 區</span>
-            <button onClick={() => onChange([])} style={{ ...ghostBtn(), height: 22, fontSize: 10 }}>清除全部</button>
+            <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-sans)' }}>已選 {selected.length} / 8 區</span>
+            <button onClick={() => onChange([])} style={{ ...ghostBtn(), height: 22, fontSize: 'var(--text-3xs)' }}>清除全部</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {ALL_DISTRICTS.map(d => {
@@ -175,7 +175,7 @@ function DistrictDropdown({ selected, onChange }: { selected: string[]; onChange
               return (
                 <button key={d} onClick={() => toggle(d)} style={{
                   height: 26, padding: '0 10px', borderRadius: 'var(--radius-full)',
-                  fontSize: 11, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                  fontSize: 'var(--text-2xs)', fontFamily: 'var(--font-sans)', cursor: 'pointer',
                   background: isSelected ? (color ?? 'var(--accent)') : 'transparent',
                   color: isSelected ? '#fff' : 'var(--text-muted)',
                   border: isSelected ? `1px solid ${color ?? 'var(--accent)'}` : '1px solid var(--border-control)',
@@ -208,7 +208,7 @@ function ChartTypePills({ value, onChange }: { value: ChartType; onChange: (v: C
       {CHART_TYPES.map(c => (
         <button key={c.key} onClick={() => onChange(c.key as ChartType)} style={{
           height: 28, padding: '0 10px', borderRadius: 'var(--radius-full)',
-          fontSize: 11, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+          fontSize: 'var(--text-2xs)', fontFamily: 'var(--font-sans)', cursor: 'pointer',
           background: value === c.key ? 'var(--accent-wash)' : 'transparent',
           color: value === c.key ? 'var(--accent-tint)' : 'var(--text-muted)',
           border: value === c.key ? '1px solid var(--accent-wash-border)' : '1px solid var(--border-control)',
@@ -235,7 +235,7 @@ function YearMonthRange({
       <select value={monthFrom} onChange={e => onMonthFrom(Number(e.target.value))} style={{ ...selectStyle(), width: 64 }}>
         {MONTHS.map(m => <option key={m} value={m}>{m}月</option>)}
       </select>
-      <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>～</span>
+      <span style={{ color: 'var(--text-faint)', fontSize: 'var(--text-xs)' }}>～</span>
       <select value={yearTo} onChange={e => onYearTo(Number(e.target.value))} style={{ ...selectStyle(), width: 80 }}>
         {YEARS.map(y => <option key={y} value={y}>{y}年</option>)}
       </select>
@@ -390,7 +390,7 @@ export default function AnalysisPanel() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <input placeholder="最小" value={yMin} onChange={e => setYMin(e.target.value)}
                 style={{ ...selectStyle(), width: 72, padding: '0 8px', backgroundImage: 'none', appearance: 'none' }} />
-              <span style={{ color: 'var(--text-faint)', fontSize: 12 }}>～</span>
+              <span style={{ color: 'var(--text-faint)', fontSize: 'var(--text-xs)' }}>～</span>
               <input placeholder="最大" value={yMax} onChange={e => setYMax(e.target.value)}
                 style={{ ...selectStyle(), width: 72, padding: '0 8px', backgroundImage: 'none', appearance: 'none' }} />
             </div>
@@ -412,13 +412,13 @@ export default function AnalysisPanel() {
             {metricLabel}
             {showRecord && (
               <span style={{
-                fontSize: 10, fontWeight: 600, marginLeft: 8, padding: '2px 8px',
+                fontSize: 'var(--text-3xs)', fontWeight: 600, marginLeft: 8, padding: '2px 8px',
                 borderRadius: 'var(--radius-full)', background: 'var(--accent-wash)',
                 color: 'var(--accent-tint)', border: '1px solid var(--accent-wash-border)',
               }}>{statLabel}</span>
             )}
             {selectedDistricts.length > 0 && (
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>
                 {selectedDistricts.join(' · ')}
                 {mode !== 'all' && ` · ${mode === 'presale' ? '預售屋' : '成屋'}`}
                 {buildingType && ` · ${BUILDING_TYPES.find(t => t.key === buildingType)?.label}`}
@@ -445,7 +445,7 @@ export default function AnalysisPanel() {
       {/* ── 已記錄 ── */}
       {saved.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>已記錄（{saved.length}）</div>
+          <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>已記錄（{saved.length}）</div>
           {saved.map((s, si) => <SavedChart key={si} saved={s} onRemove={() => setSaved(prev => prev.filter((_, i) => i !== si))} />)}
         </div>
       )}
@@ -470,7 +470,7 @@ function SavedChart({ saved, onRemove }: { saved: { label: string; data: Analysi
   return (
     <div style={{ background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-xl)', padding: '14px 18px', boxShadow: 'var(--shadow-card)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{saved.label}</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{saved.label}</div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => saveChartAsPng(ref, saved.label)} style={ghostBtn()}>↓ PNG</button>
           <button onClick={onRemove} style={{ ...ghostBtn(), color: 'var(--negative)' }}>✕</button>

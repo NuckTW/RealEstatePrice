@@ -41,7 +41,7 @@ const PRESALE_OPTIONS = [
 ]
 
 function centerStyle(h: number): React.CSSProperties {
-  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
+  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }
 }
 function cardStyle(): React.CSSProperties {
   return { background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 16 }
@@ -49,7 +49,7 @@ function cardStyle(): React.CSSProperties {
 function chipStyle(active: boolean): React.CSSProperties {
   return {
     height: 26, padding: '0 10px', borderRadius: 'var(--radius-full)',
-    fontSize: 12, fontFamily: 'var(--font-sans)', fontWeight: active ? 600 : 400,
+    fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', fontWeight: active ? 600 : 400,
     background: active ? 'var(--accent-wash)' : 'var(--surface-control)',
     color: active ? 'var(--accent-tint)' : 'var(--text-muted)',
     border: active ? '1px solid var(--accent-wash-border)' : '1px solid var(--border-control)',
@@ -148,7 +148,7 @@ export default function ProjectComparePanel() {
             placeholder={`搜尋建案（共 ${data.projects.length} 案）`}
             style={{
               height: 32, padding: '0 12px', minWidth: 220, flex: '0 1 280px',
-              borderRadius: 'var(--radius-md)', fontSize: 13,
+              borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)',
               background: 'var(--surface-control)', color: 'var(--text-default)',
               border: '1px solid var(--border-control)', fontFamily: 'var(--font-sans)',
             }} />
@@ -156,16 +156,16 @@ export default function ProjectComparePanel() {
             options={[{ label: '全部行政區', value: '' },
                       ...data.districts.map(d => ({ label: d, value: d }))]}
             value={district} onChange={setDistrict} />
-          <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <label style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={hideUnreliable}
               onChange={e => setHideUnreliable(e.target.checked)} />
             只顯示 ≥{data.minReliableTx} 筆
           </label>
-          <span style={{ fontSize: 12, color: 'var(--text-faint)', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', marginLeft: 'auto' }}>
             已選 {selected.length}/{MAX_SELECTED}
             {selected.length > 0 && (
               <button onClick={() => setSelected([])}
-                style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>
+                style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
                 清除
               </button>
             )}
@@ -183,12 +183,12 @@ export default function ProjectComparePanel() {
           {(types.length > 0 || rooms.length > 0 || presale !== 'all') && (
             <button onClick={() => { setTypes([]); setRooms([]); setPresale('all') }}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted)',
-                       cursor: 'pointer', fontSize: 12, height: 32 }}>
+                       cursor: 'pointer', fontSize: 'var(--text-xs)', height: 32 }}>
               重設篩選
             </button>
           )}
           {loading && (
-            <span style={{ fontSize: 11, color: 'var(--text-faint)', height: 32,
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', height: 32,
                            display: 'flex', alignItems: 'center' }}>更新中…</span>
           )}
         </div>
@@ -204,13 +204,13 @@ export default function ProjectComparePanel() {
             </button>
           ))}
           {!candidates.length && (
-            <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>沒有符合的建案</span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)' }}>沒有符合的建案</span>
           )}
         </div>
       </div>
 
       <div style={cardStyle()}>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginBottom: 8 }}>
           <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#4ca8e0', marginRight: 5 }} />樣本 ≥{data.minReliableTx} 筆</span>
           <span><span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: 'var(--text-faint)', marginRight: 5 }} />樣本不足，僅供參考</span>
           <span>圓圈大小 = 成交筆數</span>
@@ -222,7 +222,7 @@ export default function ProjectComparePanel() {
           : <ProjectCompareChart points={points} isoLines={ISO_LINES} />}
 
         {(unreliableCount > 0 || districtsInView.length > 1 || droppedCount > 0 || filtersActive) && (
-          <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.9 }}>
+          <div style={{ marginTop: 10, fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', lineHeight: 1.9 }}>
             {filtersActive && (
               <div>目前數字是「符合篩選條件的交易」之中位數，不是各案全部交易的中位數。</div>
             )}
@@ -241,7 +241,7 @@ export default function ProjectComparePanel() {
 
       {points.length > 0 && (
         <div style={{ ...cardStyle(), overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
             <thead>
               <tr style={{ color: 'var(--text-muted)', textAlign: 'right' }}>
                 {['建案', '行政區', '建物型態', '筆數', '中位單價', 'P25–P75', '中位坪數', '中位總價', '成交期間'].map((h, i) => (

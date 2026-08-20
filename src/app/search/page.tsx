@@ -21,14 +21,14 @@ export default function SearchPage() {
           </h2>
         </div>
         {/* SearchPanel 用 useSearchParams 讀取 ?q=，production build 要求包一層 Suspense */}
-        <Suspense fallback={<div style={{ padding: 20, color: 'var(--text-faint)', fontSize: 13 }}>載入中…</div>}>
+        <Suspense fallback={<div style={{ padding: 20, color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>載入中…</div>}>
           <SearchPanel />
         </Suspense>
       </div>
       <footer style={{
         borderTop: '1px solid var(--border-card)',
         marginTop: 48, padding: '20px 0',
-        textAlign: 'center', fontSize: 11,
+        textAlign: 'center', fontSize: 'var(--text-2xs)',
         color: 'var(--text-faint)', fontFamily: 'var(--font-sans)',
       }}>
         資料來源：內政部不動產交易實價查詢服務網 ｜ 僅收錄預售建案，成屋建案搜尋將於第二階段推出

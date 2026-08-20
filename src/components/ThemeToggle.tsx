@@ -52,17 +52,19 @@ export default function ThemeToggle() {
             title={id === 'light' ? '明亮模式' : '暗色模式'}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              height: 22, padding: '0 8px', border: 'none', cursor: 'pointer',
+              // 高度沿用 --control-h-sm 换算（減去外層 padding），字級切到「大」時按鈕文字本身也會放大，
+              // 固定 22px 會被撐破，改成跟著 --font-scale 一起長高（與 FontSizeToggle 一致）
+              height: 'calc(var(--control-h-sm) - 6px)', padding: '0 8px', border: 'none', cursor: 'pointer',
               borderRadius: 'var(--radius-full)',
               background: active ? 'var(--accent-wash)' : 'transparent',
               color: active ? 'var(--accent-tint)' : 'var(--text-muted)',
               boxShadow: active ? 'inset 0 0 0 1px var(--accent-wash-border)' : 'none',
               font: `var(--weight-semibold) var(--text-3xs) var(--font-sans)`,
-              fontSize: 10, fontFamily: 'var(--font-sans)',
+              fontFamily: 'var(--font-sans)',
               transition: 'var(--transition-base)',
             }}
           >
-            <span style={{ fontSize: 11 }}>{id === 'light' ? '☀' : '☾'}</span>
+            <span style={{ fontSize: 'var(--text-2xs)' }}>{id === 'light' ? '☀' : '☾'}</span>
             <span>{id === 'light' ? '明' : '暗'}</span>
           </button>
         )

@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from 'recharts'
 import { SERIES_COLORS } from './AnalysisChart'
+import { useCssPx } from '@/hooks/useCssPx'
 
 interface Props {
   chartRows: Record<string, unknown>[]
@@ -16,7 +17,10 @@ interface Props {
 }
 
 export default function PriceIndexChart({ chartRows, names, unit = '', baseline, height = 420 }: Props) {
-  const axisStyle = { fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }
+  // tick 畫在 SVG 座標系裡，Recharts 內部用 canvas 量測文字寬度，吃不了 CSS var()，
+  // 必須傳真正的數字 px；用 useCssPx 讀取換算後的實際值，字級切換時會自動重讀。
+  const axisFontSize = useCssPx('--text-3xs', 10)
+  const axisStyle = { fontSize: axisFontSize, fill: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -28,11 +32,11 @@ export default function PriceIndexChart({ chartRows, names, unit = '', baseline,
         <Tooltip
           contentStyle={{
             background: 'var(--surface-card)', border: '1px solid var(--border-card)',
-            borderRadius: 8, fontSize: 11, color: 'var(--text-default)',
+            borderRadius: 8, fontSize: 'var(--text-2xs)', color: 'var(--text-default)',
           }}
           formatter={(value) => (value == null ? '—' : `${value}${unit}`)}
         />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Legend wrapperStyle={{ fontSize: 'var(--text-2xs)' }} />
         {baseline != null && <ReferenceLine y={baseline} stroke="var(--text-faint)" strokeDasharray="4 4" />}
         {names.map((n, i) => (
           <Line key={n} type="monotone" dataKey={n}

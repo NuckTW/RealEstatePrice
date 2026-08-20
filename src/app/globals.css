@@ -83,8 +83,14 @@
   /* ── Typography ───────────────────────────────────────────── */
   --font-sans: 'Noto Sans TC', 'Geist', -apple-system, 'PingFang TC', sans-serif;
   --font-mono: 'Geist Mono', 'Noto Sans TC', ui-monospace, monospace;
-  --text-2xl: 24px; --text-xl: 20px; --text-lg: 16px; --text-base: 14px;
-  --text-sm: 13px;  --text-xs: 12px; --text-2xs: 11px; --text-3xs: 10px;
+
+  /* 全站字級縮放係數：由 [data-fontsize] 覆寫（見下方），與明暗主題（data-theme）互相獨立 */
+  --font-scale: 1;
+  --text-3xl: calc(32px * var(--font-scale));
+  --text-2xl: calc(24px * var(--font-scale)); --text-xl: calc(20px * var(--font-scale));
+  --text-lg:  calc(16px * var(--font-scale)); --text-base: calc(14px * var(--font-scale));
+  --text-sm:  calc(13px * var(--font-scale)); --text-xs:  calc(12px * var(--font-scale));
+  --text-2xs: calc(11px * var(--font-scale)); --text-3xs: calc(10px * var(--font-scale));
   --weight-medium: 500; --weight-semibold: 600; --weight-bold: 700;
   --tracking-tight: -0.02em; --tracking-caps: 0.08em;
   --leading-tight: 1.15; --leading-normal: 1.6;
@@ -92,7 +98,8 @@
   /* ── Spacing & radii ──────────────────────────────────────── */
   --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px;
   --radius-xl: 16px; --radius-2xl: 20px; --radius-full: 999px;
-  --control-h-sm: 28px; --control-h-md: 32px;
+  /* 控制項高度跟著字級縮放，避免字級放大後文字撐破固定高度的圓角按鈕/下拉選單 */
+  --control-h-sm: calc(28px * var(--font-scale)); --control-h-md: calc(32px * var(--font-scale));
   --pad-card: 16px; --nav-h: 56px;
 }
 
@@ -117,6 +124,13 @@
   --shadow-pop:     0 12px 32px -8px rgba(45,33,15,0.18), 0 0 0 1px rgba(45,33,15,0.06);
   --glow-accent:    0 8px 20px -6px rgba(217,145,42,0.32);
 }
+
+/* ── Font size scale ──────────────────────────────────────────── */
+/* 與 data-theme（明暗主題）互相獨立：只覆寫 --font-scale，不動任何顏色變數，
+   因此無論目前是亮/暗主題，套用 data-fontsize 都只會影響字級大小。
+   small 未列出，沿用 :root 的預設值 1。 */
+:root[data-fontsize="medium"] { --font-scale: 1.15; }
+:root[data-fontsize="large"]  { --font-scale: 1.5; }
 
 /* ── Base ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }

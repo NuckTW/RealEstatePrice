@@ -63,9 +63,11 @@ export default function KpiBar({ data, dateRange, showBackfillWarning }: { data:
       </div>
 
       {/* KPI cards */}
+      {/* 卡片最小寬度跟著字級縮放：大字級時 auto-fit 會自然讓每列排下更少張卡、卡片變寬，
+          避免 --text-2xl 放大到 36px 後數字被卡片邊界裁掉 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(calc(160px * var(--font-scale)), 1fr))',
         gap: 12,
       }}>
         {CARDS.map(card => {
@@ -99,10 +101,10 @@ export default function KpiBar({ data, dateRange, showBackfillWarning }: { data:
                   textTransform: 'uppercase',
                   fontFamily: 'var(--font-sans)',
                 }}>{card.label}</span>
-                <span style={{ fontSize: 14, opacity: 0.45, color: card.tone }}>{card.icon}</span>
+                <span style={{ fontSize: 'var(--text-base)', opacity: 0.45, color: card.tone }}>{card.icon}</span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
                 <span style={{
                   fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)',
                   letterSpacing: 'var(--tracking-tight)',
@@ -122,7 +124,7 @@ export default function KpiBar({ data, dateRange, showBackfillWarning }: { data:
               {/* 補登警示：只在「成交戶數」卡片、且迄月落在最新資料月往前 2 個月內才顯示 */}
               {card.key === 'total' && showBackfillWarning && (
                 <span style={{
-                  fontSize: 10, color: 'var(--text-faint)',
+                  fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
                   fontFamily: 'var(--font-sans)', lineHeight: 1.4,
                 }}>
                   最近 2 個月仍在補登，戶數會被低估

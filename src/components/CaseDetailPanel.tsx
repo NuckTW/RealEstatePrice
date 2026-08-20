@@ -53,14 +53,14 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
   const hasLand = row.land_area != null && row.land_area > 0
 
   const label = (text: string) => (
-    <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-sans)', fontSize: 11 }}>{text}</span>
+    <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-2xs)' }}>{text}</span>
   )
   const val = (text: string) => (
-    <span style={{ color: 'var(--text-default)', fontFamily: 'var(--font-sans)', fontSize: 11 }}>{text}</span>
+    <span style={{ color: 'var(--text-default)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-2xs)' }}>{text}</span>
   )
   const sectionHead = (text: string) => (
     <div style={{
-      fontSize: 10, color: 'var(--text-faint)',
+      fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
       textTransform: 'uppercase', letterSpacing: '0.08em',
       marginBottom: 6, fontFamily: 'var(--font-sans)',
     }}>{text}</div>
@@ -78,7 +78,7 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
         {row.unit_number && (
           <span style={{ display: 'flex', gap: 6 }}>
             {label('棟號')}
-            <span style={{ color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>
+            <span style={{ color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontWeight: 600 }}>
               {row.unit_number}
             </span>
           </span>
@@ -101,7 +101,7 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
             {sqm(row.main_area) && (
               <span style={{ display: 'flex', gap: 6 }}>
                 {label('主建物')}
-                <span style={{ color: 'var(--positive)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>
+                <span style={{ color: 'var(--positive)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontWeight: 600 }}>
                   {sqm(row.main_area)}
                 </span>
               </span>
@@ -113,7 +113,7 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
               return common > 0 ? (
                 <span style={{ display: 'flex', gap: 6 }}>
                   {label('公設')}
-                  <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                  <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)' }}>
                     {common}坪 <span style={{ color: 'var(--text-faint)' }}>({Math.round(common / row.area * 100)}%)</span>
                   </span>
                 </span>
@@ -135,7 +135,7 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
             {row.parking_price !== 'x' && row.parking_price !== '含' && row.parking_price && (
               <span style={{ display: 'flex', gap: 6 }}>
                 {label('價格')}
-                <span style={{ color: 'var(--secondary-tint)', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600 }}>
+                <span style={{ color: 'var(--secondary-tint)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontWeight: 600 }}>
                   {row.parking_price}萬
                 </span>
               </span>
@@ -190,7 +190,7 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
 
   const thStyle = (align: 'left' | 'right' | 'center' = 'right') => ({
     padding: '8px 8px',
-    fontSize: 10, color: 'var(--text-faint)',
+    fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
     fontWeight: 600, textTransform: 'uppercase' as const,
     letterSpacing: '0.08em', whiteSpace: 'nowrap' as const,
     fontFamily: 'var(--font-sans)',
@@ -236,7 +236,7 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <span style={{
-                fontSize: 10, fontWeight: 600, padding: '2px 8px',
+                fontSize: 'var(--text-3xs)', fontWeight: 600, padding: '2px 8px',
                 borderRadius: 'var(--radius-full)',
                 fontFamily: 'var(--font-sans)',
                 background: caseType === 'presale' ? 'rgba(76,168,224,0.15)' : 'rgba(43,179,163,0.15)',
@@ -245,14 +245,14 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
               }}>
                 {caseType === 'presale' ? '預售' : '成屋'}
               </span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{district}</span>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>{district}</span>
             </div>
             <h2 style={{
               margin: 0, fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semibold)',
               color: 'var(--text-strong)', fontFamily: 'var(--font-sans)',
             }}>{caseName}</h2>
             {!loading && rows.length > 0 && (
-              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>
+              <p style={{ margin: '4px 0 0', fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }}>
                 共 {rows.length} 筆交易紀錄
                 {caseType === 'presale' && <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>（完整銷售期）</span>}
                 <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>· 點擊列可展開詳情</span>
@@ -268,7 +268,7 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
               border: '1px solid var(--border-control)',
               cursor: 'pointer', display: 'flex', alignItems: 'center',
               justifyContent: 'center', flexShrink: 0,
-              color: 'var(--text-muted)', fontSize: 14,
+              color: 'var(--text-muted)', fontSize: 'var(--text-base)',
               transition: 'var(--transition-base)',
             }}
             onMouseEnter={e => { const el = e.currentTarget; el.style.color = 'var(--text-strong)'; el.style.background = 'var(--surface-hover)' }}
@@ -279,21 +279,24 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 128, gap: 8, color: 'var(--text-muted)', fontSize: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 128, gap: 8, color: 'var(--text-muted)', fontSize: 'var(--text-base)' }}>
               <span style={{ width: 16, height: 16, border: '1.5px solid var(--border-strong)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'tra-spin .6s linear infinite', display: 'inline-block' }} />
               載入中…
             </div>
           )}
 
           {!loading && rows.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 128, gap: 8, color: 'var(--text-faint)', fontSize: 14 }}>
-              <span style={{ fontSize: 24, opacity: 0.3 }}>◌</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 128, gap: 8, color: 'var(--text-faint)', fontSize: 'var(--text-base)' }}>
+              <span style={{ fontSize: 'var(--text-2xl)', opacity: 0.3 }}>◌</span>
               <span style={{ fontFamily: 'var(--font-sans)' }}>無交易紀錄</span>
             </div>
           )}
 
           {!loading && rows.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            // 字級放大後欄位變寬，加 overflowX 避免撐破外層面板；外層仍是 overflowY 捲動容器，
+            // 這裡不設 overflowY，thead 的 sticky top 仍相對外層垂直捲動容器生效
+            <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)' }}>
               <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
                 <tr>
                   <th style={{ ...thStyle('center'), width: 28 }}>#</th>
@@ -327,57 +330,57 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
                       }}
                     >
                       {/* # */}
-                      <td style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-faint)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                      <td style={{ padding: '10px 8px', textAlign: 'center', color: 'var(--text-faint)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xs)' }}>
                         {i + 1}
                       </td>
 
                       {/* 交易日期 */}
-                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)' }}>
                         {rocDate(row.transaction_date)}
                       </td>
 
                       {/* 棟號 */}
                       <td style={{ padding: '10px 8px', whiteSpace: 'nowrap' }}>
                         {row.unit_number
-                          ? <span style={{ color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)', fontSize: 10, fontWeight: 600 }}>{row.unit_number}</span>
+                          ? <span style={{ color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-3xs)', fontWeight: 600 }}>{row.unit_number}</span>
                           : <span style={{ color: 'var(--text-faint)' }}>—</span>}
                       </td>
 
                       {/* 樓層 */}
-                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)', fontSize: 11 }}>
+                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-2xs)' }}>
                         {row.floor != null
                           ? (row.total_floors != null ? `${row.floor}／共${row.total_floors}層` : row.floor)
                           : '—'}
                       </td>
 
                       {/* 房型 */}
-                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-sans)', fontSize: 11 }}>
+                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-2xs)' }}>
                         {row.rooms === 0 ? '0房' : `${row.rooms}房`}
                       </td>
 
                       {/* 坪數 */}
-                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
+                      <td style={{ padding: '10px 8px', color: 'var(--text-default)', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontVariantNumeric: 'tabular-nums' }}>
                         {row.area ?? '—'}
                       </td>
 
                       {/* 單價 */}
-                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontVariantNumeric: 'tabular-nums' }}>
                         <span style={{ color: 'var(--series-3)', fontWeight: 600 }}>{row.unit_price ?? '—'}</span>
                       </td>
 
                       {/* 總價 */}
-                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontVariantNumeric: 'tabular-nums' }}>
                         <span style={{ color: 'var(--accent-tint)', fontWeight: 600 }}>
                           {row.total_price != null ? row.total_price.toLocaleString() : '—'}
                         </span>
                       </td>
 
                       {/* 車位 */}
-                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
+                      <td style={{ padding: '10px 8px', whiteSpace: 'nowrap', textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', fontVariantNumeric: 'tabular-nums' }}>
                         {row.parking_price === 'x'
                           ? <span style={{ color: 'var(--text-faint)' }}>x</span>
                           : row.parking_price === '含'
-                            ? <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>含</span>
+                            ? <span style={{ color: 'var(--text-muted)', fontSize: 'var(--text-3xs)' }}>含</span>
                             : <span style={{ color: 'var(--secondary-tint)' }}>{row.parking_price}</span>}
                       </td>
                     </tr>
@@ -394,6 +397,7 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

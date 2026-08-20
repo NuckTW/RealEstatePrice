@@ -11,7 +11,7 @@ export default function ChatPage() {
           border: '1px solid var(--border-card)', borderRadius: 'var(--radius-xl)',
           background: 'var(--surface-card)',
         }}>
-          <div style={{ fontSize: 32, opacity: 0.4, marginBottom: 12 }}>◇</div>
+          <div style={{ fontSize: 'var(--text-3xl)', opacity: 0.4, marginBottom: 12 }}>◇</div>
           <h2 style={{
             margin: 0,
             fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)',
@@ -30,7 +30,7 @@ export default function ChatPage() {
         marginTop: 64,
         padding: '24px 0',
         textAlign: 'center',
-        fontSize: 11,
+        fontSize: 'var(--text-2xs)',
         color: 'var(--text-faint)',
         fontFamily: 'var(--font-sans)',
       }}>

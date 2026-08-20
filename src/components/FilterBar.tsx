@@ -162,8 +162,8 @@ export function MultiSelect({ label, options, selected, onChange, placeholder }:
           borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-pop)', width: 176,
         }}>
           <div style={{ display: 'flex', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-card)' }}>
-            <button onClick={() => onChange(options.map(o => o.value))} style={{ fontSize: 11, color: 'var(--accent-tint)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>全選</button>
-            <button onClick={() => onChange([])} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>清除</button>
+            <button onClick={() => onChange(options.map(o => o.value))} style={{ fontSize: 'var(--text-2xs)', color: 'var(--accent-tint)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>全選</button>
+            <button onClick={() => onChange([])} style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>清除</button>
           </div>
           <div style={{ padding: 4, maxHeight: 224, overflowY: 'auto' }}>
             {options.map(o => (
@@ -241,8 +241,8 @@ function DistrictSelect({ selected, onChange }: { selected: string[]; onChange: 
           width: 224, maxHeight: 288, overflowY: 'auto',
         }}>
           <div style={{ display: 'flex', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-card)', position: 'sticky', top: 0, background: 'var(--surface-overlay)' }}>
-            <button onClick={() => onChange(TAINAN_DISTRICTS)} style={{ fontSize: 11, color: 'var(--accent-tint)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>全選</button>
-            <button onClick={() => onChange([])} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>清除</button>
+            <button onClick={() => onChange(TAINAN_DISTRICTS)} style={{ fontSize: 'var(--text-2xs)', color: 'var(--accent-tint)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>全選</button>
+            <button onClick={() => onChange([])} style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>清除</button>
           </div>
           <div style={{ padding: 4 }}>
             {TAINAN_DISTRICTS.map(d => (
@@ -295,7 +295,7 @@ export function ActiveFilterTags({ filters, onRemove }: {
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 5,
             padding: '3px 10px', borderRadius: 'var(--radius-full)',
-            fontSize: 11, fontWeight: 'var(--weight-medium)',
+            fontSize: 'var(--text-2xs)', fontWeight: 'var(--weight-medium)',
             fontFamily: 'var(--font-sans)',
             background: 'var(--accent-wash)',
             color: 'var(--accent-tint)',
@@ -316,7 +316,7 @@ export function ActiveFilterTags({ filters, onRemove }: {
           }}
         >
           {tag.label}
-          <span style={{ opacity: 0.6, fontSize: 10 }}>×</span>
+          <span style={{ opacity: 0.6, fontSize: 'var(--text-3xs)' }}>×</span>
         </button>
       ))}
     </div>
@@ -376,7 +376,7 @@ export default function FilterBar({ onApply, loading, autoApply, value }: {
             <span style={{
               padding: '1px 8px', borderRadius: 'var(--radius-full)',
               background: 'var(--accent-wash)', color: 'var(--accent-tint)',
-              border: '1px solid var(--accent-wash-border)', fontSize: 10,
+              border: '1px solid var(--accent-wash-border)', fontSize: 'var(--text-3xs)',
             }}>{activeCount}</span>
           )}
         </span>

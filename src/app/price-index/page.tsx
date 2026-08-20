@@ -24,7 +24,7 @@ export default function PriceIndexPage() {
       <footer style={{
         borderTop: '1px solid var(--border-card)',
         marginTop: 48, padding: '20px 0',
-        textAlign: 'center', fontSize: 11,
+        textAlign: 'center', fontSize: 'var(--text-2xs)',
         color: 'var(--text-faint)', fontFamily: 'var(--font-sans)',
       }}>
         資料來源：臺南市實價登錄大數據輔助區段地價平衡之研究（第六期） ｜ 僅供參考，不構成投資建議

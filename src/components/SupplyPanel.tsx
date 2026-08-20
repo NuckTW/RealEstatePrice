@@ -20,7 +20,7 @@ interface ApiData {
 }
 
 function centerStyle(h: number): React.CSSProperties {
-  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
+  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }
 }
 
 function cardStyle(): React.CSSProperties {
@@ -33,8 +33,8 @@ function cardStyle(): React.CSSProperties {
 function sectionTitle(title: string, sub?: string) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <span style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--text-strong)' }}>{title}</span>
-      {sub && <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 10 }}>{sub}</span>}
+      <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>{title}</span>
+      {sub && <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>{sub}</span>}
     </div>
   )
 }

@@ -24,7 +24,7 @@ export default function AnalysisPage() {
       <footer style={{
         borderTop: '1px solid var(--border-card)',
         marginTop: 48, padding: '20px 0',
-        textAlign: 'center', fontSize: 11,
+        textAlign: 'center', fontSize: 'var(--text-2xs)',
         color: 'var(--text-faint)', fontFamily: 'var(--font-sans)',
       }}>
         資料來源：內政部不動產交易實價查詢服務網 ｜ 僅供參考，不構成投資建議

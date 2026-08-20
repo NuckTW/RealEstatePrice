@@ -30,7 +30,7 @@ function thStyle(): React.CSSProperties {
   return {
     padding: '6px 10px',
     textAlign: 'left',
-    fontSize: 10,
+    fontSize: 'var(--text-3xs)',
     fontWeight: 600,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.06em',
@@ -45,7 +45,7 @@ function thStyle(): React.CSSProperties {
 function tdStyle(numeric = false): React.CSSProperties {
   return {
     padding: '5px 10px',
-    fontSize: 11,
+    fontSize: 'var(--text-2xs)',
     color: numeric ? 'var(--text-strong)' : 'var(--text-default)',
     fontFamily: numeric ? 'var(--font-mono)' : 'var(--font-sans)',
     borderBottom: '1px solid var(--border-card)',
@@ -68,7 +68,7 @@ function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
 
   return (
     <div style={{ marginTop: 10, overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-card)' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-2xs)' }}>
         <thead>
           <tr>
             {keys.map(k => <th key={k} style={thStyle()}>{k}</th>)}
@@ -90,7 +90,7 @@ function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
         <button
           onClick={() => setExpanded(e => !e)}
           style={{
-            width: '100%', padding: '5px', fontSize: 10,
+            width: '100%', padding: '5px', fontSize: 'var(--text-3xs)',
             color: 'var(--text-muted)', background: 'var(--surface-card)',
             border: 'none', borderTop: '1px solid var(--border-card)',
             cursor: 'pointer', fontFamily: 'var(--font-sans)',
@@ -117,7 +117,7 @@ function MessageBubble({ msg }: {
           width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
           background: 'var(--gradient-brand)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, color: 'var(--on-accent)', fontWeight: 700,
+          fontSize: 'var(--text-xs)', color: 'var(--on-accent)', fontWeight: 700,
           fontFamily: 'var(--font-sans)', marginTop: 2,
         }}>南</div>
       )}
@@ -168,7 +168,7 @@ function MessageBubble({ msg }: {
         {/* Row count badge */}
         {!isUser && msg.rows && msg.rows.length > 0 && !msg.streaming && (
           <div style={{
-            marginTop: 4, fontSize: 10, color: 'var(--text-faint)',
+            marginTop: 4, fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
             fontFamily: 'var(--font-sans)', paddingLeft: 2,
           }}>
             {msg.rows.length} 筆資料
@@ -332,7 +332,7 @@ export default function ChatInterface() {
                     animationDelay: `${delay}ms`,
                   }} />
                 ))}
-                <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 6, fontFamily: 'var(--font-sans)' }}>
+                <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', marginLeft: 6, fontFamily: 'var(--font-sans)' }}>
                   生成中…
                 </span>
               </div>
@@ -351,7 +351,7 @@ export default function ChatInterface() {
               key={s}
               onClick={() => sendMessage(s)}
               style={{
-                fontSize: 11, fontFamily: 'var(--font-sans)',
+                fontSize: 'var(--text-2xs)', fontFamily: 'var(--font-sans)',
                 background: 'var(--surface-control)',
                 color: 'var(--text-muted)',
                 border: '1px solid var(--border-control)',
@@ -372,11 +372,11 @@ export default function ChatInterface() {
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-card)' }}>
         {/* 對話輪數指示 */}
         {messages.length > 1 && (
-          <div style={{ marginBottom: 6, fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)' }}>
+          <div style={{ marginBottom: 6, fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-sans)' }}>
             ◎ 支援追問 ·{' '}
             <button
               onClick={() => setMessages(msgs => [msgs[0]])}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 10, fontFamily: 'var(--font-sans)', padding: 0, textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 'var(--text-3xs)', fontFamily: 'var(--font-sans)', padding: 0, textDecoration: 'underline' }}
             >
               清除對話
             </button>

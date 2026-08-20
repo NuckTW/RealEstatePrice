@@ -24,7 +24,7 @@ type Mode = 'index' | 'yoy'
 
 /* ── Style helpers ───────────────────────────────────────── */
 function centerStyle(h: number): React.CSSProperties {
-  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
+  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }
 }
 
 function cardStyle(): React.CSSProperties {
@@ -37,7 +37,7 @@ function cardStyle(): React.CSSProperties {
 function chipStyle(active: boolean, color?: string): React.CSSProperties {
   return {
     height: 28, padding: '0 12px', borderRadius: 'var(--radius-full)',
-    fontSize: 12, fontFamily: 'var(--font-sans)', fontWeight: active ? 600 : 400,
+    fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', fontWeight: active ? 600 : 400,
     background: active ? 'var(--accent-wash)' : 'var(--surface-control)',
     color: active ? (color ?? 'var(--accent-tint)') : 'var(--text-muted)',
     border: active ? `1px solid ${color ?? 'var(--accent-wash-border)'}` : '1px solid var(--border-control)',
@@ -103,26 +103,26 @@ export default function PriceIndexPanel() {
       {summary && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
           <div style={cardStyle()}>
-            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>最新指數（{summary.name}・{summary.label}）</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-strong)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>最新指數（{summary.name}・{summary.label}）</div>
+            <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-strong)', fontFamily: 'var(--font-mono)', marginTop: 4 }}>
               {summary.value.toFixed(2)}
             </div>
           </div>
           <div style={cardStyle()}>
-            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>月增率 MoM</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: pctColor(summary.mom), fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>月增率 MoM</div>
+            <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: pctColor(summary.mom), fontFamily: 'var(--font-mono)', marginTop: 4 }}>
               {fmtPct(summary.mom)}
             </div>
           </div>
           <div style={cardStyle()}>
-            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>年增率 YoY</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: pctColor(summary.yoy), fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>年增率 YoY</div>
+            <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: pctColor(summary.yoy), fontFamily: 'var(--font-mono)', marginTop: 4 }}>
               {fmtPct(summary.yoy)}
             </div>
           </div>
           <div style={cardStyle()}>
-            <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>距歷史高點（{summary.peak.label}・{summary.peak.value.toFixed(2)}）</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: pctColor(summary.drawdown), fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>距歷史高點（{summary.peak.label}・{summary.peak.value.toFixed(2)}）</div>
+            <div style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: pctColor(summary.drawdown), fontFamily: 'var(--font-mono)', marginTop: 4 }}>
               {fmtPct(summary.drawdown)}
             </div>
           </div>
@@ -132,7 +132,7 @@ export default function PriceIndexPanel() {
       {/* 控制列 */}
       <div style={{ ...cardStyle(), display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-faint)', marginRight: 4 }}>數列</span>
+          <span style={{ fontSize: 'var(--text-3xs)', fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-faint)', marginRight: 4 }}>數列</span>
           {(data?.available ?? ['全市']).map(name => {
             const idx = selected.indexOf(name)
             const color = idx >= 0 ? SERIES_COLORS[idx % SERIES_COLORS.length] : undefined
@@ -144,10 +144,10 @@ export default function PriceIndexPanel() {
           })}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-faint)', marginRight: 4 }}>顯示</span>
+          <span style={{ fontSize: 'var(--text-3xs)', fontWeight: 600, letterSpacing: '0.08em', color: 'var(--text-faint)', marginRight: 4 }}>顯示</span>
           <button style={chipStyle(mode === 'index')} onClick={() => setMode('index')}>指數值</button>
           <button style={chipStyle(mode === 'yoy')} onClick={() => setMode('yoy')}>年增率 YoY%</button>
-          <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', marginLeft: 'auto' }}>
             基期：民國 110 年 1 月 = 100
           </span>
         </div>

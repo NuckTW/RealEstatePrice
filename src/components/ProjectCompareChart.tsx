@@ -6,6 +6,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Label, Cell,
 } from 'recharts'
 import type { ProjectPoint } from './ProjectComparePanel'
+import { useCssPx } from '@/hooks/useCssPx'
 
 interface Props {
   points: ProjectPoint[]
@@ -16,7 +17,9 @@ interface Props {
 const UNRELIABLE = 'var(--text-faint)'
 const RELIABLE = '#4ca8e0'
 
-/** 等值線本身不畫點，只在最後一點渲染金額標籤 */
+/** 等值線本身不畫點，只在最後一點渲染金額標籤
+ *  刻意例外（不跟隨字級縮放）：這是畫在散佈圖資料座標系裡的等值線標籤，
+ *  字級縮放是版面/排版需求，這裡的文字大小要跟著圖形座標系走，放大會跟曲線位置脫節、破圖。 */
 function isoShape(props: { cx?: number; cy?: number; payload?: { isoLabel?: string } }) {
   const { cx, cy, payload } = props
   if (!payload?.isoLabel || cx == null || cy == null) return <g />
@@ -34,7 +37,7 @@ function Tip({ active, payload }: TipProps) {
   return (
     <div style={{
       background: 'var(--surface-card)', border: '1px solid var(--border-card)',
-      borderRadius: 8, padding: '8px 10px', fontSize: 11,
+      borderRadius: 8, padding: '8px 10px', fontSize: 'var(--text-2xs)',
       color: 'var(--text-default)', fontFamily: 'var(--font-sans)', lineHeight: 1.7,
     }}>
       <div style={{ fontWeight: 600, marginBottom: 2 }}>{p.name}</div>
@@ -50,7 +53,11 @@ function Tip({ active, payload }: TipProps) {
 }
 
 export default function ProjectCompareChart({ points, isoLines, height = 460 }: Props) {
-  const axisStyle = { fontSize: 10, fill: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }
+  // tick / <Label> 畫在 SVG 座標系裡，Recharts 內部用 canvas 量測文字寬度，吃不了 CSS var()，
+  // 必須傳真正的數字 px；用 useCssPx 讀取換算後的實際值，字級切換時會自動重讀。
+  const axisFontSize = useCssPx('--text-3xs', 10)
+  const labelFontSize = useCssPx('--text-2xs', 11)
+  const axisStyle = { fontSize: axisFontSize, fill: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }
 
   const xs = points.map(p => p.areaMedian)
   const ys = points.map(p => p.priceMedian)
@@ -78,13 +85,13 @@ export default function ProjectCompareChart({ points, isoLines, height = 460 }: 
         <XAxis type="number" dataKey="x" domain={[xMin, xMax]} tick={axisStyle}
           axisLine={false} tickLine={false} tickFormatter={(v: number) => `${Math.round(v)}`}>
           <Label value="中位坪數" position="insideBottom" offset={-12}
-            style={{ fontSize: 11, fill: 'var(--text-muted)' }} />
+            style={{ fontSize: labelFontSize, fill: 'var(--text-muted)' }} />
         </XAxis>
         <YAxis type="number" dataKey="y" domain={[yMin, yMax]} tick={axisStyle}
           axisLine={false} tickLine={false} width={56}
           tickFormatter={(v: number) => `${Math.round(v)}萬`}>
           <Label value="中位單價（萬/坪）" angle={-90} position="insideLeft"
-            style={{ fontSize: 11, fill: 'var(--text-muted)', textAnchor: 'middle' }} />
+            style={{ fontSize: labelFontSize, fill: 'var(--text-muted)', textAnchor: 'middle' }} />
         </YAxis>
         <ZAxis type="number" dataKey="z" range={[60, 900]} />
 

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
+import FontSizeToggle from './FontSizeToggle'
 
 function toRocDate(isoDate: string): string {
   const [y, m] = isoDate.split('-')
@@ -52,7 +53,7 @@ export default function Navbar() {
             background: 'var(--gradient-brand)',
             boxShadow: 'var(--glow-accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 700, color: 'var(--on-accent)',
+            fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--on-accent)',
             fontFamily: 'var(--font-sans)',
           }}>南</div>
           {/* 窄螢幕只留 logo，文字資訊全部隱藏 */}
@@ -63,13 +64,13 @@ export default function Navbar() {
               fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap',
             }}>台南市不動產分析</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1, whiteSpace: 'nowrap' }}>
-              <span style={{ fontSize: 10, color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
                 民國 110 年至今
               </span>
               {lastDate && (
                 <>
-                  <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>·</span>
-                  <span style={{ fontSize: 10, color: 'var(--positive)', fontFamily: 'var(--font-mono)' }}>
+                  <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)' }}>·</span>
+                  <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--positive)', fontFamily: 'var(--font-mono)' }}>
                     最新 {lastDate}
                   </span>
                 </>
@@ -149,6 +150,7 @@ export default function Navbar() {
           {/* Divider */}
           <div style={{ width: 1, height: 20, background: 'var(--border-card)', margin: '0 4px' }} />
 
+          <FontSizeToggle />
           <ThemeToggle />
         </div>
       </div>

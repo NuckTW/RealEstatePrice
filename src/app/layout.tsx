@@ -30,19 +30,21 @@ export const metadata: Metadata = {
   },
 };
 
-// 在 HTML 解析前套用儲存的主題，避免 flash
+// 在 HTML 解析前套用儲存的主題與字級，避免 flash（先小字再跳大字的閃爍）
 const themeScript = `
 (function(){
   try {
     var t = localStorage.getItem('tra-theme');
     if (t === 'light') document.documentElement.setAttribute('data-theme','light');
+    var f = localStorage.getItem('tra-fontsize');
+    if (f === 'medium' || f === 'large') document.documentElement.setAttribute('data-fontsize', f);
   } catch(e){}
 })();
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // suppressHydrationWarning：themeScript 在 hydration 前就會改 data-theme，屬預期差異
+    // suppressHydrationWarning：themeScript 在 hydration 前就會改 data-theme / data-fontsize，屬預期差異
     <html lang="zh-Hant" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${notoSansTC.variable} h-full`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />

@@ -63,7 +63,7 @@ function PlainCell({ col, value }: { col: ColDef; value: unknown }) {
   return (
     <td style={{ padding: '10px 12px', fontSize: 'var(--text-xs)', color: 'var(--text-default)', whiteSpace: 'nowrap', textAlign: col.align === 'left' ? 'left' : col.align === 'center' ? 'center' : 'right', fontFamily: 'var(--font-sans)' }}>
       {badgeClass ? (
-        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeClass}`}>
+        <span className={`inline-block px-2 py-0.5 rounded-full font-semibold ${badgeClass}`} style={{ fontSize: 'var(--text-3xs)' }}>
           {display}
         </span>
       ) : display}
@@ -94,7 +94,7 @@ export default function DataTable({
           <span style={{ width: 4, height: 16, borderRadius: 'var(--radius-full)', background: 'var(--gradient-accent)', flexShrink: 0, display: 'block' }} />
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>{title}</span>
           {data.length > 0 && (
-            <span style={{ fontSize: 10, color: 'var(--text-faint)', background: 'var(--surface-control)', borderRadius: 'var(--radius-full)', padding: '1px 7px', fontFamily: 'var(--font-mono)' }}>
+            <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', background: 'var(--surface-control)', borderRadius: 'var(--radius-full)', padding: '1px 7px', fontFamily: 'var(--font-mono)' }}>
               {data.length}
             </span>
           )}
@@ -149,7 +149,7 @@ export default function DataTable({
               <tr>
                 <td colSpan={columns.length} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 24, opacity: 0.3 }}>◌</span>
+                    <span style={{ fontSize: 'var(--text-2xl)', opacity: 0.3 }}>◌</span>
                     <span>無符合條件的資料</span>
                   </div>
                 </td>

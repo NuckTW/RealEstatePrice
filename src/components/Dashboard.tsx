@@ -446,7 +446,7 @@ export default function Dashboard() {
                         統計總覽（行政區／類型／房型）
                       </span>
                     </span>
-                    <span style={{ color: 'var(--text-faint)', fontSize: 12, transform: statsExpanded ? 'rotate(180deg)' : 'none', transition: 'var(--transition-base)' }}>⌄</span>
+                    <span style={{ color: 'var(--text-faint)', fontSize: 'var(--text-xs)', transform: statsExpanded ? 'rotate(180deg)' : 'none', transition: 'var(--transition-base)' }}>⌄</span>
                   </button>
 
                   {statsExpanded && (

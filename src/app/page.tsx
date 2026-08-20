@@ -11,7 +11,7 @@ export default function Home() {
         marginTop: 32,
         padding: '20px 0',
         textAlign: 'center',
-        fontSize: 11,
+        fontSize: 'var(--text-2xs)',
         color: 'var(--text-faint)',
         fontFamily: 'var(--font-sans)',
       }}>

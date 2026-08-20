@@ -87,13 +87,13 @@ export default function AreaAnalysisTab({ filters }: Props) {
     <div className="lg:h-[calc(100vh-var(--nav-h)-108px)]" style={{ padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 500 }}>
       {/* 說明列 + 清除按鈕 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexShrink: 0 }}>
-        <p style={{ fontSize: 11, color: 'var(--text-faint)' }}>
+        <p style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>
           點「▭ 框選範圍」在地圖上拖拉矩形，或直接點擊建案標記加入分析（最多 {MAX_SELECT} 個）
         </p>
         {selected.length > 0 && (
           <button
             onClick={() => setSelected([])}
-            style={{ fontSize: 11, padding: '3px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}
+            style={{ fontSize: 'var(--text-2xs)', padding: '3px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,.12)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0 }}
           >
             清除全部
           </button>
@@ -105,7 +105,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
         {/* 地圖（手機固定 60vh，桌機吃滿欄高） */}
         <div className="h-[60vh] lg:h-auto" style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border-card)' }}>
           {loading && (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,13,22,.7)', zIndex: 1000, fontSize: 13, color: '#9ca3af' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,13,22,.7)', zIndex: 1000, fontSize: 'var(--text-sm)', color: '#9ca3af' }}>
               載入建案資料…
             </div>
           )}

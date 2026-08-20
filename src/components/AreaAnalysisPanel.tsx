@@ -36,6 +36,7 @@ interface BuildingTypeRow {
 }
 
 import { MAX_SELECT, seriesColor } from '@/lib/areaSelection'
+import { useCssPx } from '@/hooks/useCssPx'
 
 interface Props {
   selected: string[]
@@ -52,6 +53,10 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
   const [results, setResults] = useState<SearchResult[]>([])
   const [showDrop, setShowDrop] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // tick 畫在 SVG 座標系裡，Recharts 內部用 canvas 量測文字寬度，吃不了 CSS var()，
+  // 必須傳真正的數字 px；用 useCssPx 讀取換算後的實際值，字級切換時會自動重讀。
+  const axisFontSize = useCssPx('--text-3xs', 10)
 
   /* 分析資料 */
   useEffect(() => {
@@ -107,7 +112,8 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           onFocus={() => search && setShowDrop(true)}
           onBlur={() => setTimeout(() => setShowDrop(false), 200)}
           placeholder="搜尋建案名稱加入…"
-          className="w-full px-3 py-2 rounded-lg text-xs bg-[#1e293b] border border-white/10 text-gray-200 placeholder-gray-500 outline-none focus:border-amber-500/50"
+          className="w-full px-3 py-2 rounded-lg bg-[#1e293b] border border-white/10 text-gray-200 placeholder-gray-500 outline-none focus:border-amber-500/50"
+          style={{ fontSize: 'var(--text-xs)' }}
         />
         {showDrop && results.length > 0 && (
           <div className="absolute top-full mt-1 left-0 right-0 z-50 bg-[#1e293b] border border-white/10 rounded-lg overflow-hidden shadow-xl max-h-52 overflow-y-auto">
@@ -116,7 +122,8 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                 key={r.project_name}
                 disabled={selected.includes(r.project_name) || selected.length >= MAX_SELECT}
                 onClick={() => { onAdd(r.project_name); setSearch(''); setShowDrop(false) }}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed flex justify-between"
+                className="w-full text-left px-3 py-2 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed flex justify-between"
+                style={{ fontSize: 'var(--text-xs)' }}
               >
                 <span className="text-gray-200">{r.project_name}</span>
                 <span className="text-gray-500">{r.district} · {r.count}戶</span>
@@ -132,8 +139,8 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           {selected.map((key, i) => (
             <span
               key={key}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-              style={{ background: seriesColor(i) + '22', color: seriesColor(i), border: `1px solid ${seriesColor(i)}44` }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+              style={{ background: seriesColor(i) + '22', color: seriesColor(i), border: `1px solid ${seriesColor(i)}44`, fontSize: 'var(--text-xs)' }}
             >
               {key}
               <button onClick={() => onRemove(key)} className="ml-0.5 opacity-60 hover:opacity-100">✕</button>
@@ -141,11 +148,11 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-500 text-center py-1.5">在地圖上框選建案或搜尋加入</p>
+        <p className="text-gray-500 text-center py-1.5" style={{ fontSize: 'var(--text-xs)' }}>在地圖上框選建案或搜尋加入</p>
       )}
 
       {loading && (
-        <div className="text-xs text-gray-500 text-center py-2 animate-pulse">分析中…</div>
+        <div className="text-gray-500 text-center py-2 animate-pulse" style={{ fontSize: 'var(--text-xs)' }}>分析中…</div>
       )}
 
       {stats.length > 0 && !loading && (
@@ -158,8 +165,8 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
               { label: '總戶數', value: `${totalCount.toLocaleString()} 戶` },
             ].map(c => (
               <div key={c.label} className="bg-[#1e293b] rounded-lg px-3 py-2 text-center border border-white/5">
-                <div className="text-[10px] text-gray-500 mb-0.5">{c.label}</div>
-                <div className="text-sm font-bold text-amber-400">{c.value}</div>
+                <div className="text-gray-500 mb-0.5" style={{ fontSize: 'var(--text-3xs)' }}>{c.label}</div>
+                <div className="font-bold text-amber-400" style={{ fontSize: 'var(--text-base)' }}>{c.value}</div>
               </div>
             ))}
           </div>
@@ -174,7 +181,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
             const TYPE_COLORS = ['#f59e0b','#3b82f6','#10b981','#ef4444','#8b5cf6','#ec4899','#06b6d4']
             return (
               <div>
-                <div className="text-[10px] text-gray-500 mb-1.5">房屋類型分布</div>
+                <div className="text-gray-500 mb-1.5" style={{ fontSize: 'var(--text-3xs)' }}>房屋類型分布</div>
                 {/* 堆疊進度條 */}
                 <div className="flex rounded-full overflow-hidden h-3 mb-2">
                   {sorted.map(([type, cnt], i) => (
@@ -187,7 +194,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
                   {sorted.map(([type, cnt], i) => (
-                    <span key={type} className="flex items-center gap-1 text-[10px] text-gray-400">
+                    <span key={type} className="flex items-center gap-1 text-gray-400" style={{ fontSize: 'var(--text-3xs)' }}>
                       <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: TYPE_COLORS[i % TYPE_COLORS.length] }} />
                       {type}
                       <span className="text-gray-500">{cnt}戶 ({Math.round(cnt / total * 100)}%)</span>
@@ -200,14 +207,14 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
 
           {/* 均單價長條圖 */}
           <div>
-            <div className="text-[10px] text-gray-500 mb-1">均單價對比（萬/坪）</div>
+            <div className="text-gray-500 mb-1" style={{ fontSize: 'var(--text-3xs)' }}>均單價對比（萬/坪）</div>
             <ResponsiveContainer width="100%" height={Math.max(160, stats.length * 22)}>
               {/* key：子元素數量隨選取數改變，remount 避免 Recharts 內部 hook deps 大小變化 */}
               <BarChart key={stats.length} data={stats} layout="vertical" margin={{ left: 4, right: 24, top: 0, bottom: 0 }}>
-                <XAxis type="number" tick={{ fontSize: 9, fill: '#6b7280' }} />
-                <YAxis type="category" dataKey="project_name" tick={{ fontSize: 9, fill: '#9ca3af' }} width={72} />
+                <XAxis type="number" tick={{ fontSize: axisFontSize, fill: '#6b7280' }} />
+                <YAxis type="category" dataKey="project_name" tick={{ fontSize: axisFontSize, fill: '#9ca3af' }} width={72} />
                 <Tooltip
-                  contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
+                  contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 'var(--text-2xs)', color: '#f1f5f9' }}
                   formatter={(v: unknown) => [`${v} 萬/坪`, '均單價']}
                 />
                 <Bar dataKey="unit_price" radius={[0, 4, 4, 0]}>
@@ -222,17 +229,17 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
           {/* 月度走勢 */}
           {trendData.length > 1 && (
             <div>
-              <div className="text-[10px] text-gray-500 mb-1">月度成交均單價走勢（萬/坪）</div>
+              <div className="text-gray-500 mb-1" style={{ fontSize: 'var(--text-3xs)' }}>月度成交均單價走勢（萬/坪）</div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart key={selected.join('|')} data={trendData} margin={{ left: 0, right: 8, top: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 9, fill: '#6b7280' }} minTickGap={20} />
-                  <YAxis tick={{ fontSize: 9, fill: '#6b7280' }} width={32} />
+                  <XAxis dataKey="month" tick={{ fontSize: axisFontSize, fill: '#6b7280' }} minTickGap={20} />
+                  <YAxis tick={{ fontSize: axisFontSize, fill: '#6b7280' }} width={32} />
                   <Tooltip
-                    contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 11, color: '#f1f5f9' }}
+                    contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,.15)', borderRadius: 8, fontSize: 'var(--text-2xs)', color: '#f1f5f9' }}
                     formatter={(v: unknown, name: unknown) => [`${v} 萬/坪`, String(name)]}
                   />
-                  <Legend wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+                  <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)', paddingTop: 4 }} />
                   {selected.map((key, i) => (
                     <Line
                       key={key}
@@ -251,9 +258,9 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
 
           {/* 明細表 */}
           <div>
-            <div className="text-[10px] text-gray-500 mb-1">建案明細</div>
+            <div className="text-gray-500 mb-1" style={{ fontSize: 'var(--text-3xs)' }}>建案明細</div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full border-collapse" style={{ fontSize: 'var(--text-xs)' }}>
                 <thead>
                   <tr className="text-gray-500 border-b border-white/10">
                     <th className="text-left pb-1 font-normal">建案</th>

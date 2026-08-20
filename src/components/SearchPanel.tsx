@@ -34,7 +34,7 @@ interface DetailRow {
 const MAX_CANDIDATES = 20
 
 function centerStyle(h: number): React.CSSProperties {
-  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 13, fontFamily: 'var(--font-sans)' }
+  return { height: h, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }
 }
 function cardStyle(): React.CSSProperties {
   return { background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 16 }
@@ -180,7 +180,7 @@ export default function SearchPanel() {
             placeholder={allData ? `輸入建案名稱搜尋（共 ${allData.projects.length} 案預售建案）` : '載入建案清單中…'}
             style={{
               width: '100%', height: 36, padding: '0 12px',
-              borderRadius: 'var(--radius-md)', fontSize: 13,
+              borderRadius: 'var(--radius-md)', fontSize: 'var(--text-sm)',
               background: 'var(--surface-control)', color: 'var(--text-default)',
               border: '1px solid var(--border-control)', fontFamily: 'var(--font-sans)',
             }}
@@ -205,8 +205,8 @@ export default function SearchPanel() {
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)' }}
                   onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                 >
-                  <span style={{ fontSize: 13, color: 'var(--text-default)' }}>{p.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-default)' }}>{p.name}</span>
+                  <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>
                     {p.district} · {p.txCount} 筆
                   </span>
                 </button>
@@ -218,14 +218,14 @@ export default function SearchPanel() {
               position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, zIndex: 20,
               background: 'var(--surface-overlay)', border: '1px solid var(--border-card)',
               borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-pop)',
-              padding: '10px 12px', fontSize: 12, color: 'var(--text-faint)', fontFamily: 'var(--font-sans)',
+              padding: '10px 12px', fontSize: 'var(--text-xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-sans)',
             }}>
               沒有符合的預售建案
             </div>
           )}
         </div>
         {loadFailed && (
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--negative)' }}>建案清單載入失敗，請重新整理頁面</div>
+          <div style={{ marginTop: 8, fontSize: 'var(--text-xs)', color: 'var(--negative)' }}>建案清單載入失敗，請重新整理頁面</div>
         )}
       </div>
 
@@ -243,9 +243,9 @@ export default function SearchPanel() {
               <h3 style={{ margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semibold)', color: 'var(--text-strong)', fontFamily: 'var(--font-sans)' }}>
                 {selected.name}
               </h3>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selected.district} · {selected.buildingType || '—'}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{selected.district} · {selected.buildingType || '—'}</span>
               {unreliable && (
-                <span style={{ fontSize: 11, color: 'var(--negative)', fontWeight: 600 }}>樣本不足，僅供參考</span>
+                <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--negative)', fontWeight: 600 }}>樣本不足，僅供參考</span>
               )}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
@@ -257,16 +257,16 @@ export default function SearchPanel() {
                 ['成交期間', `${selected.firstTx}～${selected.lastTx}`],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <div style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 2 }}>{label}</div>
+                  <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', marginBottom: 2 }}>{label}</div>
                   <div style={{
-                    fontSize: 14, fontFamily: 'var(--font-mono)', fontWeight: 600,
+                    fontSize: 'var(--text-base)', fontFamily: 'var(--font-mono)', fontWeight: 600,
                     color: unreliable ? 'var(--negative)' : 'var(--text-default)',
                   }}>{value}</div>
                 </div>
               ))}
             </div>
             {allData && (
-              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-faint)' }}>
+              <div style={{ marginTop: 10, fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>
                 僅計入預售交易；成交筆數低於 {allData.minReliableTx} 筆時中位數等同少數幾筆的算術結果，不宜當作行情。
               </div>
             )}
@@ -291,11 +291,11 @@ export default function SearchPanel() {
               )}
               {!detailLoading && detail && detail.rows.length > 0 && (
                 <>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+                  <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginBottom: 8 }}>
                     共 {detail.rows.length} 筆交易紀錄
                   </div>
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>
                       <thead>
                         <tr style={{ color: 'var(--text-muted)' }}>
                           {['交易日', '樓層', '坪數', '單價(萬/坪)', '總價(萬)', '房型', '車位', '註記'].map((h, i) => (
