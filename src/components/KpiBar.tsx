@@ -3,6 +3,8 @@ interface KpiData {
   avg_unit_price?: number
   avg_area?: number
   avg_total?: number
+  avg_parking?: number
+  parking_count?: number
   total_sales?: number
 }
 
@@ -30,6 +32,12 @@ const CARDS = [
     label: '均總價', icon: '◆',
     format: (v: number) => v.toLocaleString(),
     unit: '萬', tone: 'var(--clay-400)',
+  },
+  {
+    key: 'avg_parking' as const,
+    label: '均車位價', icon: '◲',
+    format: (v: number) => v.toLocaleString(),
+    unit: '萬', tone: 'var(--series-4)',
   },
   {
     key: 'total_sales' as const,
@@ -128,6 +136,18 @@ export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; s
                   fontFamily: 'var(--font-sans)',
                 }}>{card.unit}</span>
               </div>
+
+              {/* 均車位價的分母與其他卡不同：只計「有拆出車位價」的交易。
+                  多數交易的車位價併入房價未拆分，不標註會讓人以為是全體平均。 */}
+              {card.key === 'avg_parking' && data.parking_count != null && data.total ? (
+                <span style={{
+                  fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
+                  fontFamily: 'var(--font-sans)', lineHeight: 1.4,
+                }}>
+                  僅計 {data.parking_count.toLocaleString()} 筆有拆出車位價者
+                  （{Math.round(data.parking_count / data.total * 100)}%）
+                </span>
+              ) : null}
 
               {/* 補登警示：只在「成交戶數」卡片、且迄月落在最新資料月往前 2 個月內才顯示 */}
               {card.key === 'total' && showBackfillWarning && (

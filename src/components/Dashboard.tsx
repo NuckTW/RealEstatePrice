@@ -44,8 +44,11 @@ const TYPE_COLS: ColDef[] = [
       return s.slice(0, 10)
     }
   },
-  { key: 'count', label: '戶數',     barColor: S1, minWidth: 72 },
-  { key: 'sales', label: '總銷(億)', barColor: S8, minWidth: 64 },
+  { key: 'count',      label: '戶數',        barColor: S1, minWidth: 72 },
+  { key: 'unit_price', label: '單價(萬/坪)', barColor: S3, minWidth: 72 },
+  { key: 'area',       label: '坪數',        barColor: S6, minWidth: 64 },
+  { key: 'avg_total',  label: '均總價(萬)',  barColor: S2, minWidth: 80 },
+  { key: 'sales',      label: '總銷(億)',    barColor: S8, minWidth: 64 },
   { key: 'pct',   label: '佔比',     barColor: INFO, format: v => `${v}%`, minWidth: 52 },
 ]
 
@@ -94,6 +97,8 @@ interface ChartData {
   kpi: {
     total?: number
     avg_unit_price?: number
+    avg_parking?: number
+    parking_count?: number
     avg_area?: number
     avg_total?: number
     total_sales?: number

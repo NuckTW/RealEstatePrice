@@ -11,6 +11,7 @@ interface ProjectStat {
   district: string
   count: number
   unit_price: number
+  avg_area?: number | null
   avg_total: number
   first_date: string
   last_date: string
@@ -290,6 +291,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                     <th className="text-left pb-1 font-normal">建案</th>
                     <th className="text-right pb-1 font-normal">行政區</th>
                     <th className="text-right pb-1 font-normal">均單價</th>
+                    <th className="text-right pb-1 font-normal">均坪數</th>
                     <th className="text-right pb-1 font-normal">均總價</th>
                     <th className="text-right pb-1 font-normal">戶數</th>
                   </tr>
@@ -304,6 +306,7 @@ export default function AreaAnalysisPanel({ selected, onRemove, onAdd }: Props) 
                       </td>
                       <td className="text-right text-gray-400">{r.district}</td>
                       <td className="text-right text-amber-400 font-medium">{r.unit_price}</td>
+                      <td className="text-right text-gray-300">{r.avg_area ?? '—'}</td>
                       <td className="text-right text-gray-300">{r.avg_total?.toLocaleString()}</td>
                       <td className="text-right text-gray-400">{r.count}</td>
                     </tr>

@@ -16,6 +16,7 @@ interface Marker {
   count: number
   unit_price: number
   avg_total: number
+  avg_area?: number | null
   lat: number
   lon: number
   // 預售屋專屬（成屋為 null）
@@ -53,6 +54,7 @@ function buildPopup(m: Marker, color: string): string {
       <div style="display:flex;gap:12px">
         <div><div style="color:#888;font-size:var(--text-3xs)">均單價</div><div style="color:${color};font-weight:600">${price}</div></div>
         <div><div style="color:#888;font-size:var(--text-3xs)">均總價</div><div style="font-weight:600">${m.avg_total ? m.avg_total.toLocaleString()+'萬' : '—'}</div></div>
+        <div><div style="color:#888;font-size:var(--text-3xs)">均坪數</div><div style="font-weight:600">${m.avg_area != null ? m.avg_area + '坪' : '—'}</div></div>
         <div><div style="color:#888;font-size:var(--text-3xs)">戶數</div><div style="font-weight:600">${m.count}</div></div>
       </div>
       ${salesRow}

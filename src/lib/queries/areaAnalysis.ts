@@ -21,6 +21,7 @@ export async function fetchProjectStats(projects: string[]): Promise<Row[]> {
       COUNT(*)::int                                           AS count,
       ROUND((AVG(t.unit_price_sqm)*3.3058/10000)::numeric,1) AS unit_price,
       ROUND(AVG(t.total_price)/10000)::int                   AS avg_total,
+      ROUND((AVG(NULLIF(t.building_area_sqm,0))*0.3025)::numeric,1) AS avg_area,
       MIN(t.transaction_date)::text                          AS first_date,
       MAX(t.transaction_date)::text                          AS last_date
     FROM transactions t

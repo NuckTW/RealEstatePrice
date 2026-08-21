@@ -21,6 +21,7 @@ export function fetchPresaleMarkers(where: string): Promise<Row[]> {
       COUNT(*)::int                                           AS count,
       ROUND((AVG(t.unit_price_sqm)*3.3058/10000)::numeric,1) AS unit_price,
       ROUND(AVG(t.total_price)/10000)::int                   AS avg_total,
+      ROUND((AVG(NULLIF(t.building_area_sqm,0))*0.3025)::numeric,1) AS avg_area,
       pp.total_units                                          AS total_units,
       s.sold_total::int                                       AS sold_total,
       CASE WHEN pp.total_units > 0
@@ -64,6 +65,7 @@ export function fetchExistingMarkers(where: string): Promise<Row[]> {
       COUNT(*)::int                                           AS count,
       ROUND((AVG(t.unit_price_sqm)*3.3058/10000)::numeric,1) AS unit_price,
       ROUND(AVG(t.total_price)/10000)::int                   AS avg_total,
+      ROUND((AVG(NULLIF(t.building_area_sqm,0))*0.3025)::numeric,1) AS avg_area,
       bl.lat,
       bl.lon
     FROM transactions t
