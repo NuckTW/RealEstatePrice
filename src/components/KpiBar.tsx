@@ -76,15 +76,15 @@ export function DateBadge({ dateRange }: { dateRange: string }) {
 
 export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; showBackfillWarning?: boolean }) {
   return (
-    <div style={{ padding: '4px 20px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ padding: '4px 20px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
       {/* KPI cards */}
       {/* 卡片最小寬度跟著字級縮放：大字級時 auto-fit 會自然讓每列排下更少張卡、卡片變寬，
-          避免 --text-2xl 放大到 36px 後數字被卡片邊界裁掉 */}
+          避免 --text-xl 放大到 30px 後數字被卡片邊界裁掉 */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(calc(160px * var(--font-scale)), 1fr))',
-        gap: 12,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(calc(128px * var(--font-scale)), 1fr))',
+        gap: 8,
       }}>
         {CARDS.map(card => {
           const raw = data[card.key]
@@ -97,14 +97,14 @@ export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; s
                 borderRadius: 'var(--radius-lg)',
                 border: '1px solid var(--border-card)',
                 background: 'var(--surface-card)',
-                padding: '14px 16px',
-                display: 'flex', flexDirection: 'column', gap: 8,
+                padding: '9px 12px',
+                display: 'flex', flexDirection: 'column', gap: 4,
                 boxShadow: 'var(--shadow-card)',
               }}
             >
               {/* Left accent rail */}
               <span style={{
-                position: 'absolute', left: 0, top: 12, bottom: 12,
+                position: 'absolute', left: 0, top: 8, bottom: 8,
                 width: 3, borderRadius: '0 3px 3px 0',
                 background: card.tone,
               }} />
@@ -117,12 +117,12 @@ export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; s
                   textTransform: 'uppercase',
                   fontFamily: 'var(--font-sans)',
                 }}>{card.label}</span>
-                <span style={{ fontSize: 'var(--text-base)', opacity: 0.45, color: card.tone }}>{card.icon}</span>
+                <span style={{ fontSize: 'var(--text-sm)', opacity: 0.45, color: card.tone }}>{card.icon}</span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
                 <span style={{
-                  fontSize: 'var(--text-2xl)', fontWeight: 'var(--weight-bold)',
+                  fontSize: 'var(--text-xl)', fontWeight: 'var(--weight-bold)',
                   letterSpacing: 'var(--tracking-tight)',
                   fontVariantNumeric: 'tabular-nums',
                   fontFamily: 'var(--font-mono)',

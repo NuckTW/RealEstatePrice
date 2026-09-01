@@ -302,8 +302,9 @@ export default function Dashboard() {
       {/* 地圖／框選模式改動即套用；value 讓刪標籤與 URL 還原同步回篩選列 */}
       <FilterBar onApply={handleApply} loading={loading} autoApply={activeTab !== 'data'} value={filters} />
 
-      {/* Tab 切換 */}
-      <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+      {/* Tab 切換。條件膠囊（期間 + 篩選標籤）跟 tab 同列：兩者都是「目前看的是什麼」，
+          另起一行會多吃一段垂直空間，也讓人以為是不同層級的資訊。 */}
+      <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         {([
           { id: 'data', label: '▦ 數據看板' },
           { id: 'map',  label: '◵ 地圖' },
@@ -330,6 +331,12 @@ export default function Dashboard() {
             </button>
           )
         })}
+
+        {/* 與 tab 之間留一段間距，視覺上區隔「切換」與「條件」 */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginLeft: 6 }}>
+          <DateBadge dateRange={dateRange} />
+          <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
+        </div>
       </div>
 
       {/* Case detail panel */}
@@ -367,7 +374,6 @@ export default function Dashboard() {
                 >{o.l}</button>
               ))}
             </div>
-            <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
           </div>
           <MapView
             filters={filters}
@@ -400,14 +406,6 @@ export default function Dashboard() {
 
           {data && (
             <div className="pb-10">
-              {/* 期間膠囊與篩選標籤同一列：兩者都是「目前套用的條件」，
-                  分成兩行會被誤讀成不同層級的資訊。標籤多時自動換行。 */}
-              <div className="px-5 pt-3"
-                style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                <DateBadge dateRange={dateRange} />
-                <ActiveFilterTags filters={filters} onRemove={handleTagRemove} />
-              </div>
-
               {/* KPI */}
               <KpiBar data={data.kpi} showBackfillWarning={showBackfillWarning} />
 
