@@ -35,7 +35,7 @@ flowchart TB
         PAGES["頁面<br/>數據看板・數據分析・價格指數<br/>市場供給・AI 問答"]
     end
 
-    GEMINI["Google Gemini 2.5 Flash<br/>AI 問答 text-to-SQL"]
+    GEMINI["Google Gemini 3.5 Flash-Lite<br/>AI 問答 text-to-SQL"]
 
     LVR --> S1
     TNH --> S2

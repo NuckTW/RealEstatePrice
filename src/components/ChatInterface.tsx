@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from 'react'
 import dynamic from 'next/dynamic'
 import type { ChartConfig } from '@/app/api/chat/route'
 
@@ -15,6 +15,25 @@ interface Message {
   chart?: ChartConfig | null
   streaming?: boolean
   error?: boolean
+}
+
+/* ── 密碼（存 localStorage，換裝置需重輸；被 401 時清掉重問）── */
+// 用 useSyncExternalStore 讀 localStorage：server snapshot 回 null（尚未 hydrate），client 回字串
+const PW_KEY = 'tra_chat_pw'
+const pwListeners = new Set<() => void>()
+function subscribePassword(cb: () => void) {
+  pwListeners.add(cb)
+  return () => { pwListeners.delete(cb) }
+}
+function loadPassword(): string {
+  try { return localStorage.getItem(PW_KEY) ?? '' } catch { return '' }
+}
+function savePassword(pw: string) {
+  try {
+    if (pw) localStorage.setItem(PW_KEY, pw)
+    else localStorage.removeItem(PW_KEY)
+  } catch { /* private mode 等情況忽略 */ }
+  pwListeners.forEach(cb => cb())
 }
 
 /* ── Suggestions ───────────────────────────────────────── */
@@ -190,6 +209,10 @@ export default function ChatInterface() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  // null = 尚未 hydrate；'' = 未輸入密碼；其他 = 已存的密碼
+  const password = useSyncExternalStore(subscribePassword, loadPassword, () => null)
+  const [pwInput, setPwInput] = useState('')            // 密碼閘輸入框
+  const [pwError, setPwError] = useState('')            // 密碼閘錯誤訊息
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -221,9 +244,27 @@ export default function ChatInterface() {
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-chat-password': password ?? '' },
         body: JSON.stringify({ question, history }),
       })
+
+      // 非 2xx 都是 JSON { error }（401 密碼錯 / 429 限流 / 503 未設定），不是 NDJSON 串流
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: '查詢失敗，請稍後再試' }))
+        if (res.status === 401) {
+          // 密碼失效：清掉並回到密碼閘，同時把這輪問答從列表移除
+          savePassword('')
+          setPwError(error ?? '密碼錯誤，請重新輸入')
+          setMessages(prev => prev.slice(0, -2))
+          return
+        }
+        setMessages(prev => {
+          const next = [...prev]
+          next[next.length - 1] = { role: 'assistant', content: error ?? '查詢失敗', error: true }
+          return next
+        })
+        return
+      }
 
       if (!res.body) throw new Error('no body')
 
@@ -295,7 +336,71 @@ export default function ChatInterface() {
     }
 
     void aiIdx // suppress unused warning
-  }, [input, loading, messages])
+  }, [input, loading, messages, password])
+
+  const submitPassword = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const pw = pwInput.trim()
+    if (!pw) return
+    savePassword(pw)
+    setPwInput('')
+    setPwError('')
+  }
+
+  // 尚未載入 localStorage 前先不渲染，避免密碼閘閃一下
+  if (password === null) return <div style={{ height: 640 }} />
+
+  if (!password) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: 640, gap: 14, padding: 24,
+        background: 'var(--surface-card)',
+        border: '1px solid var(--border-card)',
+        borderRadius: 'var(--radius-xl)',
+        boxShadow: 'var(--shadow-card)',
+      }}>
+        <div style={{ fontSize: 'var(--text-3xl)', opacity: 0.4 }}>◇</div>
+        <h2 style={{
+          margin: 0, fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-bold)',
+          color: 'var(--text-strong)', fontFamily: 'var(--font-sans)',
+        }}>AI 問答需要密碼</h2>
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--text-faint)', fontFamily: 'var(--font-sans)', textAlign: 'center' }}>
+          此功能使用免費 AI 額度，目前僅開放給知道密碼的使用者
+        </p>
+        <form onSubmit={submitPassword} style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 360 }}>
+          <input
+            type="password"
+            value={pwInput}
+            onChange={e => setPwInput(e.target.value)}
+            placeholder="輸入密碼"
+            autoFocus
+            style={{
+              flex: 1, height: 40, padding: '0 16px',
+              background: 'var(--surface-control)', color: 'var(--text-default)',
+              border: `1px solid ${pwError ? 'var(--negative)' : 'var(--border-control)'}`,
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)', outline: 'none',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!pwInput.trim()}
+            style={{
+              height: 40, padding: '0 20px', borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-sans)',
+              background: 'var(--gradient-accent)', color: 'var(--on-accent)', border: 'none',
+              cursor: pwInput.trim() ? 'pointer' : 'not-allowed',
+              opacity: pwInput.trim() ? 1 : 0.45,
+            }}
+          >進入</button>
+        </form>
+        {pwError && (
+          <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--negative)', fontFamily: 'var(--font-sans)' }}>{pwError}</div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -387,6 +492,7 @@ export default function ChatInterface() {
             value={input}
             onChange={e => setInput(e.target.value)}
             placeholder="輸入問題，可追問上一輪…"
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) sendMessage() }}  // 中文輸入法選字中不送出
             disabled={loading}
             style={{
               flex: 1,

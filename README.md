@@ -20,7 +20,7 @@
 | 市場供給面 | 建照／使照核發量疊上成交量，及各區待售新成屋餘屋趨勢 |
 | 建案比較 | 中位單價 × 中位坪數散佈定位產品，附總價等值線 |
 | 建案搜尋 | 搜尋預售建案，查看位置與完整實價登錄明細 |
-| AI 問答 | 自然語言轉 SQL 查詢並自動視覺化（尚未公開） |
+| AI 問答 | 自然語言轉 SQL 查詢並自動視覺化（需密碼） |
 
 全站共用篩選器（日期區間、行政區、建物類型、房型、成屋／預售屋、屋齡）、深色／亮色主題、三段字級切換，篩選條件會寫入網址可直接分享。
 
@@ -39,7 +39,7 @@
 | 前端 | Next.js 16 App Router + Tailwind CSS |
 | 後端 | Next.js API Routes (Server) |
 | 資料庫 | Supabase PostgreSQL |
-| AI 問答 | Google Gemini 2.5 Flash（尚未公開） |
+| AI 問答 | Google Gemini 3.5 Flash-Lite（免費層，429 時備援 2.5 Flash-Lite） |
 | 部署 | Vercel |
 | 資料抓取 | Python + GitHub Actions |
 
@@ -68,7 +68,9 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=       # Supabase 專案網址
 NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Supabase 公開金鑰
 SUPABASE_SERVICE_ROLE_KEY=      # Supabase 服務金鑰（伺服器端專用）
-GEMINI_API_KEY=                 # Google Gemini API 金鑰（AI 問答尚未公開）
+GEMINI_API_KEY=                 # Google Gemini API 金鑰
+GEMINI_MODEL=                   # 選填，預設 gemini-3.5-flash-lite
+CHAT_PASSWORD=                  # AI 問答密碼閘（未設定則功能回 503）
 ```
 
 ---

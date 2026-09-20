@@ -54,3 +54,6 @@ data/*.json
 *.tsbuildinfo
 next-env.d.ts
 !data/housing_price_index.csv
+
+# Google Drive 捷徑檔（本機同步產生，不進版控）
+*.gsheet
