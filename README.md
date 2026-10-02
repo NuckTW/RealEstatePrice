@@ -9,6 +9,8 @@
 ## 功能
 
 > 📖 **完整功能說明（每項功能 30 字內）：見 [docs/USER-GUIDE.md](docs/USER-GUIDE.md)**
+>
+> 🧭 **開發中：購屋潛在客群分析（資料來源、評估、實作與下一步）：見 [docs/potential-buyer-analysis-plan.md](docs/potential-buyer-analysis-plan.md)**
 
 | 頁面 | 內容 |
 |------|------|
