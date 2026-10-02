@@ -145,3 +145,14 @@ CREATE TABLE IF NOT EXISTS rentals (
   UNIQUE (serial_number)              -- 編號全國唯一；同一案出現在不同發布季時只留一筆
 );
 CREATE INDEX IF NOT EXISTS idx_rentals_district_date ON rentals (district, rental_date);
+
+-- ------------------------------------------------------------
+-- 啟用 RLS、不設公開 policy：前端 anon key 無法讀寫；
+-- 後端 API 與匯入腳本使用 service role（不受 RLS 限制），行為不變
+-- ------------------------------------------------------------
+ALTER TABLE villages                   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_population_monthly ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_vital_monthly      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_migration_monthly  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE village_income_yearly      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rentals                    ENABLE ROW LEVEL SECURITY;
