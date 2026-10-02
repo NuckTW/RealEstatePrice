@@ -1,0 +1,40 @@
+name: 潛在客群資料月度更新
+
+on:
+  schedule:
+    # 每月 5 日 UTC 02:00（台灣時間 10:00）；戶政約落後 1–2 個月發布，財政部所得每年 8 月更新
+    - cron: '0 2 5 * *'
+  workflow_dispatch:  # 允許手動觸發
+
+jobs:
+  fetch-potential-buyers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      # 順序固定：村里主檔由戶政資料建立，所得資料需要它來對齊代碼
+      - name: 戶政村里資料（人口、戶籍動態、遷徙）
+        run: python scripts/fetch_ris_village.py
+
+      - name: 財政部村里所得（未發布新年度時自動跳過）
+        run: python scripts/fetch_fia_income.py
+
+      - name: 實價登錄租賃
+        run: python scripts/fetch_rentals.py
