@@ -8,7 +8,8 @@ import {
   AffordabilitySection, TransfersSection, LowUsageSection,
   type MarketPoint, type LowUsageRow, type TransfersData,
 } from './MarketSection'
-import SouthParkSection, { type SouthParkRow } from './SouthParkSection'
+import SouthParkSection, { type SouthParkRow, type IndustryRow } from './SouthParkSection'
+import ProjectionSection, { type ProjectionData } from './ProjectionSection'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
 const VillageChoroplethMap = dynamic(() => import('./VillageChoroplethMap'), {
@@ -49,6 +50,8 @@ interface ApiData {
   villages: Village[]
   rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
   southPark: SouthParkRow[]
+  southParkIndustry: IndustryRow[]
+  projection: ProjectionData
   houseAge: { period: string | null; cityAvgAge: number | null; rows: HouseAgeRow[] }
   market: MarketPoint[]
   lowUsage: LowUsageRow[]
@@ -336,6 +339,11 @@ export default function PotentialBuyersPanel() {
       <TransfersSection data={data.transfers} highlightDistrict={district || undefined} />
       <LowUsageSection rows={data.lowUsage} highlightDistrict={district || undefined} />
 
+      {/* 未來人口推估（行政區，僅計自然增減） */}
+      {data.projection.rows.length > 0 && (
+        <ProjectionSection data={data.projection} highlightDistrict={district || undefined} />
+      )}
+
       {/* 就業動能：南科（台南最大外來購屋族群來源） */}
       {data.southPark.length > 0 && (
         <div style={cardStyle}>
@@ -345,7 +353,7 @@ export default function PotentialBuyersPanel() {
               南科是台南最大的外來購屋族群來源；園區級資料，不計入村里指數
             </span>
           </div>
-          <SouthParkSection rows={data.southPark} />
+          <SouthParkSection rows={data.southPark} industry={data.southParkIndustry} />
         </div>
       )}
 

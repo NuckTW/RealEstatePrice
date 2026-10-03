@@ -36,3 +36,26 @@ export function TwoLineChart({ rows, nameA, nameB, unit, height = 200, digits = 
     </ResponsiveContainer>
   )
 }
+
+export interface OnePoint { label: string; v: number | null }
+
+/** 單一數列折線（標題已命名，不需圖例） */
+export function OneLineChart({ rows, name, unit, height = 200, digits = 0, tickFormatter }: {
+  rows: OnePoint[]; name: string; unit: string; height?: number; digits?: number
+  tickFormatter?: (v: number) => string
+}) {
+  const axisFontSize = useCssPx('--text-3xs', 10)
+  const axisStyle = { fontSize: axisFontSize, fill: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={rows} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-card)" vertical={false} />
+        <XAxis dataKey="label" tick={axisStyle} axisLine={false} tickLine={false} minTickGap={24} />
+        <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={44} domain={['auto', 'auto']} tickFormatter={tickFormatter} />
+        <Tooltip contentStyle={tooltipStyle}
+          formatter={(v) => [`${Number(v).toLocaleString('zh-TW', { maximumFractionDigits: digits })}${unit}`, name]} />
+        <Line type="monotone" dataKey="v" name={name} stroke={C1} strokeWidth={2} dot={false} activeDot={{ r: 4 }} connectNulls />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}

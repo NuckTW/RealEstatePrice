@@ -251,11 +251,13 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
   - 財政部 105 年度「廍」為造字 U+FFFB4、「赤崁里」＝戶政「赤嵌里」，已加對照
 - **村里戶政年資料、戶長年齡**（分支 feat/potential-buyers-village-annual）：`village_annual_stats`（ODRP020 教育程度、ODRP025 戶數結構，106 年起）、`village_household_quarterly`（平台 T06 戶長年齡、T02 宅內人口數、T04 宅內戶數，105Q1 起）+ `scripts/fetch_village_household.py`；view v3 新增顯示欄位（一宅多戶、26–45 歲戶長占比等），權重待討論
 
+- **南科產業別員工**（分支 feat/potential-buyers-sp-industry-projection）：`science_park_industry_yearly`，data.gov.tw 101986（`serialno=398&fileodr=2`），由 `fetch_science_park.py` 一併匯入；**開放資料只有 107～113 年**，105～106 年僅見於南科年報 PDF（南科管理局網站 2026-10 連不上）
+- **臺南市人口推估**：`population_projection` + `scripts/fetch_population_projection.py`；臺南市政府 data.gov.tw 134546（行政區 × 單一年齡 × 高中低推估），從 data.gov.tw API 自動挑最新版次（目前 2025-2070、2024-2070），匯入時彙整成年齡級距並加總全市；⚠️ 官方只計出生、死亡、未計遷徙
+  - 2025 版中推估：全市 2025 年 185.2 萬 → 2070 年 107.6 萬
+
 #### 待辦（使用者要求清單全做，依建議順序）
 | # | 資料 | 粒度 | 來源 | 備註 |
 |---|---|---|---|---|
-| 8 | 南科產業別員工 | 園區／年 | data.gov.tw 101986 | |
-| 9 | 未來人口推估 | 縣市 | 國發會人口推估查詢系統 | |
 | 10 | 家庭收支調查（可支配所得） | 縣市／年 | 主計總處 | |
 | 11 | 行政區級建照、開工量 | 行政區 | 台南市工務局（需確認是否公開） | |
 | 13 | 學區學生數 | 學校 | 教育部統計處、台南市教育局 | |
