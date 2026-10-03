@@ -65,14 +65,14 @@ const COMPONENTS: Record<Mode, { key: PKey; raw: RawKey; label: string; weight: 
     { key: 'cohortYoung', raw: 'cohortYoung', label: '世代淨移入（25–34 歲）', weight: 30, unit: '‰', hint: '同一批人一年後的人數變化，≈ 年輕人淨搬入' },
     { key: 'share2534',   raw: 'share2534',   label: '25–34 歲人口占比',      weight: 20, unit: '%', hint: '首購主力年齡層' },
     { key: 'marriage',    raw: 'marriage',    label: '結婚率',                 weight: 20, unit: '‰', hint: '每千人・年，已往行政區平均收縮' },
-    { key: 'income',      raw: 'income',      label: '所得中位數',             weight: 20, unit: '千元', hint: '綜所稅申報，只做相對排名' },
+    { key: 'income',      raw: 'income',      label: '所得中位數（購買力）',   weight: 20, unit: '千元', hint: '綜所稅申報，代表購買力；只做相對排名' },
     { key: 'social',      raw: 'social',      label: '社會增加率',             weight: 10, unit: '‰', hint: '淨遷入（含同區跨里）' },
   ],
   upgrader: [
     { key: 'cohortMid',   raw: 'cohortMid',   label: '世代淨移入（35–44 歲）', weight: 20, unit: '‰', hint: '同一批人一年後的人數變化' },
     { key: 'share3544',   raw: 'share3544',   label: '35–44 歲人口占比',      weight: 20, unit: '%', hint: '換屋主力年齡層' },
     { key: 'birth',       raw: 'birth',       label: '出生率',                 weight: 20, unit: '‰', hint: '每千人・年，已往行政區平均收縮' },
-    { key: 'income',      raw: 'income',      label: '所得中位數',             weight: 30, unit: '千元', hint: '綜所稅申報，只做相對排名' },
+    { key: 'income',      raw: 'income',      label: '所得中位數（購買力）',   weight: 30, unit: '千元', hint: '綜所稅申報，代表購買力；只做相對排名' },
     { key: 'social',      raw: 'social',      label: '社會增加率',             weight: 10, unit: '‰', hint: '淨遷入（含同區跨里）' },
   ],
 }
@@ -547,7 +547,7 @@ function RankingTable({ rows, mode, cityRank, selected, onPick }: {
             <th style={th}>世代淨移入 {young ? '25–34' : '35–44'}</th>
             <th style={th}>{young ? '25–34' : '35–44'} 占比</th>
             <th style={th}>{young ? '結婚率' : '出生率'}</th>
-            <th style={th}>所得中位數（千元）</th>
+            <th style={th}>所得中位數（購買力，千元）</th>
             <th style={th}>社會增加率</th>
           </tr>
         </thead>
@@ -586,12 +586,12 @@ function Methodology() {
       <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>指數怎麼算？</summary>
       <ul style={{ margin: '10px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li style={li}>每項指標先換算成全市 650 里的百分位（0–100），再依權重加總；指數 50 約為全市中間水準。</li>
-        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 20% + 結婚率 20% + 所得 20% + 社會增加率 10%。</li>
-        <li style={li}><b>換屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得 30% + 社會增加率 10%。</li>
+        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 20% + 結婚率 20% + 所得（購買力）20% + 社會增加率 10%。</li>
+        <li style={li}><b>換屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得（購買力）30% + 社會增加率 10%。</li>
         <li style={li}><b>世代淨移入</b>：比較同一批人一年前後的人數（例如去年 25–34 歲 vs 今年 26–35 歲），這個年齡層死亡很少，差額約等於淨搬入。</li>
         <li style={li}><b>社會增加率</b>含同區跨里遷移；新社區的住戶常來自同區隔壁里，不加回會被低估。</li>
         <li style={li}><b>結婚率、出生率</b>在小里波動很大，已往所屬行政區的平均收縮（人口越少收縮越多）。</li>
-        <li style={li}><b>所得</b>為財政部綜所稅申報資料，不含免稅與分離課稅所得，且落後約 2–3 年，只做相對排名。</li>
+        <li style={li}><b>所得（購買力）</b>為財政部綜所稅申報資料，用來代表各里的購買力；不含免稅與分離課稅所得，且落後約 2–3 年，只做相對排名。</li>
         <li style={li}>時間窗為最近 12 個月；人口未滿 1,000 的里雜訊大，地圖以淡色虛線標示。</li>
       </ul>
     </details>
