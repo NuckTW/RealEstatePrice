@@ -42,3 +42,7 @@ jobs:
       # 國科會每月約 10–15 日發布上月資料；5 日執行時取到的是前一期
       - name: 科學園區從業員工（南科就業動能）
         run: python scripts/fetch_science_park.py
+
+      # 不動產資訊平台（負擔能力、房貸、低度使用、稅籍屋齡）每次全量覆寫；台南開放資料抓今年與去年
+      - name: 住宅市場統計（負擔能力、房貸利率、低度使用、屋齡存量、建物移轉）
+        run: python scripts/fetch_housing_stats.py

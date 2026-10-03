@@ -4,8 +4,8 @@ import { useMemo } from 'react'
 
 export interface HouseAgeRow {
   district: string
-  n: number
-  medianAge: number | null
+  n: number                  // 房屋稅籍住宅數（宅）
+  avgAge: number | null      // 住宅平均屋齡（歲）
   pctLt10: number
   pct10_20: number
   pct20_30: number
@@ -13,8 +13,6 @@ export interface HouseAgeRow {
   pctGe40: number
 }
 
-/** 樣本數門檻：低於此數的行政區不畫（比例波動太大） */
-const MIN_N = 30
 
 /**
  * 屋齡五級，依序由新到舊；顏色沿用潛在客群頁的 brass 色階 --pb-ramp-0..4（由 PotentialBuyersPanel 定義）
@@ -28,14 +26,13 @@ const BANDS: { key: keyof HouseAgeRow; label: string }[] = [
   { key: 'pctGe40',  label: '40 年以上' },
 ]
 
-export default function HouseAgeChart({ rows, period, highlightDistrict }: {
-  rows: HouseAgeRow[]; period: string | null; highlightDistrict?: string
+export default function HouseAgeChart({ rows, period, cityAvgAge, highlightDistrict }: {
+  rows: HouseAgeRow[]; period: string | null; cityAvgAge: number | null; highlightDistrict?: string
 }) {
   const view = useMemo(() => rows
-    .filter(r => r.n >= MIN_N)
+    .filter(r => r.n > 0)
     .map(r => ({ ...r, old: r.pct30_40 + r.pctGe40 }))
     .sort((a, b) => b.old - a.old), [rows])
-  const skipped = rows.filter(r => r.n < MIN_N)
 
   return (
     <div>
@@ -52,8 +49,8 @@ export default function HouseAgeChart({ rows, period, highlightDistrict }: {
       <div style={{ overflowX: 'auto' }}>
         <div style={{ minWidth: 560 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '64px 1fr 64px 64px 56px', gap: 8, fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', fontWeight: 600, padding: '0 0 6px', borderBottom: '1px solid var(--border-card)' }}>
-            <span>行政區</span><span>屋齡分布（成交件數占比）</span>
-            <span style={{ textAlign: 'right' }}>30 年以上</span><span style={{ textAlign: 'right' }}>中位數</span><span style={{ textAlign: 'right' }}>件數</span>
+            <span>行政區</span><span>屋齡分布（住宅宅數占比）</span>
+            <span style={{ textAlign: 'right' }}>30 年以上</span><span style={{ textAlign: 'right' }}>平均屋齡</span><span style={{ textAlign: 'right' }}>宅數</span>
           </div>
           {view.map(r => (
             <div key={r.district} style={{
@@ -74,22 +71,17 @@ export default function HouseAgeChart({ rows, period, highlightDistrict }: {
                 })}
               </div>
               <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-strong)', fontWeight: 600 }}>{r.old.toFixed(0)}%</span>
-              <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-default)' }}>{r.medianAge != null ? `${r.medianAge.toFixed(0)} 年` : '—'}</span>
+              <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-default)' }}>{r.avgAge != null ? `${r.avgAge.toFixed(1)} 年` : '—'}</span>
               <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-faint)' }}>{r.n.toLocaleString()}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {skipped.length > 0 && (
-        <div style={{ marginTop: 8, fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>
-          件數不足 {MIN_N}：{skipped.map(r => `${r.district}（${r.n}）`).join('、')}
-        </div>
-      )}
       <div style={{ marginTop: 8, fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', lineHeight: 1.7 }}>
-        依 30 年以上占比排序；越高代表區內流通的老屋越多，換屋需求的潛力越大。
-        ⚠️ 這是 {period ?? '近 24 個月'} 成交成屋（大樓、華廈、公寓、透天，排除預售與特殊關係交易）的屋齡，不是全部住宅存量；
-        「未滿 10 年」含建商的新成屋銷售，重劃區、新市鎮比例會特別高。
+        依 30 年以上占比排序；老屋比例越高，換屋需求的潛力越大。
+        資料：內政部不動產資訊平台「房屋稅籍住宅類數量依屋齡區分」{period ? `（${period}）` : ''}，為全部住宅存量；
+        全市平均屋齡 {cityAvgAge != null ? `${cityAvgAge.toFixed(1)} 年` : '—'}。
       </div>
     </div>
   )

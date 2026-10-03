@@ -110,44 +110,88 @@ export function fetchSouthParkEmployees(): Promise<Row[]> {
   `)
 }
 
-/**
- * 行政區成交物件屋齡結構（老屋換屋需求的代理指標）
- * ⚠️ 這是「近 24 個月成交的成屋」屋齡，不是全部住宅存量（存量需房屋稅籍資料，目前無公開來源）
- * - 住宅類：大樓、華廈、公寓、透天；排除預售、特殊關係交易
- * - completion_date 為民國 YYYMMDD（如 '1131015'），屋齡 = 成交日 − 完工日（年）
- */
-export function fetchDistrictHouseAge(): Promise<Row[]> {
+/* ── 住宅市場統計（housing_market_stats，由 scripts/fetch_housing_stats.py 匯入） ── */
+
+/** 縣市級時間序列：負擔能力、新增房貸條件、五大銀行房貸利率（臺南市與全國） */
+export function fetchMarketSeries(): Promise<Row[]> {
   return cachedQuery(`
-    WITH
-    tw AS (SELECT (date_trunc('month', max(transaction_date)) - interval '1 month')::date AS end_d FROM transactions),
-    t AS (
-      SELECT t.district,
-             (t.transaction_date - make_date(
-                left(t.completion_date, length(t.completion_date) - 4)::int + 1911,
-                greatest(1, least(12, substr(t.completion_date, length(t.completion_date) - 3, 2)::int)),
-                1)) / 365.25 AS age
-      FROM transactions t, tw
-      WHERE t.transaction_date >= tw.end_d - interval '24 months' AND t.transaction_date < tw.end_d
-        AND NOT t.is_presale
-        AND (t.building_type LIKE '住宅大樓%' OR t.building_type LIKE '華廈%'
-          OR t.building_type LIKE '公寓%'   OR t.building_type LIKE '透天%')
-        AND coalesce(t.notes, '') NOT LIKE '%特殊關係%'
-        AND t.completion_date ~ '^[0-9]{6,7}$'
-        AND t.district <> ''
+    SELECT indicator, area, period, value::float AS value
+    FROM housing_market_stats
+    WHERE indicator IN ('price_income_ratio', 'mortgage_burden_pct', 'new_mortgage_rate',
+                        'new_mortgage_ltv', 'new_mortgage_term', 'bank5_mortgage_rate')
+      AND area_level IN ('nation', 'city')
+    ORDER BY period_date, indicator, area
+  `)
+}
+
+/** 行政區低度使用（用電）住宅：最新一期與前一年同期（上下半年用電季節不同，只能同期比） */
+export function fetchLowUsageByDistrict(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH p AS (
+      SELECT max(period_date) AS d FROM housing_market_stats WHERE indicator = 'low_usage_rate'
     )
-    SELECT district,
-           count(*) AS n,
-           round(percentile_cont(0.5) WITHIN GROUP (ORDER BY age)::numeric, 1)::float AS median_age,
-           round(avg((age < 10)::int)::numeric * 100, 1)::float               AS pct_lt10,
-           round(avg((age >= 10 AND age < 20)::int)::numeric * 100, 1)::float AS pct_10_20,
-           round(avg((age >= 20 AND age < 30)::int)::numeric * 100, 1)::float AS pct_20_30,
-           round(avg((age >= 30 AND age < 40)::int)::numeric * 100, 1)::float AS pct_30_40,
-           round(avg((age >= 40)::int)::numeric * 100, 1)::float              AS pct_ge40,
-           (SELECT to_char(end_d - interval '24 months', 'YYYY-MM') FROM tw) AS period_from,
-           (SELECT to_char(end_d - interval '1 day', 'YYYY-MM') FROM tw)     AS period_to
-    FROM t
-    WHERE age >= 0
-    GROUP BY district
-    ORDER BY district
+    SELECT h.indicator, h.area_level, h.area, h.period,
+           (h.period_date = p.d) AS is_latest, h.value::float AS value
+    FROM housing_market_stats h, p
+    WHERE h.indicator IN ('low_usage_rate', 'low_usage_units')
+      AND h.period_date IN (p.d, (p.d - interval '1 year')::date)
+    ORDER BY h.area
+  `)
+}
+
+/** 行政區住宅存量屋齡（房屋稅籍，最新一季） */
+export function fetchStockAgeByDistrict(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH p AS (
+      SELECT max(period_date) AS d FROM housing_market_stats WHERE indicator = 'stock_units'
+    )
+    SELECT h.indicator, h.area_level, h.area, h.period, h.value::float AS value
+    FROM housing_market_stats h, p
+    WHERE h.indicator LIKE 'stock\\_%' AND h.period_date = p.d
+      AND h.area_level IN ('city', 'district')
+  `)
+}
+
+/**
+ * 建物移轉（台南開放資料，行政區・月）
+ * - 各區近 12 個月與前 12 個月合計：新屋交屋（第一次移轉，六層以下 + 七層以上）、買賣移轉建物件數
+ * - 全市月序列：各區加總（資料集沒有全市合計列）
+ */
+export function fetchTransfersByDistrict(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH p AS (
+      SELECT max(period_date) AS d FROM housing_market_stats WHERE indicator = 'sale_transfer_buildings'
+    )
+    SELECT h.area,
+           sum(h.value) FILTER (WHERE h.indicator IN ('first_transfer_low', 'first_transfer_high')
+                                  AND h.period_date > (p.d - interval '12 months'))::float AS first_12m,
+           sum(h.value) FILTER (WHERE h.indicator IN ('first_transfer_low', 'first_transfer_high')
+                                  AND h.period_date <= (p.d - interval '12 months')
+                                  AND h.period_date > (p.d - interval '24 months'))::float AS first_prev_12m,
+           sum(h.value) FILTER (WHERE h.indicator = 'sale_transfer_buildings'
+                                  AND h.period_date > (p.d - interval '12 months'))::float AS sale_12m,
+           sum(h.value) FILTER (WHERE h.indicator = 'sale_transfer_buildings'
+                                  AND h.period_date <= (p.d - interval '12 months')
+                                  AND h.period_date > (p.d - interval '24 months'))::float AS sale_prev_12m,
+           (SELECT to_char(d, 'YYYY-MM') FROM p) AS latest_month
+    FROM housing_market_stats h, p
+    WHERE h.area_level = 'district'
+      AND h.indicator IN ('first_transfer_low', 'first_transfer_high', 'sale_transfer_buildings')
+      AND h.period_date > (p.d - interval '24 months')
+    GROUP BY h.area
+    ORDER BY h.area
+  `)
+}
+
+export function fetchTransfersCitySeries(): Promise<Row[]> {
+  return cachedQuery(`
+    SELECT period,
+           sum(value) FILTER (WHERE indicator IN ('first_transfer_low', 'first_transfer_high'))::float AS first_transfer,
+           sum(value) FILTER (WHERE indicator = 'sale_transfer_buildings')::float AS sale_transfer
+    FROM housing_market_stats
+    WHERE area_level = 'district'
+      AND indicator IN ('first_transfer_low', 'first_transfer_high', 'sale_transfer_buildings')
+    GROUP BY period, period_date
+    ORDER BY period_date
   `)
 }

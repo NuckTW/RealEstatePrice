@@ -4,6 +4,10 @@ import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { VillageGeo } from './VillageChoroplethMap'
 import HouseAgeChart, { type HouseAgeRow } from './HouseAgeChart'
+import {
+  AffordabilitySection, TransfersSection, LowUsageSection,
+  type MarketPoint, type LowUsageRow, type TransfersData,
+} from './MarketSection'
 import SouthParkSection, { type SouthParkRow } from './SouthParkSection'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
@@ -39,7 +43,10 @@ interface ApiData {
   villages: Village[]
   rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
   southPark: SouthParkRow[]
-  houseAge: { period: string | null; rows: HouseAgeRow[] }
+  houseAge: { period: string | null; cityAvgAge: number | null; rows: HouseAgeRow[] }
+  market: MarketPoint[]
+  lowUsage: LowUsageRow[]
+  transfers: TransfersData
 }
 
 type Mode = 'firstBuyer' | 'upgrader'
@@ -127,7 +134,13 @@ export default function PotentialBuyersPanel() {
       fetch('/api/potential-buyers').then(r => r.json()),
       fetch('/geo/tainan_villages.json').then(r => r.json()),
     ])
-      .then(([d, g]) => { if (d.error) setError(true); else { setData(d); setGeo(g) } })
+      .then(([d, g]) => {
+        if (d.error) { setError(true); return }
+        setData(d); setGeo(g)
+        // 租金／房貸比的預設利率改用臺南市最新一季「新增購置住宅貸款平均利率」
+        const rate = (d as ApiData).market?.filter(m => m.indicator === 'new_mortgage_rate' && m.area === '臺南市').at(-1)
+        if (rate) setAssumption(a => ({ ...a, ratePct: rate.value }))
+      })
       .catch(() => setError(true))
   }, [])
 
@@ -293,6 +306,10 @@ export default function PotentialBuyersPanel() {
           salePeriod={data.rent.salePeriod}
           assumption={assumption}
           onAssumptionChange={setAssumption}
+          rateNote={(() => {
+            const r = data.market.filter(m => m.indicator === 'new_mortgage_rate' && m.area === '臺南市').at(-1)
+            return r ? `預設利率為臺南市 ${r.period} 新增購屋貸款平均利率` : undefined
+          })()}
           highlightDistrict={district || undefined}
         />
       </div>
@@ -302,11 +319,16 @@ export default function PotentialBuyersPanel() {
         <div style={{ marginBottom: 10 }}>
           <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>屋齡結構（行政區）</span>
           <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
-            老屋占比高的區，換屋需求潛力越大；不計入村里指數
+            房屋稅籍住宅存量；老屋占比高的區，換屋需求潛力越大；不計入村里指數
           </span>
         </div>
-        <HouseAgeChart rows={data.houseAge.rows} period={data.houseAge.period} highlightDistrict={district || undefined} />
+        <HouseAgeChart rows={data.houseAge.rows} period={data.houseAge.period} cityAvgAge={data.houseAge.cityAvgAge} highlightDistrict={district || undefined} />
       </div>
+
+      {/* 市場環境：負擔能力、建物移轉、低度使用（縣市／行政區級，不計入村里指數） */}
+      <AffordabilitySection market={data.market} />
+      <TransfersSection data={data.transfers} highlightDistrict={district || undefined} />
+      <LowUsageSection rows={data.lowUsage} highlightDistrict={district || undefined} />
 
       {/* 就業動能：南科（台南最大外來購屋族群來源） */}
       {data.southPark.length > 0 && (

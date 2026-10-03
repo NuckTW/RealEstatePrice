@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 import {
-  fetchVillageBuyerIndicators, fetchDistrictRentVsPrice, fetchSouthParkEmployees, fetchDistrictHouseAge,
+  fetchVillageBuyerIndicators, fetchDistrictRentVsPrice, fetchSouthParkEmployees,
+  fetchMarketSeries, fetchLowUsageByDistrict, fetchStockAgeByDistrict,
+  fetchTransfersByDistrict, fetchTransfersCitySeries,
 } from '@/lib/queries/potentialBuyers'
+import type { Row } from '@/lib/queries/client'
 
 /**
  * 戶政資料的村里名含造字區字元，前端字型無法顯示 → 換成通用字
@@ -14,15 +17,50 @@ function fixName(s: string): string {
 
 const num = (v: unknown): number | null => (v == null ? null : Number(v))
 
+/** 附加資訊查詢失敗（如資料表尚未建立）時回傳空陣列，不影響主頁面 */
+const optional = (label: string, p: Promise<Row[]>) =>
+  p.catch(err => { console.error(`[/api/potential-buyers] ${label}`, err); return [] as Row[] })
+
+/** 房屋稅籍屋齡十級 → 五級（與 HouseAgeChart 的分級一致） */
+const AGE_BANDS: Record<string, string[]> = {
+  pctLt10:  ['stock_age_0_1', 'stock_age_1_5', 'stock_age_5_10'],
+  pct10_20: ['stock_age_10_15', 'stock_age_15_20'],
+  pct20_30: ['stock_age_20_25', 'stock_age_25_30'],
+  pct30_40: ['stock_age_30_40'],
+  pctGe40:  ['stock_age_40_50', 'stock_age_50p'],
+}
+
 export async function GET() {
   try {
-    const [rows, rentRows, parkRows, ageRows] = await Promise.all([
+    const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity] = await Promise.all([
       fetchVillageBuyerIndicators(),
       fetchDistrictRentVsPrice(),
-      // 南科是附加資訊：查詢失敗（如資料表尚未建立）不影響主頁面
-      fetchSouthParkEmployees().catch(err => { console.error('[/api/potential-buyers] 南科', err); return [] }),
-      fetchDistrictHouseAge(),
+      optional('南科', fetchSouthParkEmployees()),
+      optional('市場序列', fetchMarketSeries()),
+      optional('低度使用', fetchLowUsageByDistrict()),
+      optional('稅籍屋齡', fetchStockAgeByDistrict()),
+      optional('建物移轉', fetchTransfersByDistrict()),
+      optional('建物移轉序列', fetchTransfersCitySeries()),
     ])
+
+    // 房屋稅籍屋齡：每區一列，十級合併為五級百分比
+    const stockByArea = new Map<string, Record<string, number>>()
+    for (const r of stockRows) {
+      const key = String(r.area)
+      const m = stockByArea.get(key) ?? {}
+      m[String(r.indicator)] = Number(r.value)
+      stockByArea.set(key, m)
+    }
+    const stockPeriod = stockRows.length ? String(stockRows[0].period) : null
+    const houseAgeRows = [...stockByArea.entries()]
+      .filter(([area]) => area !== '臺南市')
+      .map(([area, m]) => {
+        const units = m.stock_units ?? 0
+        const pct = Object.fromEntries(Object.entries(AGE_BANDS).map(([k, cols]) =>
+          [k, units ? cols.reduce((s, c) => s + (m[c] ?? 0), 0) / units * 100 : 0]))
+        return { district: area, n: units, avgAge: m.stock_avg_age ?? null, ...pct }
+      })
+    const cityStock = stockByArea.get('臺南市')
     const villages = rows.map(r => ({
       code:     String(r.village_code),
       district: String(r.district),
@@ -73,13 +111,31 @@ export async function GET() {
           pricePing: num(r.price_ping),  // 元／坪
         })),
       },
-      // 行政區成交成屋屋齡結構（近 24 個月）
+      // 行政區住宅存量屋齡（房屋稅籍，最新一季）
       houseAge: {
-        period: ageRows.length ? `${ageRows[0].period_from}～${ageRows[0].period_to}` : null,
-        rows: ageRows.map(r => ({
-          district: String(r.district), n: Number(r.n), medianAge: num(r.median_age),
-          pctLt10: Number(r.pct_lt10), pct10_20: Number(r.pct_10_20), pct20_30: Number(r.pct_20_30),
-          pct30_40: Number(r.pct_30_40), pctGe40: Number(r.pct_ge40),
+        period: stockPeriod,
+        cityAvgAge: cityStock?.stock_avg_age ?? null,
+        rows: houseAgeRows,
+      },
+      // 縣市級市場序列（臺南市 vs 全國）：indicator → [{ period, area, value }]
+      market: seriesRows.map(r => ({
+        indicator: String(r.indicator), area: String(r.area), period: String(r.period), value: Number(r.value),
+      })),
+      // 低度使用（用電）住宅：最新一期 vs 前一年同期
+      lowUsage: lowRows.map(r => ({
+        indicator: String(r.indicator), level: String(r.area_level), area: String(r.area),
+        period: String(r.period), isLatest: Boolean(r.is_latest), value: Number(r.value),
+      })),
+      // 建物移轉：各區近 12 月 vs 前 12 月；全市月序列
+      transfers: {
+        latestMonth: transferRows.length ? String(transferRows[0].latest_month) : null,
+        rows: transferRows.map(r => ({
+          district: String(r.area),
+          first12m: num(r.first_12m), firstPrev12m: num(r.first_prev_12m),
+          sale12m: num(r.sale_12m), salePrev12m: num(r.sale_prev_12m),
+        })),
+        city: transferCity.map(r => ({
+          period: String(r.period), first: num(r.first_transfer), sale: num(r.sale_transfer),
         })),
       },
       // 南科從業員工：sub_park = '合計' 為園區總數，其餘為子園區（臺南園區、高雄園區…）

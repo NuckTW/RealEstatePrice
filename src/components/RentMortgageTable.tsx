@@ -17,7 +17,7 @@ export interface MortgageAssumption {
   years: number     // 貸款年限
 }
 
-/** 預設：一般首購房貸利率約 2.2%（⚠️ 依當期市場調整）、8 成、30 年 */
+/** 預設：8 成、30 年；利率由上層以臺南市最新「新增購屋貸款平均利率」覆寫（無資料時用 2.2%） */
 export const DEFAULT_ASSUMPTION: MortgageAssumption = { ratePct: 2.2, ltv: 0.8, years: 30 }
 
 /** 樣本數門檻：租金或成交任一低於此數 → 不計算比值 */
@@ -51,9 +51,11 @@ interface Props {
   onAssumptionChange: (a: MortgageAssumption) => void
   /** 行政區篩選時高亮該區 */
   highlightDistrict?: string
+  /** 預設利率的來源說明 */
+  rateNote?: string
 }
 
-export default function RentMortgageTable({ rows, rentPeriod, salePeriod, assumption, onAssumptionChange, highlightDistrict }: Props) {
+export default function RentMortgageTable({ rows, rentPeriod, salePeriod, assumption, onAssumptionChange, highlightDistrict, rateNote }: Props) {
   const [btype, setBtype] = useState<'大樓華廈' | '透天'>('大樓華廈')
 
   const view = useMemo(() => rows
@@ -90,7 +92,7 @@ export default function RentMortgageTable({ rows, rentPeriod, salePeriod, assump
         <label>利率 <NumField value={assumption.ratePct} max={20} onCommit={v => onAssumptionChange({ ...assumption, ratePct: v })} style={inputStyle} /> %</label>
         <label>成數 <NumField value={Math.round(assumption.ltv * 100)} max={100} onCommit={v => onAssumptionChange({ ...assumption, ltv: v / 100 })} style={inputStyle} /> %</label>
         <label>年限 <NumField value={assumption.years} min={1} max={40} onCommit={v => onAssumptionChange({ ...assumption, years: v })} style={inputStyle} /> 年</label>
-        <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>本息平均攤還；自備款不計入月付</span>
+        <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>本息平均攤還；自備款不計入月付{rateNote ? `；${rateNote}` : ''}</span>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
