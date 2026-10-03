@@ -4,7 +4,7 @@ import {
   fetchMarketSeries, fetchLowUsageByDistrict, fetchStockAgeByDistrict,
   fetchTransfersByDistrict, fetchTransfersCitySeries,
   fetchSouthParkIndustry, fetchPopulationProjection,
-  fetchSchoolByDistrict, fetchSchoolGrowth, fetchPoiByVillage,
+  fetchSchoolByDistrict, fetchSchoolGrowth, fetchPoiByVillage, fetchIndustryStats,
 } from '@/lib/queries/potentialBuyers'
 import type { Row } from '@/lib/queries/client'
 
@@ -35,7 +35,7 @@ const AGE_BANDS: Record<string, string[]> = {
 export async function GET() {
   try {
     const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity, industryRows, projRows,
-           schoolRows, schoolGrowthRows, poiRows] = await Promise.all([
+           schoolRows, schoolGrowthRows, poiRows, industryStatRows] = await Promise.all([
       fetchVillageBuyerIndicators(),
       fetchDistrictRentVsPrice(),
       optional('南科', fetchSouthParkEmployees()),
@@ -49,6 +49,7 @@ export async function GET() {
       optional('學生數', fetchSchoolByDistrict()),
       optional('學校成長', fetchSchoolGrowth()),
       optional('生活機能', fetchPoiByVillage()),
+      optional('產業與就業', fetchIndustryStats()),
     ])
 
     // 生活機能：village_code → { 類別: 點數 }
@@ -177,6 +178,11 @@ export async function GET() {
           total: Number(r.pop_total), a2534: Number(r.age_25_34), a3544: Number(r.age_35_44), a65p: Number(r.age_65_plus),
         })),
       },
+      // 產業與就業：普查（110 年）各行業從業員工等、最新一期工商家數
+      industry: industryStatRows.map(r => ({
+        indicator: String(r.indicator), level: String(r.area_level), area: String(r.area),
+        period: String(r.period), value: Number(r.value),
+      })),
       // 國中小學生數：行政區 × 學年 × 學制；各校新生成長
       schools: {
         byDistrict: schoolRows.map(r => ({
