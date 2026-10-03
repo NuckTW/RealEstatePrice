@@ -58,3 +58,6 @@ next-env.d.ts
 # Google Drive 捷徑檔（本機同步產生，不進版控）
 *.gsheet
 data/ris_preview/
+
+# Supabase CLI 本機狀態（--linked 時產生，不進版控）
+supabase/.temp/
