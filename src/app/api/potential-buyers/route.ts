@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { fetchVillageBuyerIndicators, fetchDistrictRentVsPrice, fetchSouthParkEmployees } from '@/lib/queries/potentialBuyers'
+import {
+  fetchVillageBuyerIndicators, fetchDistrictRentVsPrice, fetchSouthParkEmployees, fetchDistrictHouseAge,
+} from '@/lib/queries/potentialBuyers'
 
 /**
  * 戶政資料的村里名含造字區字元，前端字型無法顯示 → 換成通用字
@@ -14,11 +16,12 @@ const num = (v: unknown): number | null => (v == null ? null : Number(v))
 
 export async function GET() {
   try {
-    const [rows, rentRows, parkRows] = await Promise.all([
+    const [rows, rentRows, parkRows, ageRows] = await Promise.all([
       fetchVillageBuyerIndicators(),
       fetchDistrictRentVsPrice(),
       // 南科是附加資訊：查詢失敗（如資料表尚未建立）不影響主頁面
       fetchSouthParkEmployees().catch(err => { console.error('[/api/potential-buyers] 南科', err); return [] }),
+      fetchDistrictHouseAge(),
     ])
     const villages = rows.map(r => ({
       code:     String(r.village_code),
@@ -43,6 +46,8 @@ export async function GET() {
         hhSize: num(r.hh_size), splitSpeed: num(r.split_speed_pct),
         netOtherCity: num(r.net_other_city_k), netOtherTown: num(r.net_other_town_k),
         netSameTown: num(r.net_same_town_k),
+        women1549: num(r.women_15_49), women1549Share: num(r.women_15_49_share),
+        divorces: num(r.divorces), divorceKDistrict: num(r.divorce_k_district),
       },
       lowConfidence:    Boolean(r.low_confidence),
       cohortMissing:    Boolean(r.cohort_missing),
@@ -66,6 +71,15 @@ export async function GET() {
           rentPing:  num(r.rent_ping),   // 元／坪・月
           nSale:     Number(r.n_sale),
           pricePing: num(r.price_ping),  // 元／坪
+        })),
+      },
+      // 行政區成交成屋屋齡結構（近 24 個月）
+      houseAge: {
+        period: ageRows.length ? `${ageRows[0].period_from}～${ageRows[0].period_to}` : null,
+        rows: ageRows.map(r => ({
+          district: String(r.district), n: Number(r.n), medianAge: num(r.median_age),
+          pctLt10: Number(r.pct_lt10), pct10_20: Number(r.pct_10_20), pct20_30: Number(r.pct_20_30),
+          pct30_40: Number(r.pct_30_40), pctGe40: Number(r.pct_ge40),
         })),
       },
       // 南科從業員工：sub_park = '合計' 為園區總數，其餘為子園區（臺南園區、高雄園區…）

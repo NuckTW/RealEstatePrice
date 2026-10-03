@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { VillageGeo } from './VillageChoroplethMap'
+import HouseAgeChart, { type HouseAgeRow } from './HouseAgeChart'
 import SouthParkSection, { type SouthParkRow } from './SouthParkSection'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
@@ -26,6 +27,8 @@ interface Village {
     social: number | null; income: number | null
     hhSize: number | null; splitSpeed: number | null
     netOtherCity: number | null; netOtherTown: number | null; netSameTown: number | null
+    women1549: number | null; women1549Share: number | null
+    divorces: number | null; divorceKDistrict: number | null
   }
   lowConfidence: boolean
   cohortMissing: boolean
@@ -36,6 +39,7 @@ interface ApiData {
   villages: Village[]
   rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
   southPark: SouthParkRow[]
+  houseAge: { period: string | null; rows: HouseAgeRow[] }
 }
 
 type Mode = 'firstBuyer' | 'upgrader'
@@ -68,7 +72,7 @@ const MODE_LABEL: Record<Mode, string> = { firstBuyer: '首購指數', upgrader:
  */
 const RAMP = [0, 1, 2, 3, 4].map(i => `var(--pb-ramp-${i})`)
 const RAMP_CSS = `
-  :root { --pb-ramp-0: #43290c; --pb-ramp-1: #6a4312; --pb-ramp-2: #a8661a; --pb-ramp-3: #e8ad3f; --pb-ramp-4: #f7dca2; }
+  :root { --pb-ramp-0: #6a4312; --pb-ramp-1: #8f5a16; --pb-ramp-2: #b9761d; --pb-ramp-3: #e8ad3f; --pb-ramp-4: #f7dca2; }
   :root[data-theme="light"] { --pb-ramp-0: #f7dca2; --pb-ramp-1: #f0c86e; --pb-ramp-2: #d9912a; --pb-ramp-3: #a8661a; --pb-ramp-4: #6a4312; }
 `
 const RAMP_LABEL = ['後 20%', '20–40%', '40–60%', '60–80%', '前 20%']
@@ -293,6 +297,17 @@ export default function PotentialBuyersPanel() {
         />
       </div>
 
+      {/* 老屋換屋：行政區成交屋齡結構 */}
+      <div style={cardStyle}>
+        <div style={{ marginBottom: 10 }}>
+          <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>屋齡結構（行政區）</span>
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+            老屋占比高的區，換屋需求潛力越大；不計入村里指數
+          </span>
+        </div>
+        <HouseAgeChart rows={data.houseAge.rows} period={data.houseAge.period} highlightDistrict={district || undefined} />
+      </div>
+
       {/* 就業動能：南科（台南最大外來購屋族群來源） */}
       {data.southPark.length > 0 && (
         <div style={cardStyle}>
@@ -450,6 +465,10 @@ function VillageDetail({ v, mode, rank, total, rentRow, assumption, onClose }: {
         <dt style={{ color: 'var(--text-muted)' }}>跨縣市淨移入</dt><dd style={ddStyle}>{signed(v.raw.netOtherCity)}‰</dd>
         <dt style={{ color: 'var(--text-muted)' }}>市內他區淨移入</dt><dd style={ddStyle}>{signed(v.raw.netOtherTown)}‰</dd>
         <dt style={{ color: 'var(--text-muted)' }}>同區跨里淨移入</dt><dd style={ddStyle}>{signed(v.raw.netSameTown)}‰</dd>
+        <dt style={{ color: 'var(--text-muted)' }}>育齡婦女（15–49 歲）</dt>
+        <dd style={ddStyle}>{v.raw.women1549?.toLocaleString() ?? '—'}（{fmt(v.raw.women1549Share)}%）</dd>
+        <dt style={{ color: 'var(--text-muted)' }} title="村里間離婚率差異經檢定為隨機波動，故以行政區離婚率代表">近 12 月離婚對數／{v.district}離婚率</dt>
+        <dd style={ddStyle}>{v.raw.divorces ?? '—'} 對／{fmt(v.raw.divorceKDistrict, 2)}‰</dd>
         <dt style={{ color: 'var(--text-muted)' }}>{v.district}大樓租金／房貸月付比</dt>
         <dd style={ddStyle}>{ratio != null ? fmt(ratio, 2) : '樣本不足'}</dd>
       </dl>

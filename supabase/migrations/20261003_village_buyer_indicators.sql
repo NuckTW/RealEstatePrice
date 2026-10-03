@@ -10,6 +10,9 @@
 --   換屋指數 = 世代淨移入(35–44) 20 + 35–44 占比 20 + 出生率 20 + 所得 30 + 社會增加 10
 -- 時間窗：最新月份往前 12 個月
 -- 分戶速度、戶量、跨縣市／市內他區淨移入：僅供前端顯示，不計分
+-- v2（2026-10-03）：新增育齡婦女（15–49 歲女性）、離婚數（僅顯示，不計分）
+--   離婚率村里間差異經檢定全為隨機雜訊（村里間變異 ≤ Poisson 雜訊）→ 只提供村里離婚對數與行政區離婚率
+--   本檔可重複執行（DROP 後重建）
 -- ============================================================
 
 DROP MATERIALIZED VIEW IF EXISTS village_buyer_indicators;
@@ -36,7 +39,7 @@ pop_w AS ( -- 時間窗內平均人口（作為率的分母，單位：人年）
 ),
 vital_w AS (
   SELECT v.village_code, sum(v.births) AS births, sum(v.marriages) AS marriages,
-         count(*) AS n_months
+         sum(v.divorces) AS divorces, count(*) AS n_months
   FROM village_vital_monthly v, win
   WHERE v.ym_date > win.start_date AND v.ym_date <= win.end_date
   GROUP BY v.village_code
@@ -91,6 +94,10 @@ base AS (
     c.village_code, vg.district, vg.village,
     c.pop_total, c.households,
     round(c.pop_total::numeric / nullif(c.households, 0), 3)                       AS hh_size,
+    -- 育齡婦女：15–49 歲女性（ages_f[a + 1] = a 歲）
+    (SELECT sum(c.ages_f[i]) FROM generate_series(16, 50) i)                       AS women_15_49,
+    round((SELECT sum(c.ages_f[i]) FROM generate_series(16, 50) i)::numeric
+          / nullif(c.pop_total, 0) * 100, 2)                                       AS women_15_49_share,
     round((c.households::numeric / nullif(p.households, 0)
          - c.pop_total::numeric / nullif(p.pop_total, 0)) * 100, 3)               AS split_speed_pct,
     round(c.age_25_34::numeric / nullif(c.pop_total, 0) * 100, 2)                  AS share_25_34,
@@ -98,7 +105,7 @@ base AS (
     round(co.young_net::numeric / nullif(co.young_base, 0) * 1000, 2)              AS cohort_young_k,
     round(co.mid_net::numeric   / nullif(co.mid_base, 0)   * 1000, 2)              AS cohort_mid_k,
     co.young_net AS cohort_young_n, co.mid_net AS cohort_mid_n,
-    vw.marriages, vw.births,
+    vw.marriages, vw.births, vw.divorces,
     -- 人年曝露量：平均人口 × 月數 / 12
     pw.avg_pop * vw.n_months / 12.0                                                AS exposure_vital,
     round(mw.net_social     / nullif(pw.avg_pop, 0) * 1000 * 12.0 / mw.n_months, 2) AS social_k,
@@ -122,13 +129,15 @@ base AS (
 dist_rate AS (
   SELECT district,
          sum(marriages)::numeric / nullif(sum(exposure_vital), 0) AS marr_rate,
-         sum(births)::numeric    / nullif(sum(exposure_vital), 0) AS birth_rate
+         sum(births)::numeric    / nullif(sum(exposure_vital), 0) AS birth_rate,
+         sum(divorces)::numeric  / nullif(sum(exposure_vital), 0) AS divorce_rate
   FROM base GROUP BY district
 ),
 shrunk AS (
   SELECT b.*,
          round((b.marriages + 7000 * d.marr_rate)  / (b.exposure_vital + 7000) * 1000, 3) AS marriage_k,
-         round((b.births    + 7000 * d.birth_rate) / (b.exposure_vital + 7000) * 1000, 3) AS birth_k
+         round((b.births    + 7000 * d.birth_rate) / (b.exposure_vital + 7000) * 1000, 3) AS birth_k,
+         round(d.divorce_rate * 1000, 3) AS divorce_k_district
   FROM base b JOIN dist_rate d USING (district)
 ),
 -- 百分位（0–100）：NULL 不參與排名，給中性值 50
@@ -169,6 +178,8 @@ SELECT
   social_k, income_median,
   -- 僅顯示、不計分
   hh_size, split_speed_pct, net_other_city_k, net_other_town_k, net_same_town_k,
+  women_15_49, women_15_49_share,                      -- 育齡婦女人數、占總人口 %
+  divorces, divorce_k_district,                        -- 近 12 個月離婚對數；所屬行政區離婚率（每千人・年）
   -- 品質旗標
   pop_total < 1000                AS low_confidence,   -- 小里：指標雜訊大，前端需提示
   cohort_young_k IS NULL          AS cohort_missing,   -- 12 個月內新設的里，世代指標以 50 代入

@@ -26,6 +26,8 @@ export function fetchVillageBuyerIndicators(): Promise<Row[]> {
       net_other_city_k::float AS net_other_city_k,
       net_other_town_k::float AS net_other_town_k,
       net_same_town_k::float  AS net_same_town_k,
+      women_15_49, women_15_49_share::float AS women_15_49_share,
+      divorces, divorce_k_district::float AS divorce_k_district,
       low_confidence, cohort_missing, income_from_parent
     FROM village_buyer_indicators
     ORDER BY village_code
@@ -105,5 +107,47 @@ export function fetchSouthParkEmployees(): Promise<Row[]> {
     FROM science_park_employees_monthly
     WHERE park = '南部科學園區'
     ORDER BY ym_date, sub_park
+  `)
+}
+
+/**
+ * 行政區成交物件屋齡結構（老屋換屋需求的代理指標）
+ * ⚠️ 這是「近 24 個月成交的成屋」屋齡，不是全部住宅存量（存量需房屋稅籍資料，目前無公開來源）
+ * - 住宅類：大樓、華廈、公寓、透天；排除預售、特殊關係交易
+ * - completion_date 為民國 YYYMMDD（如 '1131015'），屋齡 = 成交日 − 完工日（年）
+ */
+export function fetchDistrictHouseAge(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH
+    tw AS (SELECT (date_trunc('month', max(transaction_date)) - interval '1 month')::date AS end_d FROM transactions),
+    t AS (
+      SELECT t.district,
+             (t.transaction_date - make_date(
+                left(t.completion_date, length(t.completion_date) - 4)::int + 1911,
+                greatest(1, least(12, substr(t.completion_date, length(t.completion_date) - 3, 2)::int)),
+                1)) / 365.25 AS age
+      FROM transactions t, tw
+      WHERE t.transaction_date >= tw.end_d - interval '24 months' AND t.transaction_date < tw.end_d
+        AND NOT t.is_presale
+        AND (t.building_type LIKE '住宅大樓%' OR t.building_type LIKE '華廈%'
+          OR t.building_type LIKE '公寓%'   OR t.building_type LIKE '透天%')
+        AND coalesce(t.notes, '') NOT LIKE '%特殊關係%'
+        AND t.completion_date ~ '^[0-9]{6,7}$'
+        AND t.district <> ''
+    )
+    SELECT district,
+           count(*) AS n,
+           round(percentile_cont(0.5) WITHIN GROUP (ORDER BY age)::numeric, 1)::float AS median_age,
+           round(avg((age < 10)::int)::numeric * 100, 1)::float               AS pct_lt10,
+           round(avg((age >= 10 AND age < 20)::int)::numeric * 100, 1)::float AS pct_10_20,
+           round(avg((age >= 20 AND age < 30)::int)::numeric * 100, 1)::float AS pct_20_30,
+           round(avg((age >= 30 AND age < 40)::int)::numeric * 100, 1)::float AS pct_30_40,
+           round(avg((age >= 40)::int)::numeric * 100, 1)::float              AS pct_ge40,
+           (SELECT to_char(end_d - interval '24 months', 'YYYY-MM') FROM tw) AS period_from,
+           (SELECT to_char(end_d - interval '1 day', 'YYYY-MM') FROM tw)     AS period_to
+    FROM t
+    WHERE age >= 0
+    GROUP BY district
+    ORDER BY district
   `)
 }
