@@ -119,13 +119,14 @@ export function fetchSouthParkEmployees(): Promise<Row[]> {
 
 /* ── 住宅市場統計（housing_market_stats，由 scripts/fetch_housing_stats.py 匯入） ── */
 
-/** 縣市級時間序列：負擔能力、新增房貸條件、五大銀行房貸利率（臺南市與全國） */
+/** 縣市級時間序列：負擔能力、新增房貸條件、五大銀行房貸利率、家庭收支（臺南市與全國） */
 export function fetchMarketSeries(): Promise<Row[]> {
   return cachedQuery(`
     SELECT indicator, area, period, value::float AS value
     FROM housing_market_stats
     WHERE indicator IN ('price_income_ratio', 'mortgage_burden_pct', 'new_mortgage_rate',
-                        'new_mortgage_ltv', 'new_mortgage_term', 'bank5_mortgage_rate')
+                        'new_mortgage_ltv', 'new_mortgage_term', 'bank5_mortgage_rate',
+                        'fies_disposable_income', 'fies_consumption')
       AND area_level IN ('nation', 'city')
     ORDER BY period_date, indicator, area
   `)
@@ -231,5 +232,47 @@ export function fetchPopulationProjection(): Promise<Row[]> {
       -- 全市保留每一年（畫趨勢）；各區只取基準年與 +5、+10、+20 年（表格用），減少傳輸量
       AND (p.area = '臺南市' OR p.year IN (y0.y, y0.y + 5, y0.y + 10, y0.y + 20))
     ORDER BY p.area, p.scope, p.year
+  `)
+}
+
+/**
+ * 國中小學生數（school_students_yearly，由 fetch_school_poi.py 匯入）
+ * 行政區 × 學年 × 學制：入學年級學生數（國小 1 年級、國中 7 年級）、總學生數、校數
+ */
+export function fetchSchoolByDistrict(): Promise<Row[]> {
+  return cachedQuery(`
+    SELECT school_year, level, district,
+           sum(entry_students)::int AS entry, sum(total_students)::int AS total, count(*)::int AS schools
+    FROM school_students_yearly
+    WHERE district IS NOT NULL
+    GROUP BY school_year, level, district
+    ORDER BY school_year, level, district
+  `)
+}
+
+/** 各校最新學年與 5 年前的入學年級學生數（找新生成長最多的學校） */
+export function fetchSchoolGrowth(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH y AS (SELECT level, max(school_year) AS y1 FROM school_students_yearly GROUP BY level)
+    SELECT s.level, s.school_code, s.school_name, s.district, s.is_public,
+           y.y1 AS year_now, y.y1 - 5 AS year_then,
+           max(s.entry_students) FILTER (WHERE s.school_year = y.y1)     AS entry_now,
+           max(s.entry_students) FILTER (WHERE s.school_year = y.y1 - 5) AS entry_then,
+           max(s.total_students) FILTER (WHERE s.school_year = y.y1)     AS total_now
+    FROM school_students_yearly s JOIN y USING (level)
+    WHERE s.school_year IN (y.y1, y.y1 - 5)
+    GROUP BY s.level, s.school_code, s.school_name, s.district, s.is_public, y.y1
+    HAVING max(s.entry_students) FILTER (WHERE s.school_year = y.y1) IS NOT NULL
+  `)
+}
+
+/** 生活機能點位（OSM 最新批次）：村里 × 類別點數 */
+export function fetchPoiByVillage(): Promise<Row[]> {
+  return cachedQuery(`
+    SELECT village_code, category, count(*)::int AS n
+    FROM poi_points
+    WHERE village_code IS NOT NULL
+      AND fetched_at = (SELECT max(fetched_at) FROM poi_points)
+    GROUP BY village_code, category
   `)
 }

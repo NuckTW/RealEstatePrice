@@ -4,6 +4,7 @@ import {
   fetchMarketSeries, fetchLowUsageByDistrict, fetchStockAgeByDistrict,
   fetchTransfersByDistrict, fetchTransfersCitySeries,
   fetchSouthParkIndustry, fetchPopulationProjection,
+  fetchSchoolByDistrict, fetchSchoolGrowth, fetchPoiByVillage,
 } from '@/lib/queries/potentialBuyers'
 import type { Row } from '@/lib/queries/client'
 
@@ -33,7 +34,8 @@ const AGE_BANDS: Record<string, string[]> = {
 
 export async function GET() {
   try {
-    const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity, industryRows, projRows] = await Promise.all([
+    const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity, industryRows, projRows,
+           schoolRows, schoolGrowthRows, poiRows] = await Promise.all([
       fetchVillageBuyerIndicators(),
       fetchDistrictRentVsPrice(),
       optional('南科', fetchSouthParkEmployees()),
@@ -44,7 +46,18 @@ export async function GET() {
       optional('建物移轉序列', fetchTransfersCitySeries()),
       optional('南科產業別', fetchSouthParkIndustry()),
       optional('人口推估', fetchPopulationProjection()),
+      optional('學生數', fetchSchoolByDistrict()),
+      optional('學校成長', fetchSchoolGrowth()),
+      optional('生活機能', fetchPoiByVillage()),
     ])
+
+    // 生活機能：village_code → { 類別: 點數 }
+    const poiByVillage = new Map<string, Record<string, number>>()
+    for (const r of poiRows) {
+      const m = poiByVillage.get(String(r.village_code)) ?? {}
+      m[String(r.category)] = Number(r.n)
+      poiByVillage.set(String(r.village_code), m)
+    }
 
     // 房屋稅籍屋齡：每區一列，十級合併為五級百分比
     const stockByArea = new Map<string, Record<string, number>>()
@@ -97,6 +110,7 @@ export async function GET() {
         multiHh: num(r.multi_hh_share), multiHhChg: num(r.multi_hh_share_chg),
         soloDwelling: num(r.solo_dwelling_share), dwellingsGrowth: num(r.dwellings_growth_pct),
       },
+      poi: poiByVillage.get(String(r.village_code)) ?? {},   // 生活機能（OSM，里內點數）
       lowConfidence:    Boolean(r.low_confidence),
       cohortMissing:    Boolean(r.cohort_missing),
       incomeFromParent: Boolean(r.income_from_parent),
@@ -161,6 +175,19 @@ export async function GET() {
         rows: projRows.map(r => ({
           scope: String(r.scope), area: String(r.area), year: Number(r.year),
           total: Number(r.pop_total), a2534: Number(r.age_25_34), a3544: Number(r.age_35_44), a65p: Number(r.age_65_plus),
+        })),
+      },
+      // 國中小學生數：行政區 × 學年 × 學制；各校新生成長
+      schools: {
+        byDistrict: schoolRows.map(r => ({
+          year: Number(r.school_year), level: String(r.level), district: String(r.district),
+          entry: Number(r.entry), total: Number(r.total), schools: Number(r.schools),
+        })),
+        growth: schoolGrowthRows.map(r => ({
+          level: String(r.level), code: String(r.school_code), name: String(r.school_name),
+          district: r.district == null ? null : String(r.district), isPublic: Boolean(r.is_public),
+          yearNow: Number(r.year_now), yearThen: Number(r.year_then),
+          entryNow: num(r.entry_now), entryThen: num(r.entry_then), totalNow: num(r.total_now),
         })),
       },
       // 南科從業員工：sub_park = '合計' 為園區總數，其餘為子園區（臺南園區、高雄園區…）

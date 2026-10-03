@@ -10,6 +10,7 @@ import {
 } from './MarketSection'
 import SouthParkSection, { type SouthParkRow, type IndustryRow } from './SouthParkSection'
 import ProjectionSection, { type ProjectionData } from './ProjectionSection'
+import SchoolSection, { type SchoolData } from './SchoolSection'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
 const VillageChoroplethMap = dynamic(() => import('./VillageChoroplethMap'), {
@@ -38,6 +39,7 @@ interface Village {
     headAvgAge: number | null; head2645: number | null; head2645Chg: number | null; head65p: number | null
     multiHh: number | null; multiHhChg: number | null; soloDwelling: number | null; dwellingsGrowth: number | null
   }
+  poi: Record<string, number>   // 生活機能（OSM，里內點數）
   lowConfidence: boolean
   cohortMissing: boolean
   incomeFromParent: boolean
@@ -52,6 +54,7 @@ interface ApiData {
   southPark: SouthParkRow[]
   southParkIndustry: IndustryRow[]
   projection: ProjectionData
+  schools: SchoolData
   houseAge: { period: string | null; cityAvgAge: number | null; rows: HouseAgeRow[] }
   market: MarketPoint[]
   lowUsage: LowUsageRow[]
@@ -339,6 +342,11 @@ export default function PotentialBuyersPanel() {
       <TransfersSection data={data.transfers} highlightDistrict={district || undefined} />
       <LowUsageSection rows={data.lowUsage} highlightDistrict={district || undefined} />
 
+      {/* 學區學生數（行政區・學年） */}
+      {data.schools.byDistrict.length > 0 && (
+        <SchoolSection data={data.schools} highlightDistrict={district || undefined} />
+      )}
+
       {/* 未來人口推估（行政區，僅計自然增減） */}
       {data.projection.rows.length > 0 && (
         <ProjectionSection data={data.projection} highlightDistrict={district || undefined} />
@@ -531,9 +539,32 @@ function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClos
           </dl>
         </>
       )}
+
+      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>
+        生活機能（里內點數，不計分）
+        <span style={{ fontWeight: 400, color: 'var(--text-faint)', marginLeft: 6, fontSize: 'var(--text-2xs)' }}>OpenStreetMap</span>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {POI_LABELS.map(([k, label]) => (
+          <span key={k} style={{
+            fontSize: 'var(--text-2xs)', padding: '2px 8px', borderRadius: 'var(--radius-full)',
+            background: v.poi[k] ? 'var(--accent-wash)' : 'var(--surface-control)',
+            color: v.poi[k] ? 'var(--accent-tint)' : 'var(--text-faint)',
+            border: `1px solid ${v.poi[k] ? 'var(--accent-wash-border)' : 'var(--border-control)'}`,
+          }}>{label} {v.poi[k] ?? 0}</span>
+        ))}
+      </div>
+      <div style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', marginTop: 4 }}>
+        © OpenStreetMap contributors；社群資料覆蓋率不一，0 不代表一定沒有。便利商店、診所資料過於不完整，未列入。
+      </div>
     </div>
   )
 }
+/** 生活機能類別（對應 poi_points.category） */
+const POI_LABELS: [string, string][] = [
+  ['school', '學校'], ['park', '公園'], ['supermarket', '超市'], ['mall', '量販／百貨'],
+  ['hospital', '醫院'], ['library', '圖書館'], ['station', '車站'],
+]
 const ddStyle: React.CSSProperties = { margin: 0, textAlign: 'right', color: 'var(--text-default)', fontFamily: 'var(--font-mono)' }
 
 /* ── 排行榜表格 ───────────────────────────────────────────────── */

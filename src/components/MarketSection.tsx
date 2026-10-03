@@ -40,8 +40,8 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
 }
 
 /** 最新值 + 與前一年同期比較 */
-function Kpi({ title, value, unit, diff, diffUnit, goodWhenDown }: {
-  title: string; value: number | null; unit: string; diff: number | null; diffUnit: string; goodWhenDown?: boolean
+function Kpi({ title, value, unit, diff, diffUnit, goodWhenDown, diffNote = '較去年同期' }: {
+  title: string; value: number | null; unit: string; diff: number | null; diffUnit: string; goodWhenDown?: boolean; diffNote?: string
 }) {
   const tone = diff == null ? 'var(--text-faint)' : (diff < 0) === !!goodWhenDown ? 'var(--positive)' : 'var(--negative)'
   return (
@@ -52,7 +52,7 @@ function Kpi({ title, value, unit, diff, diffUnit, goodWhenDown }: {
       </div>
       {diff != null && (
         <div style={{ fontSize: 'var(--text-2xs)', color: tone }}>
-          {diff >= 0 ? '▲' : '▼'} {fmt(Math.abs(diff), 2)}{diffUnit}（較去年同期）
+          {diff >= 0 ? '▲' : '▼'} {fmt(Math.abs(diff), 2)}{diffUnit}（{diffNote}）
         </div>
       )}
     </div>
@@ -71,10 +71,23 @@ export function AffordabilitySection({ market }: { market: MarketPoint[] }) {
       const yearAgo = rows.at(-5)   // 季資料：往前 4 季
       return { rows, latest: last?.a ?? null, period: last?.label ?? null, diff: last?.a != null && yearAgo?.a != null ? last.a - yearAgo.a : null }
     }
+    // 家庭收支（年）：可支配所得以「萬元」呈現，101 年起
+    const buildYearly = (ind: string) => {
+      const pts = market.filter(m => m.indicator === ind && /^\d+$/.test(m.period) && Number(m.period) >= 101)
+      const periods = [...new Set(pts.map(p => p.period))].sort((x, y) => Number(x) - Number(y))
+      const get = (area: string, p: string) => {
+        const v = pts.find(x => x.area === area && x.period === p)?.value
+        return v == null ? null : v / 10000
+      }
+      const rows = periods.map(p => ({ label: `${p}年`, a: get('臺南市', p), b: get('全國', p) }))
+      const last = rows.at(-1), prev = rows.at(-2)
+      return { rows, latest: last?.a ?? null, period: last?.label ?? null, diff: last?.a != null && prev?.a != null ? last.a - prev.a : null }
+    }
     return {
       pir: build('price_income_ratio'),
       burden: build('mortgage_burden_pct'),
       rate: build('new_mortgage_rate'),
+      income: buildYearly('fies_disposable_income'),
     }
   }, [market])
 
@@ -83,25 +96,31 @@ export function AffordabilitySection({ market }: { market: MarketPoint[] }) {
   const bank5 = market.filter(m => m.indicator === 'bank5_mortgage_rate').at(-1) ?? null
 
   if (!charts.pir.rows.length) return null
-  const block = (title: string, c: typeof charts.pir, unit: string, kpiUnit: string, diffUnit: string) => (
+  const block = (title: string, c: typeof charts.pir, unit: string, kpiUnit: string, diffUnit: string, goodWhenDown = true, diffNote = '較去年同期') => (
     <div style={{ minWidth: 0 }}>
-      <Kpi title={`${title}（臺南市 ${c.period}）`} value={c.latest} unit={kpiUnit} diff={c.diff} diffUnit={diffUnit} goodWhenDown />
+      <Kpi title={`${title}（臺南市 ${c.period}）`} value={c.latest} unit={kpiUnit} diff={c.diff} diffUnit={diffUnit} goodWhenDown={goodWhenDown} diffNote={diffNote} />
       <TwoLineChart rows={c.rows} nameA="臺南市" nameB="全國" unit={unit} />
     </div>
   )
+  // 儲蓄率 = 1 − 消費支出 ÷ 可支配所得（臺南市最新年度）
+  const lastIncome = latestOf('fies_disposable_income'), lastConsume = latestOf('fies_consumption')
+  const savingRate = lastIncome && lastConsume && lastIncome.period === lastConsume.period
+    ? (1 - lastConsume.value / lastIncome.value) * 100 : null
   return (
     <div style={cardStyle}>
-      <SectionTitle title="負擔能力與房貸條件" sub="臺南市 vs 全國；數值越低越容易負擔；縣市級季資料，不計入村里指數" />
+      <SectionTitle title="負擔能力與房貸條件" sub="臺南市 vs 全國；所得比、負擔率、利率越低越容易負擔；縣市級資料，不計入村里指數" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18 }}>
         {block('房價所得比', charts.pir, ' 倍', '倍', ' 倍')}
         {block('貸款負擔率', charts.burden, '%', '%', ' 個百分點')}
         {block('新增購屋貸款平均利率', charts.rate, '%', '%', ' 個百分點')}
+        {charts.income.rows.length > 0 && block('平均每戶可支配所得', charts.income, ' 萬元', '萬元', ' 萬元', false, '較前一年')}
       </div>
       <div style={{ marginTop: 10, fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', lineHeight: 1.7 }}>
         臺南市新增購屋貸款（{ltv?.period ?? '—'}）：平均成數 {fmt(ltv?.value ?? null)}%、平均期數 {fmt(term?.value ?? null)} 個月（約 {term ? fmt(term.value / 12) : '—'} 年）；
         五大銀行平均房貸利率 {fmt(bank5?.value ?? null, 2)}%（{bank5 ? label(bank5.period) : '—'}）。
+        {savingRate != null && <>臺南市 {lastIncome!.period} 年家庭儲蓄率約 {savingRate.toFixed(1)}%（1 − 消費支出 ÷ 可支配所得）。</>}
         房價所得比 = 住宅價格中位數 ÷ 家戶年可支配所得中位數；貸款負擔率 = 中位數房價的房貸月付 ÷ 家戶月可支配所得中位數（內政部定義：貸款 7 成、20 年）。
-        資料：內政部不動產資訊平台。
+        資料：內政部不動產資訊平台；家庭收支為主計總處家庭收支調查（年資料）。
       </div>
     </div>
   )
