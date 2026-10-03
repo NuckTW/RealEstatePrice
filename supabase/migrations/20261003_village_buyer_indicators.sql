@@ -13,6 +13,8 @@
 -- v2（2026-10-03）：新增育齡婦女（15–49 歲女性）、離婚數（僅顯示，不計分）
 --   離婚率村里間差異經檢定全為隨機雜訊（村里間變異 ≤ Poisson 雜訊）→ 只提供村里離婚對數與行政區離婚率
 --   本檔可重複執行（DROP 後重建）
+-- v3（2026-10-04）：新增戶政年資料（教育程度、單獨生活戶）與平台村里季資料（戶長年齡、一宅多戶、獨居宅、宅數成長），僅顯示不計分
+--   前置：20261004_village_household_annual.sql（兩張表為空時新欄位為 NULL，不影響指數）
 -- ============================================================
 
 DROP MATERIALIZED VIEW IF EXISTS village_buyer_indicators;
@@ -88,6 +90,37 @@ inc AS (
   JOIN village_income_yearly i ON i.district = ip.district AND i.village = ip.parent_village
   JOIN inc_latest l USING (tax_year)
 ),
+-- 戶政年資料：各取最新有資料的年度（教育程度與戶數結構年度可能不同，如 113 年缺戶數結構）
+edu AS (
+  SELECT a.village_code, a.year AS edu_year,
+         round((a.edu_doctor + a.edu_master + a.edu_university)::numeric / nullif(a.edu_15up_total, 0) * 100, 2) AS edu_univ_plus_share,
+         round((a.edu_doctor + a.edu_master)::numeric / nullif(a.edu_15up_total, 0) * 100, 2)                    AS edu_grad_share
+  FROM village_annual_stats a
+  WHERE a.year = (SELECT max(year) FROM village_annual_stats WHERE edu_15up_total IS NOT NULL)
+),
+hhs AS (
+  SELECT a.village_code, a.year AS hh_year,
+         round(a.hh_single::numeric / nullif(a.hh_single + a.hh_size_2 + a.hh_size_3 + a.hh_size_4
+                                             + a.hh_size_5 + a.hh_size_6up, 0) * 100, 2) AS single_hh_share
+  FROM village_annual_stats a
+  WHERE a.year = (SELECT max(year) FROM village_annual_stats WHERE hh_single IS NOT NULL)
+),
+-- 平台村里季資料：最新一季與前一年同季
+hq_d AS (SELECT max(period_date) AS d FROM village_household_quarterly),
+hq AS (
+  SELECT q.*,
+         (q.head_25_35 + q.head_35_45)::numeric / nullif(q.heads_total, 0) * 100 AS head_26_45_share,
+         q.head_65p::numeric / nullif(q.heads_total, 0) * 100                    AS head_65p_share,
+         (q.dwellings - q.dw_h1)::numeric / nullif(q.dwellings, 0) * 100         AS multi_hh_share,
+         q.dw_p1::numeric / nullif(q.dwellings, 0) * 100                         AS solo_dwelling_share
+  FROM village_household_quarterly q, hq_d WHERE q.period_date = hq_d.d
+),
+hq_prev AS (
+  SELECT q.village_code, q.dwellings,
+         (q.head_25_35 + q.head_35_45)::numeric / nullif(q.heads_total, 0) * 100 AS head_26_45_share,
+         (q.dwellings - q.dw_h1)::numeric / nullif(q.dwellings, 0) * 100         AS multi_hh_share
+  FROM village_household_quarterly q, hq_d WHERE q.period_date = (hq_d.d - interval '1 year')::date
+),
 -- 原始指標（率皆為「每千人・年」，月份不足 12 個月者年化）
 base AS (
   SELECT
@@ -112,7 +145,19 @@ base AS (
     round(mw.net_other_city / nullif(pw.avg_pop, 0) * 1000 * 12.0 / mw.n_months, 2) AS net_other_city_k,
     round(mw.net_other_town / nullif(pw.avg_pop, 0) * 1000 * 12.0 / mw.n_months, 2) AS net_other_town_k,
     round(mw.net_same_town  / nullif(pw.avg_pop, 0) * 1000 * 12.0 / mw.n_months, 2) AS net_same_town_k,
-    inc.income_median, inc.tax_year AS income_tax_year, coalesce(inc.income_from_parent, false) AS income_from_parent
+    inc.income_median, inc.tax_year AS income_tax_year, coalesce(inc.income_from_parent, false) AS income_from_parent,
+    -- v3：戶政年資料、平台村里季資料（僅顯示）
+    edu.edu_year, edu.edu_univ_plus_share, edu.edu_grad_share,
+    hhs.hh_year, hhs.single_hh_share,
+    hq.period                                           AS hhq_period,
+    hq.head_avg_age,
+    round(hq.head_26_45_share, 2)                       AS head_26_45_share,
+    round(hq.head_26_45_share - hqp.head_26_45_share, 2) AS head_26_45_share_chg,
+    round(hq.head_65p_share, 2)                         AS head_65p_share,
+    round(hq.multi_hh_share, 2)                         AS multi_hh_share,
+    round(hq.multi_hh_share - hqp.multi_hh_share, 2)    AS multi_hh_share_chg,
+    round(hq.solo_dwelling_share, 2)                    AS solo_dwelling_share,
+    round((hq.dwellings::numeric / nullif(hqp.dwellings, 0) - 1) * 100, 2) AS dwellings_growth_pct
   FROM cur c
   JOIN villages vg USING (village_code)
   LEFT JOIN prev p     USING (village_code)
@@ -121,6 +166,10 @@ base AS (
   LEFT JOIN vital_w vw USING (village_code)
   LEFT JOIN mig_w mw   USING (village_code)
   LEFT JOIN inc        USING (village_code)
+  LEFT JOIN edu        USING (village_code)
+  LEFT JOIN hhs        USING (village_code)
+  LEFT JOIN hq         USING (village_code)
+  LEFT JOIN hq_prev hqp USING (village_code)
 ),
 -- 結婚率、出生率：Empirical Bayes 往行政區平均收縮
 --   收縮後率 = (事件數 + M × 行政區率) / (人年 + M)
@@ -180,6 +229,15 @@ SELECT
   hh_size, split_speed_pct, net_other_city_k, net_other_town_k, net_same_town_k,
   women_15_49, women_15_49_share,                      -- 育齡婦女人數、占總人口 %
   divorces, divorce_k_district,                        -- 近 12 個月離婚對數；所屬行政區離婚率（每千人・年）
+  -- v3（僅顯示）
+  edu_year, edu_univ_plus_share, edu_grad_share,       -- 15 歲以上大學以上／碩博士畢業占比（%）
+  hh_year, single_hh_share,                            -- 單獨生活戶占比（%）
+  hhq_period, head_avg_age,                            -- 平台資料季別、戶長平均年齡
+  head_26_45_share, head_26_45_share_chg,              -- 26–45 歲戶長占比（%）、較一年前（百分點）
+  head_65p_share,                                      -- 65 歲以上戶長占比（%）
+  multi_hh_share, multi_hh_share_chg,                  -- 一宅多戶占比（%）≈ 潛在分戶需求；較一年前（百分點）
+  solo_dwelling_share,                                 -- 1 人一宅占比（%）
+  dwellings_growth_pct,                                -- 設有戶籍宅數年增率（%）≈ 新住宅入住
   -- 品質旗標
   pop_total < 1000                AS low_confidence,   -- 小里：指標雜訊大，前端需提示
   cohort_young_k IS NULL          AS cohort_missing,   -- 12 個月內新設的里，世代指標以 50 代入

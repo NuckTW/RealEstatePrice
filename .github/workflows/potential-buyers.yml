@@ -36,6 +36,10 @@ jobs:
       - name: 財政部村里所得（未發布新年度時自動跳過）
         run: python scripts/fetch_fia_income.py
 
+      # 戶政年資料（教育程度、戶數結構）＋平台村里季資料（戶長年齡、宅內人口數、宅內戶數）；需在村里主檔之後
+      - name: 村里戶政年資料、戶長年齡
+        run: python scripts/fetch_village_household.py
+
       - name: 實價登錄租賃
         run: python scripts/fetch_rentals.py
 

@@ -33,13 +33,19 @@ interface Village {
     netOtherCity: number | null; netOtherTown: number | null; netSameTown: number | null
     women1549: number | null; women1549Share: number | null
     divorces: number | null; divorceKDistrict: number | null
+    eduUnivPlus: number | null; eduGrad: number | null; singleHh: number | null
+    headAvgAge: number | null; head2645: number | null; head2645Chg: number | null; head65p: number | null
+    multiHh: number | null; multiHhChg: number | null; soloDwelling: number | null; dwellingsGrowth: number | null
   }
   lowConfidence: boolean
   cohortMissing: boolean
   incomeFromParent: boolean
 }
 interface ApiData {
-  meta: { dataMonth: string | null; incomeTaxYear: number | null }
+  meta: {
+    dataMonth: string | null; incomeTaxYear: number | null
+    eduYear: number | null; hhYear: number | null; hhqPeriod: string | null
+  }
   villages: Village[]
   rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
   southPark: SouthParkRow[]
@@ -59,14 +65,14 @@ const COMPONENTS: Record<Mode, { key: PKey; raw: RawKey; label: string; weight: 
     { key: 'cohortYoung', raw: 'cohortYoung', label: '世代淨移入（25–34 歲）', weight: 30, unit: '‰', hint: '同一批人一年後的人數變化，≈ 年輕人淨搬入' },
     { key: 'share2534',   raw: 'share2534',   label: '25–34 歲人口占比',      weight: 20, unit: '%', hint: '首購主力年齡層' },
     { key: 'marriage',    raw: 'marriage',    label: '結婚率',                 weight: 20, unit: '‰', hint: '每千人・年，已往行政區平均收縮' },
-    { key: 'income',      raw: 'income',      label: '所得中位數',             weight: 20, unit: '千元', hint: '綜所稅申報，只做相對排名' },
+    { key: 'income',      raw: 'income',      label: '所得中位數（購買力）',   weight: 20, unit: '千元', hint: '綜所稅申報，代表購買力；只做相對排名' },
     { key: 'social',      raw: 'social',      label: '社會增加率',             weight: 10, unit: '‰', hint: '淨遷入（含同區跨里）' },
   ],
   upgrader: [
     { key: 'cohortMid',   raw: 'cohortMid',   label: '世代淨移入（35–44 歲）', weight: 20, unit: '‰', hint: '同一批人一年後的人數變化' },
     { key: 'share3544',   raw: 'share3544',   label: '35–44 歲人口占比',      weight: 20, unit: '%', hint: '換屋主力年齡層' },
     { key: 'birth',       raw: 'birth',       label: '出生率',                 weight: 20, unit: '‰', hint: '每千人・年，已往行政區平均收縮' },
-    { key: 'income',      raw: 'income',      label: '所得中位數',             weight: 30, unit: '千元', hint: '綜所稅申報，只做相對排名' },
+    { key: 'income',      raw: 'income',      label: '所得中位數（購買力）',   weight: 30, unit: '千元', hint: '綜所稅申報，代表購買力；只做相對排名' },
     { key: 'social',      raw: 'social',      label: '社會增加率',             weight: 10, unit: '‰', hint: '淨遷入（含同區跨里）' },
   ],
 }
@@ -270,7 +276,7 @@ export default function PotentialBuyersPanel() {
         <div style={{ ...cardStyle, minWidth: 0 }}>
           {sel
             ? <VillageDetail
-                v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length}
+                v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length} meta={data.meta}
                 rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
                 assumption={assumption}
                 onClose={() => setSelected(null)}
@@ -421,8 +427,8 @@ function TopList({ rows, mode, district, onPick }: { rows: Village[]; mode: Mode
 }
 
 /* ── 村里明細 ─────────────────────────────────────────────────── */
-function VillageDetail({ v, mode, rank, total, rentRow, assumption, onClose }: {
-  v: Village; mode: Mode; rank: number; total: number
+function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClose }: {
+  v: Village; mode: Mode; rank: number; total: number; meta: ApiData['meta']
   rentRow: RentRow | null; assumption: MortgageAssumption; onClose: () => void
 }) {
   const comps = COMPONENTS[mode]
@@ -494,6 +500,29 @@ function VillageDetail({ v, mode, rank, total, rentRow, assumption, onClose }: {
         <dt style={{ color: 'var(--text-muted)' }}>{v.district}大樓租金／房貸月付比</dt>
         <dd style={ddStyle}>{ratio != null ? fmt(ratio, 2) : '樣本不足'}</dd>
       </dl>
+
+      {v.raw.headAvgAge != null && (
+        <>
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>
+            家戶結構（不計分）
+            <span style={{ fontWeight: 400, color: 'var(--text-faint)', marginLeft: 6, fontSize: 'var(--text-2xs)' }}>
+              {meta.hhqPeriod}・教育 {meta.eduYear} 年・戶數 {meta.hhYear} 年
+            </span>
+          </div>
+          <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 12, margin: 0, fontSize: 'var(--text-2xs)' }}>
+            <dt style={{ color: 'var(--text-muted)' }}>戶長平均年齡</dt><dd style={ddStyle}>{fmt(v.raw.headAvgAge)} 歲</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>26–45 歲戶長占比（較一年前）</dt>
+            <dd style={ddStyle}>{fmt(v.raw.head2645)}%（{signed(v.raw.head2645Chg)}）</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>65 歲以上戶長占比</dt><dd style={ddStyle}>{fmt(v.raw.head65p)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }} title="同一住宅設籍 2 戶以上。市區多為成年子女與父母同住（潛在分戶購屋需求）；偏鄉偏高多為三代同堂，與購屋需求呈負相關，需搭配年齡結構判讀">一宅多戶占比（較一年前）</dt>
+            <dd style={ddStyle}>{fmt(v.raw.multiHh)}%（{signed(v.raw.multiHhChg)}）</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>1 人一宅占比</dt><dd style={ddStyle}>{fmt(v.raw.soloDwelling)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }} title="設有戶籍的住宅數年增率，反映新住宅入住">設籍宅數年增</dt><dd style={ddStyle}>{signed(v.raw.dwellingsGrowth)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>大學以上學歷占比（15 歲以上）</dt><dd style={ddStyle}>{fmt(v.raw.eduUnivPlus)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>單獨生活戶占比</dt><dd style={ddStyle}>{fmt(v.raw.singleHh)}%</dd>
+          </dl>
+        </>
+      )}
     </div>
   )
 }
@@ -518,7 +547,7 @@ function RankingTable({ rows, mode, cityRank, selected, onPick }: {
             <th style={th}>世代淨移入 {young ? '25–34' : '35–44'}</th>
             <th style={th}>{young ? '25–34' : '35–44'} 占比</th>
             <th style={th}>{young ? '結婚率' : '出生率'}</th>
-            <th style={th}>所得中位數（千元）</th>
+            <th style={th}>所得中位數（購買力，千元）</th>
             <th style={th}>社會增加率</th>
           </tr>
         </thead>
@@ -557,12 +586,12 @@ function Methodology() {
       <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>指數怎麼算？</summary>
       <ul style={{ margin: '10px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li style={li}>每項指標先換算成全市 650 里的百分位（0–100），再依權重加總；指數 50 約為全市中間水準。</li>
-        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 20% + 結婚率 20% + 所得 20% + 社會增加率 10%。</li>
-        <li style={li}><b>換屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得 30% + 社會增加率 10%。</li>
+        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 20% + 結婚率 20% + 所得（購買力）20% + 社會增加率 10%。</li>
+        <li style={li}><b>換屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得（購買力）30% + 社會增加率 10%。</li>
         <li style={li}><b>世代淨移入</b>：比較同一批人一年前後的人數（例如去年 25–34 歲 vs 今年 26–35 歲），這個年齡層死亡很少，差額約等於淨搬入。</li>
         <li style={li}><b>社會增加率</b>含同區跨里遷移；新社區的住戶常來自同區隔壁里，不加回會被低估。</li>
         <li style={li}><b>結婚率、出生率</b>在小里波動很大，已往所屬行政區的平均收縮（人口越少收縮越多）。</li>
-        <li style={li}><b>所得</b>為財政部綜所稅申報資料，不含免稅與分離課稅所得，且落後約 2–3 年，只做相對排名。</li>
+        <li style={li}><b>所得（購買力）</b>為財政部綜所稅申報資料，用來代表各里的購買力；不含免稅與分離課稅所得，且落後約 2–3 年，只做相對排名。</li>
         <li style={li}>時間窗為最近 12 個月；人口未滿 1,000 的里雜訊大，地圖以淡色虛線標示。</li>
       </ul>
     </details>

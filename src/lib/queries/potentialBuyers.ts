@@ -28,6 +28,13 @@ export function fetchVillageBuyerIndicators(): Promise<Row[]> {
       net_same_town_k::float  AS net_same_town_k,
       women_15_49, women_15_49_share::float AS women_15_49_share,
       divorces, divorce_k_district::float AS divorce_k_district,
+      edu_year, edu_univ_plus_share::float AS edu_univ_plus_share, edu_grad_share::float AS edu_grad_share,
+      hh_year, single_hh_share::float AS single_hh_share,
+      hhq_period, head_avg_age::float AS head_avg_age,
+      head_26_45_share::float AS head_26_45_share, head_26_45_share_chg::float AS head_26_45_share_chg,
+      head_65p_share::float AS head_65p_share,
+      multi_hh_share::float AS multi_hh_share, multi_hh_share_chg::float AS multi_hh_share_chg,
+      solo_dwelling_share::float AS solo_dwelling_share, dwellings_growth_pct::float AS dwellings_growth_pct,
       low_confidence, cohort_missing, income_from_parent
     FROM village_buyer_indicators
     ORDER BY village_code
