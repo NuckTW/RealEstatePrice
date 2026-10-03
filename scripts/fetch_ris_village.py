@@ -260,6 +260,11 @@ def main():
         print('沒有任何月份有資料')
         sys.exit(0)
 
+    if sb:
+        # 重算村里潛在客群指數（materialized view，見 20261003_village_buyer_indicators.sql）
+        sb.rpc('refresh_village_buyer_indicators').execute()
+        print('已更新 village_buyer_indicators')
+
     path = os.environ.get('GITHUB_STEP_SUMMARY')
     if path:
         with open(path, 'a', encoding='utf-8') as f:

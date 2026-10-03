@@ -180,6 +180,7 @@ def main():
             raise SystemExit('villages 主檔是空的，請先跑 scripts/fetch_ris_village.py')
         save_aliases(sb, idx)
 
+    written = 0
     for y in years:
         rows = fetch_year(session, y)
         if not rows:
@@ -195,10 +196,16 @@ def main():
         for k in range(0, len(rows), 500):
             sb.table('village_income_yearly').upsert(
                 rows[k:k + 500], on_conflict='tax_year,district,village').execute()
+        written += len(rows)
         print(f'  {y} 年度：寫入 {len(rows)} 筆，對不到代碼 {len(missing)} 筆')
         for d, v in missing:
             note = '（已分割為 ' + '、'.join(SPLIT_VILLAGES[(d, v)]) + '）' if (d, v) in SPLIT_VILLAGES else ''
             print(f'    未對齊：{d}{v}{note}')
+
+    if written:
+        # 所得更新後重算村里潛在客群指數（所得百分位）
+        sb.rpc('refresh_village_buyer_indicators').execute()
+        print('已更新 village_buyer_indicators')
 
 
 if __name__ == '__main__':
