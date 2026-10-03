@@ -33,13 +33,19 @@ interface Village {
     netOtherCity: number | null; netOtherTown: number | null; netSameTown: number | null
     women1549: number | null; women1549Share: number | null
     divorces: number | null; divorceKDistrict: number | null
+    eduUnivPlus: number | null; eduGrad: number | null; singleHh: number | null
+    headAvgAge: number | null; head2645: number | null; head2645Chg: number | null; head65p: number | null
+    multiHh: number | null; multiHhChg: number | null; soloDwelling: number | null; dwellingsGrowth: number | null
   }
   lowConfidence: boolean
   cohortMissing: boolean
   incomeFromParent: boolean
 }
 interface ApiData {
-  meta: { dataMonth: string | null; incomeTaxYear: number | null }
+  meta: {
+    dataMonth: string | null; incomeTaxYear: number | null
+    eduYear: number | null; hhYear: number | null; hhqPeriod: string | null
+  }
   villages: Village[]
   rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
   southPark: SouthParkRow[]
@@ -270,7 +276,7 @@ export default function PotentialBuyersPanel() {
         <div style={{ ...cardStyle, minWidth: 0 }}>
           {sel
             ? <VillageDetail
-                v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length}
+                v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length} meta={data.meta}
                 rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
                 assumption={assumption}
                 onClose={() => setSelected(null)}
@@ -421,8 +427,8 @@ function TopList({ rows, mode, district, onPick }: { rows: Village[]; mode: Mode
 }
 
 /* ── 村里明細 ─────────────────────────────────────────────────── */
-function VillageDetail({ v, mode, rank, total, rentRow, assumption, onClose }: {
-  v: Village; mode: Mode; rank: number; total: number
+function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClose }: {
+  v: Village; mode: Mode; rank: number; total: number; meta: ApiData['meta']
   rentRow: RentRow | null; assumption: MortgageAssumption; onClose: () => void
 }) {
   const comps = COMPONENTS[mode]
@@ -494,6 +500,29 @@ function VillageDetail({ v, mode, rank, total, rentRow, assumption, onClose }: {
         <dt style={{ color: 'var(--text-muted)' }}>{v.district}大樓租金／房貸月付比</dt>
         <dd style={ddStyle}>{ratio != null ? fmt(ratio, 2) : '樣本不足'}</dd>
       </dl>
+
+      {v.raw.headAvgAge != null && (
+        <>
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>
+            家戶結構（不計分）
+            <span style={{ fontWeight: 400, color: 'var(--text-faint)', marginLeft: 6, fontSize: 'var(--text-2xs)' }}>
+              {meta.hhqPeriod}・教育 {meta.eduYear} 年・戶數 {meta.hhYear} 年
+            </span>
+          </div>
+          <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 12, margin: 0, fontSize: 'var(--text-2xs)' }}>
+            <dt style={{ color: 'var(--text-muted)' }}>戶長平均年齡</dt><dd style={ddStyle}>{fmt(v.raw.headAvgAge)} 歲</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>26–45 歲戶長占比（較一年前）</dt>
+            <dd style={ddStyle}>{fmt(v.raw.head2645)}%（{signed(v.raw.head2645Chg)}）</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>65 歲以上戶長占比</dt><dd style={ddStyle}>{fmt(v.raw.head65p)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }} title="同一住宅設籍 2 戶以上。市區多為成年子女與父母同住（潛在分戶購屋需求）；偏鄉偏高多為三代同堂，與購屋需求呈負相關，需搭配年齡結構判讀">一宅多戶占比（較一年前）</dt>
+            <dd style={ddStyle}>{fmt(v.raw.multiHh)}%（{signed(v.raw.multiHhChg)}）</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>1 人一宅占比</dt><dd style={ddStyle}>{fmt(v.raw.soloDwelling)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }} title="設有戶籍的住宅數年增率，反映新住宅入住">設籍宅數年增</dt><dd style={ddStyle}>{signed(v.raw.dwellingsGrowth)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>大學以上學歷占比（15 歲以上）</dt><dd style={ddStyle}>{fmt(v.raw.eduUnivPlus)}%</dd>
+            <dt style={{ color: 'var(--text-muted)' }}>單獨生活戶占比</dt><dd style={ddStyle}>{fmt(v.raw.singleHh)}%</dd>
+          </dl>
+        </>
+      )}
     </div>
   )
 }

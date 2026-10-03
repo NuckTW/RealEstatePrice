@@ -4,7 +4,7 @@
 
 用法（執行路徑：專案根目錄）：
   python3 scripts/fetch_rentals.py                   # 最近 2 季（排程用）
-  python3 scripts/fetch_rentals.py --backfill        # 110S1 起全部（與買賣資料起點一致）
+  python3 scripts/fetch_rentals.py --backfill        # 105S1 起全部（近 10 年）
   python3 scripts/fetch_rentals.py --seasons 115S2
   python3 scripts/fetch_rentals.py --seasons 115S2 --dry-run
 
@@ -30,7 +30,7 @@ from gov_http import gov_session  # noqa: E402
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 
 URL = 'https://plvr.land.moi.gov.tw/DownloadSeason?season={season}&fileName=d_lvr_land_c.csv'
-BACKFILL_START = (110, 1)
+BACKFILL_START = (105, 1)   # 潛在客群資料以近 10 年為目標（民國 105 年起）
 BATCH_SIZE = 500
 DELAY_SEC = 1.5
 

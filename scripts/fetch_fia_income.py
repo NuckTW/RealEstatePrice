@@ -39,13 +39,16 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 
 URL = 'https://www.fia.gov.tw/WEB/fia/ias/ias{y}/{y}_165-9.csv'
 COUNTY = '臺南市'
-BACKFILL_START = 108
+BACKFILL_START = 105   # 潛在客群資料以近 10 年為目標（民國 105 年起）
 
 # 財政部寫法 → 戶政寫法（異體字）
 ALIASES = {
     ('七股區', '𥂁埕里'): '塩埕里',
     ('安南區', '𥂁田里'): '塩田里',
+    ('中西區', '赤崁里'): '赤嵌里',     # 105–106 年度寫法
 }
+# 財政部造字區字元 → 通用字（105 年度「廍」為 U+FFFB4：舊廍里、後廍里、寮廍里、南廍里、頂廍里）
+PUA_CHARS = {'\U000FFFB4': '廍'}
 # 財政部年度資料仍為合併前的里（戶政已分割）：所得無法拆分，village_code 留 NULL
 SPLIT_VILLAGES = {('官田區', '東西庄里'): ['東庄里', '西庄里']}
 
@@ -56,7 +59,8 @@ def make_session() -> requests.Session:
 
 def norm(s: str) -> str:
     """統一相容字元（如「檨」在兩來源的 Unicode 碼位不同）"""
-    return unicodedata.normalize('NFKC', s.strip())
+    s = ''.join(PUA_CHARS.get(c, c) for c in s.strip())
+    return unicodedata.normalize('NFKC', s)
 
 
 def to_int(v):

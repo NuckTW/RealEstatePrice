@@ -86,6 +86,13 @@ export async function GET() {
         netSameTown: num(r.net_same_town_k),
         women1549: num(r.women_15_49), women1549Share: num(r.women_15_49_share),
         divorces: num(r.divorces), divorceKDistrict: num(r.divorce_k_district),
+        // 戶政年資料（edu_year／hh_year）、平台村里季資料（hhq_period）
+        eduUnivPlus: num(r.edu_univ_plus_share), eduGrad: num(r.edu_grad_share),
+        singleHh: num(r.single_hh_share),
+        headAvgAge: num(r.head_avg_age), head2645: num(r.head_26_45_share), head2645Chg: num(r.head_26_45_share_chg),
+        head65p: num(r.head_65p_share),
+        multiHh: num(r.multi_hh_share), multiHhChg: num(r.multi_hh_share_chg),
+        soloDwelling: num(r.solo_dwelling_share), dwellingsGrowth: num(r.dwellings_growth_pct),
       },
       lowConfidence:    Boolean(r.low_confidence),
       cohortMissing:    Boolean(r.cohort_missing),
@@ -96,6 +103,9 @@ export async function GET() {
       meta: {
         dataMonth:     rows.length ? String(rows[0].data_month) : null,       // 人口資料月份（西元 YYYY-MM）
         incomeTaxYear: rows.length ? Number(rows[0].income_tax_year) : null,  // 所得年度（民國）
+        eduYear:   rows.find(r => r.edu_year != null)?.edu_year ?? null,      // 教育程度年度（民國）
+        hhYear:    rows.find(r => r.hh_year != null)?.hh_year ?? null,        // 戶數結構年度
+        hhqPeriod: rows.find(r => r.hhq_period != null)?.hhq_period ?? null,  // 戶長年齡等季別
       },
       villages,
       // 行政區每坪租金／房價中位數；月付比由前端依利率假設計算

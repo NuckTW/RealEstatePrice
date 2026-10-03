@@ -2,15 +2,19 @@
 戶政司村里月資料匯入（潛在客群分析 第一期）
 API 文件：https://www.ris.gov.tw/rs-opendata/api/Main/docs/v1
 
-資料集（皆為「新增區域代碼」版本，village_code = district_code 11 碼）：
-  ODRP014  村里戶數、單一年齡人口        → village_population_monthly
-  ODRP060  各村（里）人口統計月報表（含同婚）→ village_vital_monthly
-  ODRP011  遷入遷出統計表               → village_migration_monthly
+資料集（village_code = district_code 11 碼）：
+                          新增區域代碼版           舊版（無代碼，106 年）
+  人口、單一年齡 → village_population_monthly  ODRP014（107/01 起）   ODRP005
+  出生死亡婚姻   → village_vital_monthly       ODRP060（109/09 起）   ODRP001
+                                               ODRP010（107/01–110/08）
+  遷入遷出       → village_migration_monthly   ODRP011（107/01 起）   ODRP002
+106 年資料沒有 district_code：以 107/01（ODRP014）的「行政區＋里名 → 代碼」對照；
+107/01 前已整併消失的里對不到，略過（約 28 里）。戶政 API 最早只到 106/01。
 官方約落後 1–2 個月發布；查無資料的月份自動跳過。
 
 用法（執行路徑：專案根目錄）：
   python3 scripts/fetch_ris_village.py                  # 最近 4 個月（月排程用）
-  python3 scripts/fetch_ris_village.py --backfill       # 自 11001 起全部回補
+  python3 scripts/fetch_ris_village.py --backfill       # 自 10601 起全部回補（API 最早月份）
   python3 scripts/fetch_ris_village.py --months 11507 11508
   python3 scripts/fetch_ris_village.py --months 11508 --dry-run   # 不寫 DB，輸出 CSV 到 data/ris_preview/
 
@@ -36,7 +40,9 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 
 API = 'https://www.ris.gov.tw/rs-opendata/api/v1/datastore/{code}/{ym}'
 COUNTY = '臺南市'
-BACKFILL_START = '11001'   # 與實價登錄歷史資料起點對齊
+BACKFILL_START = '10601'   # 戶政 API 最早月份（潛在客群資料以近 10 年為目標）
+CODED_FROM = '10701'       # 新增區域代碼版起始月；之前用舊版資料集＋名稱對照
+VITAL_060_FROM = '10909'   # ODRP060（含同婚）起始月；10701–10908 改用 ODRP010
 RECENT_MONTHS = 4
 DELAY_SEC = 1.0
 CITY_KEYS = ['ntp', 'tp', 'ty', 'tc', 'tn', 'kh', 'tw', 'fu', 'other']
@@ -99,7 +105,8 @@ def fetch(session: requests.Session, code: str, ym: str) -> list[dict]:
             return rows
         if data.get('responseCode') != 'OD-0101-S':
             return rows   # 'OD-0102-S' 查無資料
-        rows += [x for x in data.get('responseData') or []
+        # 部分舊資料集欄名帶 BOM（如 '\ufeffstatistic_yyymm'）
+        rows += [{k.lstrip('\ufeff'): v for k, v in x.items()} for x in data.get('responseData') or []
                  if str(x.get('site_id', '')).startswith(COUNTY)]
         if page >= i(data.get('totalPage')):
             return rows
@@ -134,8 +141,9 @@ def to_vital(r: dict) -> dict:
     return {
         'ym': ym, 'ym_date': roc_ym_to_date(ym), 'village_code': r['district_code'],
         'births': i(r.get('birth_total')), 'deaths': i(r.get('death_total')),
-        'marriages': i(r.get('marry_pair_OppositeSex')) + i(r.get('marry_pair_SameSex')),
-        'divorces': i(r.get('divorce_pair_OppositeSex')) + i(r.get('divorce_pair_SameSex')),
+        # ODRP060 分異性／同性；ODRP010、ODRP001（109/09 前）只有合計欄
+        'marriages': i(r.get('marry_pair_OppositeSex')) + i(r.get('marry_pair_SameSex')) + i(r.get('marry_pair')),
+        'divorces': i(r.get('divorce_pair_OppositeSex')) + i(r.get('divorce_pair_SameSex')) + i(r.get('divorce_pair')),
     }
 
 
@@ -224,16 +232,33 @@ def main():
 
     print(f'戶政村里資料：{months[0]} ~ {months[-1]}（{len(months)} 個月）')
     summary = []
+    bridge = None   # 106 年用：(行政區, 里名) → 代碼（取自 107/01 ODRP014）
     for ym in months:
-        pop = fetch(session, 'ODRP014', ym)
+        coded = ym >= CODED_FROM
+        pop = fetch(session, 'ODRP014' if coded else 'ODRP005', ym)
         if not pop:
             print(f'  {ym}: 查無資料，跳過')
             continue
         time.sleep(DELAY_SEC)
-        vital = fetch(session, 'ODRP060', ym)
+        vital_code = 'ODRP060' if ym >= VITAL_060_FROM else ('ODRP010' if coded else 'ODRP001')
+        vital = fetch(session, vital_code, ym)
         time.sleep(DELAY_SEC)
-        mig = fetch(session, 'ODRP011', ym)
+        mig = fetch(session, 'ODRP011' if coded else 'ODRP002', ym)
         time.sleep(DELAY_SEC)
+
+        if not coded:
+            if bridge is None:
+                bridge = {(split_site(r['site_id']), r['village']): r['district_code']
+                          for r in fetch(session, 'ODRP014', CODED_FROM)}
+            dropped = set()
+            for rows in (pop, vital, mig):
+                for r in rows:
+                    r['district_code'] = bridge.get((split_site(r['site_id']), r['village']))
+                    if not r['district_code']:
+                        dropped.add(r['village'])
+                rows[:] = [r for r in rows if r['district_code']]
+            if dropped:
+                print(f'  {ym}: {len(dropped)} 個里在 {CODED_FROM} 前已整併，對不到代碼，略過')
 
         villages = {r['district_code']: to_village(r) for r in pop + vital + mig}
         recs = {
