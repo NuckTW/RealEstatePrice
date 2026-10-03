@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { VillageGeo } from './VillageChoroplethMap'
+import SouthParkSection, { type SouthParkRow } from './SouthParkSection'
+import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
 const VillageChoroplethMap = dynamic(() => import('./VillageChoroplethMap'), {
   ssr: false, loading: () => <div style={centerStyle('100%')}>地圖載入中…</div>,
@@ -32,6 +34,8 @@ interface Village {
 interface ApiData {
   meta: { dataMonth: string | null; incomeTaxYear: number | null }
   villages: Village[]
+  rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
+  southPark: SouthParkRow[]
 }
 
 type Mode = 'firstBuyer' | 'upgrader'
@@ -112,6 +116,7 @@ export default function PotentialBuyersPanel() {
   const [hideLow, setHideLow] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [focusCodes, setFocusCodes] = useState<string[] | null>(null)
+  const [assumption, setAssumption] = useState<MortgageAssumption>(DEFAULT_ASSUMPTION)
 
   useEffect(() => {
     Promise.all([
@@ -247,7 +252,12 @@ export default function PotentialBuyersPanel() {
 
         <div style={{ ...cardStyle, minWidth: 0 }}>
           {sel
-            ? <VillageDetail v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length} onClose={() => setSelected(null)} />
+            ? <VillageDetail
+                v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length}
+                rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
+                assumption={assumption}
+                onClose={() => setSelected(null)}
+              />
             : <TopList rows={ranking.slice(0, 10)} mode={mode} district={district} onPick={pickFromTable} />}
         </div>
       </div>
@@ -264,6 +274,37 @@ export default function PotentialBuyersPanel() {
         </div>
         <RankingTable rows={ranking.slice(0, 30)} mode={mode} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
       </div>
+
+      {/* 租轉買：行政區租金 vs 房貸月付 */}
+      <div style={cardStyle}>
+        <div style={{ marginBottom: 10 }}>
+          <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>租金／房貸月付比（行政區）</span>
+          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+            「租轉買」潛在客：月租越接近房貸月付，越容易從租屋轉為購屋；租賃資料只到行政區，不計入村里指數
+          </span>
+        </div>
+        <RentMortgageTable
+          rows={data.rent.rows}
+          rentPeriod={data.rent.rentPeriod}
+          salePeriod={data.rent.salePeriod}
+          assumption={assumption}
+          onAssumptionChange={setAssumption}
+          highlightDistrict={district || undefined}
+        />
+      </div>
+
+      {/* 就業動能：南科（台南最大外來購屋族群來源） */}
+      {data.southPark.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{ marginBottom: 10 }}>
+            <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>南科就業動能</span>
+            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+              南科是台南最大的外來購屋族群來源；園區級資料，不計入村里指數
+            </span>
+          </div>
+          <SouthParkSection rows={data.southPark} />
+        </div>
+      )}
 
       <Methodology />
 
@@ -343,8 +384,12 @@ function TopList({ rows, mode, district, onPick }: { rows: Village[]; mode: Mode
 }
 
 /* ── 村里明細 ─────────────────────────────────────────────────── */
-function VillageDetail({ v, mode, rank, total, onClose }: { v: Village; mode: Mode; rank: number; total: number; onClose: () => void }) {
+function VillageDetail({ v, mode, rank, total, rentRow, assumption, onClose }: {
+  v: Village; mode: Mode; rank: number; total: number
+  rentRow: RentRow | null; assumption: MortgageAssumption; onClose: () => void
+}) {
   const comps = COMPONENTS[mode]
+  const ratio = rentRow ? rentRatio(rentRow, assumption) : null
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -405,6 +450,8 @@ function VillageDetail({ v, mode, rank, total, onClose }: { v: Village; mode: Mo
         <dt style={{ color: 'var(--text-muted)' }}>跨縣市淨移入</dt><dd style={ddStyle}>{signed(v.raw.netOtherCity)}‰</dd>
         <dt style={{ color: 'var(--text-muted)' }}>市內他區淨移入</dt><dd style={ddStyle}>{signed(v.raw.netOtherTown)}‰</dd>
         <dt style={{ color: 'var(--text-muted)' }}>同區跨里淨移入</dt><dd style={ddStyle}>{signed(v.raw.netSameTown)}‰</dd>
+        <dt style={{ color: 'var(--text-muted)' }}>{v.district}大樓租金／房貸月付比</dt>
+        <dd style={ddStyle}>{ratio != null ? fmt(ratio, 2) : '樣本不足'}</dd>
       </dl>
     </div>
   )

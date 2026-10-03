@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchVillageBuyerIndicators } from '@/lib/queries/potentialBuyers'
+import { fetchVillageBuyerIndicators, fetchDistrictRentVsPrice, fetchSouthParkEmployees } from '@/lib/queries/potentialBuyers'
 
 /**
  * 戶政資料的村里名含造字區字元，前端字型無法顯示 → 換成通用字
@@ -14,7 +14,12 @@ const num = (v: unknown): number | null => (v == null ? null : Number(v))
 
 export async function GET() {
   try {
-    const rows = await fetchVillageBuyerIndicators()
+    const [rows, rentRows, parkRows] = await Promise.all([
+      fetchVillageBuyerIndicators(),
+      fetchDistrictRentVsPrice(),
+      // 南科是附加資訊：查詢失敗（如資料表尚未建立）不影響主頁面
+      fetchSouthParkEmployees().catch(err => { console.error('[/api/potential-buyers] 南科', err); return [] }),
+    ])
     const villages = rows.map(r => ({
       code:     String(r.village_code),
       district: String(r.district),
@@ -50,6 +55,27 @@ export async function GET() {
         incomeTaxYear: rows.length ? Number(rows[0].income_tax_year) : null,  // 所得年度（民國）
       },
       villages,
+      // 行政區每坪租金／房價中位數；月付比由前端依利率假設計算
+      rent: {
+        rentPeriod: rentRows.length ? `${rentRows[0].rent_from}～${rentRows[0].rent_to}` : null,
+        salePeriod: rentRows.length ? `${rentRows[0].sale_from}～${rentRows[0].sale_to}` : null,
+        rows: rentRows.map(r => ({
+          district:  String(r.district),
+          btype:     String(r.btype) as '大樓華廈' | '透天',
+          nRent:     Number(r.n_rent),
+          rentPing:  num(r.rent_ping),   // 元／坪・月
+          nSale:     Number(r.n_sale),
+          pricePing: num(r.price_ping),  // 元／坪
+        })),
+      },
+      // 南科從業員工：sub_park = '合計' 為園區總數，其餘為子園區（臺南園區、高雄園區…）
+      southPark: parkRows.map(r => ({
+        ym:       String(r.ym),
+        subPark:  String(r.sub_park),
+        total:    Number(r.total),
+        phd:      num(r.phd),
+        master:   num(r.master),
+      })),
     })
   } catch (err) {
     console.error('[/api/potential-buyers]', err)
