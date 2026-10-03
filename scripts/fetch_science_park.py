@@ -8,6 +8,9 @@
   2. 政府資料開放平臺 7599 CSV（子園區級，只有最新一期、沒有日期欄）
      https://mas.nstc.gov.tw/OPENDATA/GetFile?format=csv&serialno=75&fileodr=0
      → 以「南科合計 = 統計資料庫最新月份南科總數」確認是同一期才寫入
+  3. 政府資料開放平臺 101986 南科管理局從業員工產業別統計（年，目前 107～113 年）
+     https://mas.nstc.gov.tw/OPENDATA/GetFile?format=csv&serialno=398&fileodr=2
+     → science_park_industry_yearly（每次全量覆寫）
 
 用法（執行路徑：專案根目錄）：
   python3 scripts/fetch_science_park.py                 # 最近 3 個月 + 子園區最新一期（排程用）
@@ -35,6 +38,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 
 WSTS_URL = 'https://wsts.nstc.gov.tw/STSWeb/sciencepark/ScienceParkReport.aspx?language=C&quyid=tqemployees01'
 CSV_URL = 'https://mas.nstc.gov.tw/OPENDATA/GetFile?format=csv&serialno=75&fileodr=0'
+INDUSTRY_URL = 'https://mas.nstc.gov.tw/OPENDATA/GetFile?format=csv&serialno=398&fileodr=2'
 RECENT_MONTHS = 3
 EDU_COLS = ['phd', 'master', 'bachelor', 'associate', 'high_school', 'other']
 PARKS = ('新竹科學園區', '中部科學園區', '南部科學園區')
@@ -111,6 +115,22 @@ def fetch_csv(session) -> list[dict]:
     return out
 
 
+def fetch_industry(session) -> list[dict]:
+    """南科產業別員工（年）：欄名「半導體人數」→ 產業「半導體」；「合計人數」→「合計」"""
+    raw = session.get(INDUSTRY_URL, timeout=60).content.decode('utf-8-sig')
+    if raw.lstrip().startswith('<script'):
+        raise RuntimeError('產業別 CSV 下載失敗（網址可能改變）')
+    out = []
+    for r in csv.DictReader(io.StringIO(raw)):
+        y = to_int(r.get('民國年', ''))
+        for col, v in r.items():
+            if col == '民國年' or not col.endswith('人數'):
+                continue
+            name = col.removesuffix('人數').replace('其他產業類別', '其他')
+            out.append({'year': y, 'park': '南部科學園區', 'industry': name, 'employees': to_int(v)})
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--backfill', action='store_true')
@@ -153,8 +173,13 @@ def main():
         print(f'⚠️ 開放 CSV 南科合計 {csv_south} ≠ 統計資料庫 {latest} 的 {south.get(latest)}，'
               '期別無法確認，子園區本次不寫入')
 
+    industry = fetch_industry(session)
+    years = sorted({r['year'] for r in industry})
+    semi = {r['year']: r['employees'] for r in industry if r['industry'] == '半導體'}
+    print(f'產業別：{len(industry)} 筆（{years[0]}～{years[-1]} 年）｜半導體 {years[-1]} 年 {semi.get(years[-1], 0):,}')
+
     if args.dry_run:
-        for r in park_rows[-3:] + sub_rows[:3]:
+        for r in park_rows[-3:] + sub_rows[:3] + industry[:3]:
             print('   ', r)
         print('（dry-run，未寫入）')
         return
@@ -166,6 +191,8 @@ def main():
         sb.table('science_park_employees_monthly').upsert(
             allrows[k:k + 500], on_conflict='ym,park,sub_park').execute()
     print(f'已寫入 {len(allrows)} 筆')
+    sb.table('science_park_industry_yearly').upsert(industry, on_conflict='year,park,industry').execute()
+    print(f'已寫入產業別 {len(industry)} 筆')
 
     path = os.environ.get('GITHUB_STEP_SUMMARY')
     if path:

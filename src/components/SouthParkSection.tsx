@@ -8,6 +8,8 @@ const SouthParkChart = dynamic(() => import('./SouthParkChart'), {
   loading: () => <div style={{ height: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>圖表載入中…</div>,
 })
 
+export interface IndustryRow { year: number; industry: string; employees: number }
+
 export interface SouthParkRow {
   ym: string         // 民國年月 '11508'
   subPark: string    // '合計' = 園區總數
@@ -25,7 +27,7 @@ function shiftYm(ym: string, n: number): string {
   return `${Math.floor(t / 12)}${String((t % 12) + 1).padStart(2, '0')}`
 }
 
-export default function SouthParkSection({ rows }: { rows: SouthParkRow[] }) {
+export default function SouthParkSection({ rows, industry = [] }: { rows: SouthParkRow[]; industry?: IndustryRow[] }) {
   const { series, latest, yoy, subParks, eduShare } = useMemo(() => {
     const parkTotal = rows.filter(r => r.subPark === '合計')
     const byYm = new Map(parkTotal.map(r => [r.ym, r]))
@@ -43,6 +45,18 @@ export default function SouthParkSection({ rows }: { rows: SouthParkRow[] }) {
       eduShare: last && last.phd != null && last.master != null ? (last.phd + last.master) / last.total * 100 : null,
     }
   }, [rows])
+
+  // 產業別：最新年度 vs 最早年度（開放資料目前 107～113 年）
+  const ind = useMemo(() => {
+    const years = [...new Set(industry.map(r => r.year))].sort((a, b) => a - b)
+    if (!years.length) return null
+    const y0 = years[0], y1 = years.at(-1)!
+    const get = (y: number, name: string) => industry.find(r => r.year === y && r.industry === name)?.employees ?? null
+    const names = [...new Set(industry.filter(r => r.industry !== '合計').map(r => r.industry))]
+    const list = names.map(n => ({ name: n, now: get(y1, n), then: get(y0, n) }))
+      .sort((a, b) => (b.now ?? 0) - (a.now ?? 0))
+    return { y0, y1, list, total: get(y1, '合計'), totalThen: get(y0, '合計') }
+  }, [industry])
 
   if (!latest) {
     return <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)' }}>南科資料尚未匯入</div>
@@ -91,7 +105,37 @@ export default function SouthParkSection({ rows }: { rows: SouthParkRow[] }) {
           </div>
         )}
       </div>
+      {ind && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 8 }}>
+            產業別（{ind.y1} 年，與 {ind.y0} 年比較）
+            <span style={{ fontWeight: 400, color: 'var(--text-faint)', marginLeft: 6, fontSize: 'var(--text-2xs)' }}>
+              合計 {ind.total?.toLocaleString() ?? '—'} 人
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', columnGap: 24 }}>
+            {ind.list.map(r => {
+              const chg = r.now != null && r.then ? (r.now / r.then - 1) * 100 : null
+              const max = ind.list[0].now ?? 1
+              return (
+                <div key={r.name} style={{ display: 'grid', gridTemplateColumns: '64px 1fr 64px 52px', gap: 8, alignItems: 'center', padding: '4px 0', borderBottom: '1px solid var(--border-card)', fontSize: 'var(--text-xs)' }}>
+                  <span style={{ color: 'var(--text-default)' }}>{r.name}</span>
+                  <div style={{ height: 6, borderRadius: 'var(--radius-full)', background: 'var(--surface-control)' }}>
+                    <div style={{ width: `${(r.now ?? 0) / max * 100}%`, height: '100%', borderRadius: 'var(--radius-full)', background: 'var(--accent)' }} />
+                  </div>
+                  <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--text-strong)' }}>{r.now?.toLocaleString() ?? '—'}</span>
+                  <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xs)', color: chg == null ? 'var(--text-faint)' : chg >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+                    {chg == null ? '—' : `${chg >= 0 ? '+' : ''}${chg.toFixed(0)}%`}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div style={{ marginTop: 8, fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+        產業別為南科管理局年資料（開放資料目前只有 {ind ? `${ind.y0}～${ind.y1}` : '107～113'} 年）。
         資料來源：國科會科學園區從業員工數統計（含園區事業、育成中心、研究機構，不含營建承攬商）。
         園區級資料自 105 年 11 月起；子園區明細來自開放資料，只提供最新一期，自匯入起逐月累積。
       </div>

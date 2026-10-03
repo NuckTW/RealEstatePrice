@@ -202,3 +202,34 @@ export function fetchTransfersCitySeries(): Promise<Row[]> {
     ORDER BY period_date
   `)
 }
+
+/** 南科產業別從業員工（年；science_park_industry_yearly，由 fetch_science_park.py 匯入） */
+export function fetchSouthParkIndustry(): Promise<Row[]> {
+  return cachedQuery(`
+    SELECT year, industry, employees
+    FROM science_park_industry_yearly
+    WHERE park = '南部科學園區'
+    ORDER BY year, industry
+  `)
+}
+
+/**
+ * 臺南市人口推估（最新版次；population_projection，由 fetch_population_projection.py 匯入）
+ * ⚠️ 官方只以出生、死亡推估，未計入遷徙
+ */
+export function fetchPopulationProjection(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH e AS (
+      SELECT max(edition) AS edition FROM population_projection
+    ), y0 AS (
+      SELECT min(year) AS y FROM population_projection, e WHERE population_projection.edition = e.edition
+    )
+    SELECT p.edition, p.scope, p.area, p.year, p.pop_total,
+           p.age_25_34, p.age_35_44, p.age_65_plus
+    FROM population_projection p, e, y0
+    WHERE p.edition = e.edition
+      -- 全市保留每一年（畫趨勢）；各區只取基準年與 +5、+10、+20 年（表格用），減少傳輸量
+      AND (p.area = '臺南市' OR p.year IN (y0.y, y0.y + 5, y0.y + 10, y0.y + 20))
+    ORDER BY p.area, p.scope, p.year
+  `)
+}

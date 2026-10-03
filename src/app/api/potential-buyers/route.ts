@@ -3,6 +3,7 @@ import {
   fetchVillageBuyerIndicators, fetchDistrictRentVsPrice, fetchSouthParkEmployees,
   fetchMarketSeries, fetchLowUsageByDistrict, fetchStockAgeByDistrict,
   fetchTransfersByDistrict, fetchTransfersCitySeries,
+  fetchSouthParkIndustry, fetchPopulationProjection,
 } from '@/lib/queries/potentialBuyers'
 import type { Row } from '@/lib/queries/client'
 
@@ -32,7 +33,7 @@ const AGE_BANDS: Record<string, string[]> = {
 
 export async function GET() {
   try {
-    const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity] = await Promise.all([
+    const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity, industryRows, projRows] = await Promise.all([
       fetchVillageBuyerIndicators(),
       fetchDistrictRentVsPrice(),
       optional('南科', fetchSouthParkEmployees()),
@@ -41,6 +42,8 @@ export async function GET() {
       optional('稅籍屋齡', fetchStockAgeByDistrict()),
       optional('建物移轉', fetchTransfersByDistrict()),
       optional('建物移轉序列', fetchTransfersCitySeries()),
+      optional('南科產業別', fetchSouthParkIndustry()),
+      optional('人口推估', fetchPopulationProjection()),
     ])
 
     // 房屋稅籍屋齡：每區一列，十級合併為五級百分比
@@ -146,6 +149,18 @@ export async function GET() {
         })),
         city: transferCity.map(r => ({
           period: String(r.period), first: num(r.first_transfer), sale: num(r.sale_transfer),
+        })),
+      },
+      // 南科產業別員工（年）
+      southParkIndustry: industryRows.map(r => ({
+        year: Number(r.year), industry: String(r.industry), employees: Number(r.employees),
+      })),
+      // 臺南市人口推估（最新版次；行政區 + 全市，高中低推估）
+      projection: {
+        edition: projRows.length ? String(projRows[0].edition) : null,
+        rows: projRows.map(r => ({
+          scope: String(r.scope), area: String(r.area), year: Number(r.year),
+          total: Number(r.pop_total), a2534: Number(r.age_25_34), a3544: Number(r.age_35_44), a65p: Number(r.age_65_plus),
         })),
       },
       // 南科從業員工：sub_park = '合計' 為園區總數，其餘為子園區（臺南園區、高雄園區…）
