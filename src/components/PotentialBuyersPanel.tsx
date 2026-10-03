@@ -11,6 +11,7 @@ import {
 import SouthParkSection, { type SouthParkRow, type IndustryRow } from './SouthParkSection'
 import ProjectionSection, { type ProjectionData } from './ProjectionSection'
 import SchoolSection, { type SchoolData } from './SchoolSection'
+import IndustrySection, { type IndustryPoint } from './IndustrySection'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
 const VillageChoroplethMap = dynamic(() => import('./VillageChoroplethMap'), {
@@ -55,6 +56,7 @@ interface ApiData {
   southParkIndustry: IndustryRow[]
   projection: ProjectionData
   schools: SchoolData
+  industry: IndustryPoint[]
   houseAge: { period: string | null; cityAvgAge: number | null; rows: HouseAgeRow[] }
   market: MarketPoint[]
   lowUsage: LowUsageRow[]
@@ -188,6 +190,13 @@ export default function PotentialBuyersPanel() {
     }
     return m
   }, [villages, mode, breaks, district])
+
+  // 各區人口（村里加總），產業區塊算「每千居民工作數」用
+  const popByDistrict = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + v.raw.pop)
+    return m
+  }, [villages])
 
   const lowConfidence = useMemo(() => new Set(villages.filter(v => v.lowConfidence).map(v => v.code)), [villages])
 
@@ -341,6 +350,11 @@ export default function PotentialBuyersPanel() {
       <AffordabilitySection market={data.market} />
       <TransfersSection data={data.transfers} highlightDistrict={district || undefined} />
       <LowUsageSection rows={data.lowUsage} highlightDistrict={district || undefined} />
+
+      {/* 產業與就業（普查 + 工商家數） */}
+      {data.industry.length > 0 && (
+        <IndustrySection data={data.industry} popByDistrict={popByDistrict} highlightDistrict={district || undefined} />
+      )}
 
       {/* 學區學生數（行政區・學年） */}
       {data.schools.byDistrict.length > 0 && (

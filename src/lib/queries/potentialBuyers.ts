@@ -276,3 +276,29 @@ export function fetchPoiByVillage(): Promise<Row[]> {
     GROUP BY village_code, category
   `)
 }
+
+/**
+ * 產業與就業（housing_market_stats，由 fetch_industry_census.py 匯入）
+ * - 110 年工業及服務業普查：各行業從業員工、全行業場所單位數與生產總額、職員（監督及專技人員）
+ * - SEGIS 行政區工商家數：只取最新一期
+ */
+export function fetchIndustryStats(): Promise<Row[]> {
+  // 明確列出指標（走主鍵索引）；LIKE + OR 在 6 萬筆上會全表掃描而逾時
+  const census = ['all', ...INDUSTRY_KEYS].map(k => `'census_employees:${k}'`)
+    .concat(["'census_units:all'", "'census_output:all'", "'census_officers'"])
+  const biz = ['all', ...INDUSTRY_KEYS, 'agriculture', 'mining', 'public'].map(k => `'biz_count:${k}'`)
+  return cachedQuery(`
+    SELECT indicator, area_level, area, period, value::float AS value
+    FROM housing_market_stats
+    WHERE indicator IN (${census.join(', ')})
+    UNION ALL
+    SELECT indicator, area_level, area, period, value::float AS value
+    FROM housing_market_stats
+    WHERE indicator IN (${biz.join(', ')})
+      AND period_date = (SELECT max(period_date) FROM housing_market_stats WHERE indicator = 'biz_count:all')
+  `)
+}
+
+/** 普查與工商家數共同的大行業代號（對應 scripts/fetch_industry_census.py） */
+const INDUSTRY_KEYS = ['mfg', 'electricity', 'water', 'construction', 'trade', 'transport', 'accommodation',
+  'ict', 'finance', 'realestate', 'professional', 'support', 'education', 'health', 'arts', 'other']

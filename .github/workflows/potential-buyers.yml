@@ -58,3 +58,7 @@ jobs:
       # 教育部國中小校別資料（每學年更新）＋ OSM 生活機能點位（每次全量重抓，以 fetched_at 區分批次）
       - name: 國中小學生數、生活機能
         run: python scripts/fetch_school_poi.py
+
+      # SEGIS 行政區工商家數（開放服務只給最新一期，每年底更新）；普查 5 年一次不需排程
+      - name: 行政區工商家數
+        run: python scripts/fetch_industry_census.py --only segis
