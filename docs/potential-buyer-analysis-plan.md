@@ -211,10 +211,13 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 
 **更新機制**：`fetch_ris_village.py`、`fetch_fia_income.py` 寫入資料後自動呼叫 `refresh_village_buyer_indicators()`（約 1 秒）。已驗證 650 筆、anon key 讀取回 permission denied。
 
-### 7.2 前端「潛在客群」頁
-- 村里地圖需要村里界線圖資：內政部村里界圖（SHP）→ 轉 GeoJSON，以 village_code 對應
-- 走 API route 讀資料（見 4.5）
-- 沿用全站設計系統（`Tainan Realty Analytics — Design System`）
+### 7.2 前端「潛在客群」頁（✅ 已完成 2026-10-03，`/potential-buyers`）
+- 村里界線：內政部國土測繪中心 村(里)界 1150817 版 → `scripts/build_village_geojson.sh`（npx mapshaper，簡化 10 公尺）→ `public/geo/tainan_villages.json`（1.26 MB、gzip 約 300 KB）；VILLCODE 與 village_code 650 里全數對上
+- API：`/api/potential-buyers`（service role 讀 materialized view，1 小時快取）；戶政造字 U+FB56F 於 API 換成「塭」
+- 元件：`PotentialBuyersPanel`（首購／換屋切換、行政區篩選、前 10 名、村里明細、前 30 名排行、方法說明）、`VillageChoroplethMap`（Leaflet GeoJSON 分級著色）
+- 色階：brass 單一色相五分位，CSS 變數 `--pb-ramp-0..4`；暗色主題翻轉為高分＝亮色；人口 < 1000 淡色虛線
+- 底圖沿用 OSM（CARTO 已需 API key），暗色主題以 CSS 濾鏡壓暗
+- ⚠️ Vercel Preview 環境缺 Supabase 環境變數（只設 Production），非 main 分支的 Preview build 會失敗；需在 Vercel 設定勾選 Preview
 
 ### 7.3 第二期資料
 - 南科從業員工數：https://data.gov.tw/dataset/7599
