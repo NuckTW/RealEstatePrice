@@ -48,9 +48,13 @@ jobs:
         run: python scripts/fetch_science_park.py
 
       # 不動產資訊平台（負擔能力、房貸、低度使用、稅籍屋齡）每次全量覆寫；台南開放資料抓今年與去年
-      - name: 住宅市場統計（負擔能力、房貸利率、低度使用、屋齡存量、建物移轉）
+      - name: 住宅市場統計（負擔能力、房貸利率、低度使用、屋齡存量、建物移轉、家庭收支）
         run: python scripts/fetch_housing_stats.py
 
       # 臺南市人口推估：約每 1–2 年改版；自動挑最新版次，同版重抓只會覆寫
       - name: 臺南市人口推估
         run: python scripts/fetch_population_projection.py
+
+      # 教育部國中小校別資料（每學年更新）＋ OSM 生活機能點位（每次全量重抓，以 fetched_at 區分批次）
+      - name: 國中小學生數、生活機能
+        run: python scripts/fetch_school_poi.py

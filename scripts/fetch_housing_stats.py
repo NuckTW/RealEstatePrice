@@ -11,11 +11,13 @@
   B. 臺南市政府資料開放平台 data.tainan.gov.tw（每年一個資料集、每月一個 CSV 資源）
      - {年}年臺南市建物第一次移轉統計表：行政區・月（新屋交屋量）
      - {年}年臺南市不動產買賣統計表：行政區・月（建物買賣移轉件數）
+  C. 主計總處 家庭收支調查（縣市・年，1998 年起；只取臺南市與臺灣地區）
+     - 平均每戶可支配所得、消費支出、所得收入總計
 
 用法（執行路徑：專案根目錄）：
   python3 scripts/fetch_housing_stats.py                # 平台全部歷史（檔案小，每次全抓）+ 台南開放資料今年與去年
   python3 scripts/fetch_housing_stats.py --backfill     # 台南開放資料 104 年起全部
-  python3 scripts/fetch_housing_stats.py --only pip     # 只抓不動產資訊平台（或 tainan）
+  python3 scripts/fetch_housing_stats.py --only pip     # 只抓不動產資訊平台（或 tainan、fies）
   python3 scripts/fetch_housing_stats.py --dry-run      # 不寫 DB
 
 前置：先在 Supabase SQL Editor 執行 supabase/migrations/20261004_housing_market_stats.sql
@@ -52,9 +54,11 @@ DELAY_SEC = 0.8
 # ── 共用 ─────────────────────────────────────────────────────
 
 def period_date(period: str, ptype: str) -> str:
-    """'115Q1'→2026-01-01、'114H2'→2025-07-01、'11508'→2026-08-01"""
+    """'115Q1'→2026-01-01、'114H2'→2025-07-01、'11508'→2026-08-01、年 '114'→2025-01-01"""
     y = int(re.match(r'\d+', period).group()) if ptype != 'M' else int(period[:-2])
-    if ptype == 'Q':
+    if ptype == 'Y':
+        m = 1
+    elif ptype == 'Q':
         m = (int(period[-1]) - 1) * 3 + 1
     elif ptype == 'H':
         m = 1 if period.endswith('1') else 7
@@ -299,12 +303,40 @@ def tainan_opendata(session, years: list[int]) -> list[dict]:
     return out
 
 
+# ── C. 主計總處 家庭收支調查（縣市・年，1998 年起） ─────────────
+
+FIES = {
+    # data.gov.tw 9415／9420／9418；欄名為「縣市-元」，臺灣地區視為全國
+    'fies_disposable_income': 'https://ws.dgbas.gov.tw/001/Upload/461/relfile/11525/232214/006-平均每戶可支配所得按區域別分.csv',
+    'fies_consumption':       'https://ws.dgbas.gov.tw/001/Upload/461/relfile/11525/232214/011-平均每戶消費支出按區域別分.csv',
+    'fies_income_receipts':   'https://ws.dgbas.gov.tw/001/Upload/461/relfile/11525/232214/009-平均每戶所得收入總計按區域別分.csv',
+}
+
+
+def fies(session) -> list[dict]:
+    out = []
+    for ind, url in FIES.items():
+        rows = list(csv.reader(io.StringIO(decode(session.get(url, timeout=60).content))))
+        header = rows[0]
+        for r in rows[1:]:
+            if not r or not r[0].strip().isdigit():
+                continue
+            period = str(int(r[0]) - 1911)            # 西元年 → 民國年
+            for col, v in zip(header[1:], r[1:]):
+                name = col.split('-')[0].strip()
+                area = '全國' if name == '臺灣地區' else city_of(name)
+                if area and num(v) is not None:
+                    out.append(row(ind, 'nation' if area == '全國' else 'city', area, period, 'Y', num(v), 'dgbas'))
+        time.sleep(DELAY_SEC)
+    return out
+
+
 # ── 主程式 ───────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--backfill', action='store_true', help='台南開放資料從 104 年起全部回補')
-    ap.add_argument('--only', choices=['pip', 'tainan'])
+    ap.add_argument('--only', choices=['pip', 'tainan', 'fies'])
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
 
@@ -316,6 +348,10 @@ def main():
             got = fn(s)
             print(f'不動產資訊平台 {name}：{len(got)} 筆')
             rows += got
+    if args.only in (None, 'fies'):
+        got = fies(gov_session(UA))
+        print(f'主計總處 家庭收支調查：{len(got)} 筆')
+        rows += got
     if args.only in (None, 'tainan'):
         this_year = date.today().year - 1911
         years = list(range(TN_FIRST_YEAR, this_year + 1)) if args.backfill else [this_year - 1, this_year]
