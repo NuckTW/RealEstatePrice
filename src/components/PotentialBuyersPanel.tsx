@@ -562,7 +562,6 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
   rentRow: RentRow | null; assumption: MortgageAssumption; onClose: () => void
 }) {
   const ratio = rentRow ? rentRatio(rentRow, assumption) : null
-  const scoreOf = (d: IndexDef) => d.id === 'firstBuyer' ? v.firstBuyer : d.id === 'newHome' ? v.newHome : d.id === 'resale' ? v.resale : null
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -588,7 +587,7 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
             border: `1px solid ${p.id === def.id ? 'var(--accent-wash-border)' : 'var(--border-control)'}`,
             background: p.id === def.id ? 'var(--accent-wash)' : 'transparent',
             color: p.id === def.id ? 'var(--accent-tint)' : 'var(--text-muted)',
-          }}>{p.short} <b style={{ fontFamily: 'var(--font-mono)' }}>{fmt(scoreOf(p) ?? computeIndex(p, catalog, [v.code]).scores.get(v.code))}</b></span>
+          }}>{p.short} <b style={{ fontFamily: 'var(--font-mono)' }}>{fmt(computeIndex(p, catalog, [v.code]).scores.get(v.code))}</b></span>
         ))}
       </div>
       <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', marginBottom: 12 }}>
@@ -770,7 +769,7 @@ function Methodology() {
       <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>指數怎麼算？</summary>
       <ul style={{ margin: '10px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li style={li}>每項指標先換算成全市 650 里的百分位（0–100），再依權重加總；指數 50 約為全市中間水準。</li>
-        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 20% + 結婚率 20% + 所得（購買力）20% + 社會增加率 10%。</li>
+        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 25% + 結婚率 10% + 所得（購買力）25% + 社會增加率 10%。結婚率與各區預售成交的相關較弱，權重較低。</li>
         <li style={li}><b>換新屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得（購買力）20% + 設籍宅數成長 20%。和各區近 24 月預售＋新成屋交易量的排名相關 0.79。</li>
         <li style={li}><b>換二手指數</b> = 世代淨移入（35–44）10% + 35–44 歲占比 20% + 26–45 歲戶長占比 20% + 所得（購買力）30% + 大學以上學歷 20%。和各區近 24 月二手成屋（屋齡 5 年以上）交易量的排名相關 0.80。</li>
         <li style={li}><b>世代淨移入</b>：比較同一批人一年前後的人數（例如去年 25–34 歲 vs 今年 26–35 歲），這個年齡層死亡很少，差額約等於淨搬入。</li>

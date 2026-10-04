@@ -8,6 +8,7 @@
 
 import io
 import os
+import sys
 import time
 import zipfile
 from datetime import date
@@ -16,6 +17,9 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 from supabase import create_client
+
+sys.path.insert(0, os.path.dirname(__file__))
+from gov_http import gov_session  # noqa: E402  政府網站憑證缺 SKI，Python 3.13 需放寬 strict 驗證
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
 SUPABASE_URL = os.environ['NEXT_PUBLIC_SUPABASE_URL']
@@ -31,11 +35,8 @@ DELAY_SEC  = 1.5
 
 
 def make_session() -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-        'Referer': 'https://plvr.land.moi.gov.tw/DownloadOpenData',
-    })
+    s = gov_session('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    Referer='https://plvr.land.moi.gov.tw/DownloadOpenData')
     s.get('https://plvr.land.moi.gov.tw/DownloadOpenData', timeout=10)
     return s
 
