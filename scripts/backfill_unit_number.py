@@ -5,9 +5,12 @@ backfill_unit_number.py
 """
 
 import os, sys, io, time, re
-import requests, pandas as pd
+import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client
+
+sys.path.insert(0, os.path.dirname(__file__))
+from gov_http import gov_session  # noqa: E402  政府網站憑證缺 SKI，Python 3.13 需放寬 strict 驗證
 
 sys.stdout.reconfigure(line_buffering=True)
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env.local'))
@@ -15,6 +18,7 @@ sb = create_client(os.environ['NEXT_PUBLIC_SUPABASE_URL'], os.environ['SUPABASE_
 
 BASE_URL = 'https://plvr.land.moi.gov.tw/DownloadSeason?season={season}&fileName={fname}'
 BATCH    = 500
+SESSION  = gov_session('Mozilla/5.0', Referer='https://plvr.land.moi.gov.tw/DownloadOpenData')
 
 SEASONS = [
     '110S2','110S3','110S4',
@@ -50,7 +54,7 @@ def roc_date_to_iso(v):
 def download_csv(season, fname):
     url = BASE_URL.format(season=season, fname=fname)
     try:
-        resp = requests.get(url, timeout=30)
+        resp = SESSION.get(url, timeout=30)
         if resp.status_code != 200: return None
         raw = resp.content.decode('utf-8-sig', errors='replace')
         lines = raw.splitlines()

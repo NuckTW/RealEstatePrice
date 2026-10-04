@@ -1,12 +1,12 @@
 -- ============================================================
--- 潛在客群分析｜村里潛在客群指數（首購／換屋）
+-- 潛在客群分析｜村里潛在客群指數（首購／換新屋／換二手）
 -- ⚠️ 請在 Supabase SQL Editor 手動執行（確認後再跑）
 -- 前置：20261002_potential_buyers.sql 已執行且資料已匯入
 -- 每月匯入後執行：SELECT refresh_village_buyer_indicators();
 -- 規劃文件：docs/potential-buyer-analysis-plan.md §7.1
 --
 -- 計分方式：各指標轉全市百分位（0–100）後加權相加
---   首購指數 = 世代淨移入(25–34) 30 + 25–34 占比 20 + 結婚率 20 + 所得 20 + 社會增加 10
+--   首購指數 = 世代淨移入(25–34) 30 + 25–34 占比 25 + 結婚率 10 + 所得 25 + 社會增加 10（v5 起；v4 以前結婚 20、占比 20、所得 20）
 --   換屋指數 = 世代淨移入(35–44) 20 + 35–44 占比 20 + 出生率 20 + 所得 30 + 社會增加 10（v4 起拆成換新屋／換二手，見下）
 -- 時間窗：最新月份往前 12 個月
 -- 分戶速度、戶量、跨縣市／市內他區淨移入：僅供前端顯示，不計分
@@ -21,6 +21,8 @@
 --   換二手指數 = 世代淨移入(35–44) 10 + 35–44 占比 20 + 26–45 歲戶長占比 20 + 所得 30 + 大學以上學歷 20
 --     驗證：近 24 月二手成屋（屋齡 >5 年）交易／每千戶 ρ=0.80（新屋 0.62）
 --   upgrader_index（舊換屋指數）暫時保留，讓舊版前端在部署前不會壞；新版前端不再使用，之後可移除
+-- v5（2026-10-04）：首購結婚率權重 20 → 10，釋出的 10 分給 25–34 占比、所得各 5（使用者決定）
+--   依據：結婚率與各區近 24 月預售成交排名相關只有 0.26，是首購組成中最弱的一項；調整後預售相關 0.53 → 0.57
 -- ============================================================
 
 DROP MATERIALIZED VIEW IF EXISTS village_buyer_indicators;
@@ -224,8 +226,8 @@ SELECT
   (SELECT to_char(end_date, 'YYYY-MM') FROM win) AS data_month,   -- 人口資料月份（西元）
   income_tax_year,                                                -- 所得資料年度（民國，落後約 2–3 年）
   -- 指數
-  round((0.30 * p_cohort_young + 0.20 * p_share_25_34 + 0.20 * p_marriage
-       + 0.20 * p_income + 0.10 * p_social)::numeric, 1)          AS first_buyer_index,
+  round((0.30 * p_cohort_young + 0.25 * p_share_25_34 + 0.10 * p_marriage
+       + 0.25 * p_income + 0.10 * p_social)::numeric, 1)          AS first_buyer_index,
   round((0.20 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_birth
        + 0.20 * p_income + 0.20 * p_dwellings_growth)::numeric, 1) AS new_home_index,
   round((0.10 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_head_26_45

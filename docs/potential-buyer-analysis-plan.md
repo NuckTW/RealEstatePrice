@@ -1,6 +1,6 @@
 # 台南市購屋潛在客群分析：完整交接文件
 
-> 最後更新：2026-10-02｜分支：`feat/potential-buyers-phase1`（尚未合併進 main）
+> 最後更新：2026-10-04｜已全數合併進 main（PR #1～#10），正式站 `/potential-buyers` 上線中
 > 專案：RealEstatePrice（https://tainan-realestate-ai.vercel.app，Next.js 16 + Supabase + Python 抓取腳本 + GitHub Actions）
 > 本文件整合 claude.ai 對話中的研究、評估、決定，以及 Claude Code 的實作與匯入結果。新的工作階段讀完本文即可接手。
 
@@ -156,7 +156,7 @@ Google Trends 關鍵字熱度、591 刊登與瀏覽、代銷來客資料（客�
 
 1. **Python 3.13 拒絕政府網站憑證**：fia.gov.tw、plvr.land.moi.gov.tw 憑證鏈缺 Subject Key Identifier，3.13 預設的 `VERIFY_X509_STRICT` 會報 `Missing Subject Key Identifier`。新腳本用 `scripts/gov_http.py` 的 `gov_session()` 處理（仍完整驗證，只關 strict 旗標）。**既有的 `fetch_history.py`、`fetch_latest.py` 在 3.13 上也會遇到**，GitHub Actions 用 3.11 所以沒事。
 2. **村里名異體字**：財政部寫 `𥂁埕里`、`𥂁田里`，戶政寫 `塩埕里`、`塩田里`；`檨林里` 兩邊 Unicode 碼位不同，用 NFKC 正規化解決。
-3. **分割與改名的里**：官田區「東西庄里」已分割為東庄里、西庄里（舊代碼仍在 villages 中）；新化區山腳里在 108–109 年度所得對不到代碼，疑似改名，待人工確認。
+3. **分割與改名的里**：官田區「東西庄里」已分割為東庄里、西庄里（舊代碼仍在 villages 中）；新化區山腳里在 105–109 年度所得對不到代碼，原因是異體字（財政部「山腳里」、戶政主檔「山脚里」），2026-10-04 已補進 ALIASES 並重新匯入。105 年度另有 32 個里對不到，是 107 年村里整併前的舊里，屬正常。
 4. **所得 CSV 欄名不一**：108–109 年度第一欄叫「鄉鎮市區」，110 年度起叫「縣市別」，且欄名內含 BOM。
 5. **租賃唯一鍵**：用 `serial_number` 單獨當唯一鍵，避免同一案出現在不同發布季時重複計算。
 7. **本機 `npm run build` 下載字型失敗（已解決 2026-10-04）**：原本 next/font/google 在 build 時要下載 Noto Sans TC 約百個中文子集檔，網路不穩就失敗。現改為 Geist／Geist Mono 自架於 `public/fonts`（globals.css `@font-face`），Noto Sans TC 由 `layout.tsx` 在執行時向 Google Fonts 載入。注意：Turbopack dev 的編譯快取（`.next/dev`）有時不會偵測到以腳本修改的 CSS，需重啟或清快取。
@@ -204,21 +204,21 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 - 村里社會增加必須加回同區跨里遷移（`in_total` 不含）：例如北區元美里跨區淨移入 −4‰，但同區跨里淨移入 +175‰。
 - 分戶速度、戶量訊號弱（分戶速度全市中位數 +1.4%，與淨移入相關 −0.21），只供顯示、不計分。
 - 結婚／出生率的村里差異多半是雜訊：以動差法估計，收縮強度 M ≈ 7,000 人年，往行政區平均收縮。
-- 租金／房貸比：transactions、rentals 都只有行政區欄位 → 不進村里指數，改當行政區背景資訊（尚未實作）。
+- 租金／房貸比：transactions、rentals 都只有行政區欄位 → 不進村里指數，改當行政區背景資訊（已實作，見 §7.3）。
 - 小里（人口 < 1000，111 里）不排除，以 `low_confidence` 標記；12 個月內新設的里（東庄里、西庄里）世代指標以 50 代入，所得沿用母里東西庄里。
 - materialized view 不受 RLS 保護 → SQL 內 `REVOKE ... FROM anon, authenticated`。
 
-**試算結果（11508、所得 112 年度）**：首購與換屋指數排名相關 0.77；首購前段為永康光復、歸仁沙崙、安平國平、東區東智、善化嘉北；換屋前段為安南國安、東和、海南、永康東橋、善化蓮潭。行政區平均前段為安定、新市、永康、善化（南科走廊）。
+**試算結果（11508、所得 112 年度，v1 權重）**：首購與換屋指數排名相關 0.77；首購前段為永康光復、歸仁沙崙、安平國平、東區東智、善化嘉北；換屋前段為安南國安、東和、海南、永康東橋、善化蓮潭。行政區平均前段為安定、新市、永康、善化（南科走廊）。
 
 **更新機制**：`fetch_ris_village.py`、`fetch_fia_income.py` 寫入資料後自動呼叫 `refresh_village_buyer_indicators()`（約 1 秒）。已驗證 650 筆、anon key 讀取回 permission denied。
 
-**v4（2026-10-04）換屋拆成換新屋／換二手（共三個指數）**：依 37 區近 24 月實際交易驗證（排名相關 Spearman）。
+**v4／v5（2026-10-04）換屋拆成換新屋／換二手（共三個指數）、首購結婚降權**：依 37 區近 24 月實際交易驗證（排名相關 Spearman）。
 | 指標 | 首購 | 換新屋 | 換二手 |
 |---|---|---|---|
 | 世代淨移入（25–34／35–44） | 30 | 20 | 10 |
-| 年齡層占比（25–34／35–44） | 20 | 20 | 20 |
-| 結婚率／出生率 | 結婚 20 | 出生 20 | — |
-| 所得中位數 | 20 | 20 | 30 |
+| 年齡層占比（25–34／35–44） | 25 | 20 | 20 |
+| 結婚率／出生率 | 結婚 10 | 出生 20 | — |
+| 所得中位數 | 25 | 20 | 30 |
 | 社會增加率 | 10 | — | — |
 | 設籍宅數成長（平台村里季資料） | — | 20 | — |
 | 26–45 歲戶長占比 | — | — | 20 |
@@ -226,7 +226,8 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 - 驗證目標：新屋＝預售＋新成屋（屋齡 ≤3 年）交易／每千戶；二手＝成屋（屋齡 >5 年）交易／每千戶；兩目標本身相關只有 0.25
 - 換新屋：新屋 0.79／二手 0.59；換二手：二手 0.80／新屋 0.62；舊換屋指數：0.72／0.62
 - 老屋占比、平均屋齡、65 歲以上戶長、一宅多戶與二手交易量都是**負相關**（老屋多的是偏鄉、交易少），不能當二手需求正向指標
-- 首購權重維持不變：加入戶長年齡、就業等候選指標只多 0.01–0.02；婚姻權重降為 0.1 可讓預售相關 0.53→0.57，但只有 37 區、差距可能是雜訊，暫不改
+- 首購：加入戶長年齡、就業等候選指標只多 0.01–0.02，不加；**v5（2026-10-04，使用者決定）結婚率 20 → 10**，釋出的權重給 25–34 占比、所得各 +5，預售相關 0.53 → 0.57（只有 37 區，差距可能部分是雜訊）
+- 表中首購欄為 v5 權重；MV 的 SQL 須由使用者執行才會更新資料庫的 `first_buyer_index`（前端已用新權重自行計算）
 - 前端以相同公式（`src/lib/buyerIndex.ts`，percent_rank、NULL→50）自行計算三個指數；MV 的 `upgrader_index` 僅為部署過渡保留
 - API 查詢在 v4 欄位不存在時自動退回舊欄位（`fetchVillageBuyerIndicators`），所以先部署程式、後執行 SQL 也不會壞
 
@@ -276,7 +277,7 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
   - 做不到 105 的：戶政 API 最早 106/01（村里月資料、年資料皆是）；南科統計資料庫最早 105/11
   - 106 年戶政舊版資料集（ODRP005／001／002、106 年 ODRP025）沒有 district_code → 以 107/01 ODRP014 的「行政區＋里名」對照；平台村里季資料以 villages 的 first_seen～last_seen 依期別挑代碼
   - 財政部 105 年度「廍」為造字 U+FFFB4、「赤崁里」＝戶政「赤嵌里」，已加對照
-- **村里戶政年資料、戶長年齡**（分支 feat/potential-buyers-village-annual）：`village_annual_stats`（ODRP020 教育程度、ODRP025 戶數結構，106 年起）、`village_household_quarterly`（平台 T06 戶長年齡、T02 宅內人口數、T04 宅內戶數，105Q1 起）+ `scripts/fetch_village_household.py`；view v3 新增顯示欄位（一宅多戶、26–45 歲戶長占比等），權重待討論
+- **村里戶政年資料、戶長年齡**（分支 feat/potential-buyers-village-annual）：`village_annual_stats`（ODRP020 教育程度、ODRP025 戶數結構，106 年起）、`village_household_quarterly`（平台 T06 戶長年齡、T02 宅內人口數、T04 宅內戶數，105Q1 起）+ `scripts/fetch_village_household.py`；view v3 新增顯示欄位（一宅多戶、26–45 歲戶長占比等）；v4 起 26–45 歲戶長占比、大學以上學歷、設籍宅數成長已納入換二手／換新屋指數（見 §7.1）
 
 - **南科產業別員工**（分支 feat/potential-buyers-sp-industry-projection）：`science_park_industry_yearly`，data.gov.tw 101986（`serialno=398&fileodr=2`），由 `fetch_science_park.py` 一併匯入；**開放資料只有 107～113 年**，105～106 年僅見於南科年報 PDF（南科管理局網站 2026-10 連不上）
 - **臺南市人口推估**：`population_projection` + `scripts/fetch_population_projection.py`；臺南市政府 data.gov.tw 134546（行政區 × 單一年齡 × 高中低推估），從 data.gov.tw API 自動挑最新版次（目前 2025-2070、2024-2070），匯入時彙整成年齡級距並加總全市；⚠️ 官方只計出生、死亡、未計遷徙
@@ -319,5 +320,5 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 原始清單（§2）的項目至此皆已完成或結案。
 
 ### 7.4 其他
-- 把 `scripts/gov_http.py` 套用到既有的實價登錄爬蟲，避免本機 Python 3.13 失敗
-- 確認新化區山腳里新名稱，補進 `fetch_fia_income.py` 的 ALIASES
+- ✅ 把 `scripts/gov_http.py` 套用到既有的實價登錄爬蟲（fetch_history／fetch_latest、fetch_buildcase、backfill_unit_number），2026-10-04
+- ✅ 新化區山腳里：異體字（腳／脚），已補進 `fetch_fia_income.py` 的 ALIASES 並重新匯入 105–109 年度，2026-10-04

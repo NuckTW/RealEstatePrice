@@ -3,7 +3,7 @@
  *  - 指標目錄：所有可顯示、可放進指數的資料（村里層級 + 行政區層級 + 手動資料）
  *  - 百分位：與 MV 相同的 percent_rank 定義（NULL 不參與排名、給中性值 50）
  *  - 指數：各組成百分位 × 權重 ÷ 權重總和
- * 預設三個指數的權重須與 supabase/migrations/20261003_village_buyer_indicators.sql（v4）一致
+ * 預設三個指數的權重須與 supabase/migrations/20261003_village_buyer_indicators.sql（v5）一致
  */
 import type { IndustryPoint } from '@/components/IndustrySection'
 import type { SupplyData } from '@/components/SupplyPipelineSection'
@@ -113,8 +113,8 @@ export const PRESET_INDICES: IndexDef[] = [
     id: 'firstBuyer', name: '首購指數', short: '首購', preset: true,
     desc: '25–34 歲年輕人第一次買房的需求強度',
     components: [
-      { key: 'cohortYoung', weight: 30 }, { key: 'share2534', weight: 20 }, { key: 'marriage', weight: 20 },
-      { key: 'income', weight: 20 }, { key: 'social', weight: 10 },
+      { key: 'cohortYoung', weight: 30 }, { key: 'share2534', weight: 25 }, { key: 'marriage', weight: 10 },
+      { key: 'income', weight: 25 }, { key: 'social', weight: 10 },
     ],
   },
   {
