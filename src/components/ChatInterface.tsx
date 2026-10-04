@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, useSyncExternalStore } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import type { ChartConfig } from '@/app/api/chat/route'
+import { usePassword, savePassword } from '@/lib/chatPassword'
 
 const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false })
 
@@ -17,24 +18,7 @@ interface Message {
   error?: boolean
 }
 
-/* ── 密碼（存 localStorage，換裝置需重輸；被 401 時清掉重問）── */
-// 用 useSyncExternalStore 讀 localStorage：server snapshot 回 null（尚未 hydrate），client 回字串
-const PW_KEY = 'tra_chat_pw'
-const pwListeners = new Set<() => void>()
-function subscribePassword(cb: () => void) {
-  pwListeners.add(cb)
-  return () => { pwListeners.delete(cb) }
-}
-function loadPassword(): string {
-  try { return localStorage.getItem(PW_KEY) ?? '' } catch { return '' }
-}
-function savePassword(pw: string) {
-  try {
-    if (pw) localStorage.setItem(PW_KEY, pw)
-    else localStorage.removeItem(PW_KEY)
-  } catch { /* private mode 等情況忽略 */ }
-  pwListeners.forEach(cb => cb())
-}
+/* ── 密碼：與潛在客群「自訂指數」共用（見 src/lib/chatPassword.ts）── */
 
 /* ── Suggestions ───────────────────────────────────────── */
 const SUGGESTIONS = [
@@ -210,7 +194,7 @@ export default function ChatInterface() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   // null = 尚未 hydrate；'' = 未輸入密碼；其他 = 已存的密碼
-  const password = useSyncExternalStore(subscribePassword, loadPassword, () => null)
+  const password = usePassword()
   const [pwInput, setPwInput] = useState('')            // 密碼閘輸入框
   const [pwError, setPwError] = useState('')            // 密碼閘錯誤訊息
   const bottomRef = useRef<HTMLDivElement>(null)

@@ -85,15 +85,10 @@ export async function GET() {
       code:     String(r.village_code),
       district: String(r.district),
       village:  fixName(String(r.village)),
+      // 官方三個指數（MV 計算；組成百分位由前端以同公式計算，見 src/lib/buyerIndex.ts）
       firstBuyer: Number(r.first_buyer_index),
-      upgrader:   Number(r.upgrader_index),
-      // 各指標全市百分位（0–100）
-      p: {
-        cohortYoung: Number(r.p_cohort_young), cohortMid: Number(r.p_cohort_mid),
-        share2534:   Number(r.p_share_25_34),  share3544: Number(r.p_share_35_44),
-        marriage:    Number(r.p_marriage),     birth:     Number(r.p_birth),
-        income:      Number(r.p_income),       social:    Number(r.p_social),
-      },
+      newHome:    num(r.new_home_index),   // v4 MV 尚未執行時為 null
+      resale:     num(r.resale_index),
       // 原始值（率皆為每千人・年；所得單位千元）
       raw: {
         pop: Number(r.pop_total), households: Number(r.households),

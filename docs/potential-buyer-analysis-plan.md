@@ -212,6 +212,24 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 
 **更新機制**：`fetch_ris_village.py`、`fetch_fia_income.py` 寫入資料後自動呼叫 `refresh_village_buyer_indicators()`（約 1 秒）。已驗證 650 筆、anon key 讀取回 permission denied。
 
+**v4（2026-10-04）換屋拆成換新屋／換二手（共三個指數）**：依 37 區近 24 月實際交易驗證（排名相關 Spearman）。
+| 指標 | 首購 | 換新屋 | 換二手 |
+|---|---|---|---|
+| 世代淨移入（25–34／35–44） | 30 | 20 | 10 |
+| 年齡層占比（25–34／35–44） | 20 | 20 | 20 |
+| 結婚率／出生率 | 結婚 20 | 出生 20 | — |
+| 所得中位數 | 20 | 20 | 30 |
+| 社會增加率 | 10 | — | — |
+| 設籍宅數成長（平台村里季資料） | — | 20 | — |
+| 26–45 歲戶長占比 | — | — | 20 |
+| 大學以上學歷占比 | — | — | 20 |
+- 驗證目標：新屋＝預售＋新成屋（屋齡 ≤3 年）交易／每千戶；二手＝成屋（屋齡 >5 年）交易／每千戶；兩目標本身相關只有 0.25
+- 換新屋：新屋 0.79／二手 0.59；換二手：二手 0.80／新屋 0.62；舊換屋指數：0.72／0.62
+- 老屋占比、平均屋齡、65 歲以上戶長、一宅多戶與二手交易量都是**負相關**（老屋多的是偏鄉、交易少），不能當二手需求正向指標
+- 首購權重維持不變：加入戶長年齡、就業等候選指標只多 0.01–0.02；婚姻權重降為 0.1 可讓預售相關 0.53→0.57，但只有 37 區、差距可能是雜訊，暫不改
+- 前端以相同公式（`src/lib/buyerIndex.ts`，percent_rank、NULL→50）自行計算三個指數；MV 的 `upgrader_index` 僅為部署過渡保留
+- API 查詢在 v4 欄位不存在時自動退回舊欄位（`fetchVillageBuyerIndicators`），所以先部署程式、後執行 SQL 也不會壞
+
 ### 7.2 前端「潛在客群」頁（✅ 已完成 2026-10-03，`/potential-buyers`）
 - 村里界線：內政部國土測繪中心 村(里)界 1150817 版 → `scripts/build_village_geojson.sh`（npx mapshaper，簡化 10 公尺）→ `public/geo/tainan_villages.json`（1.26 MB、gzip 約 300 KB）；VILLCODE 與 village_code 650 里全數對上
 - API：`/api/potential-buyers`（service role 讀 materialized view，1 小時快取）；戶政造字 U+FB56F 於 API 換成「塭」
@@ -219,6 +237,13 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 - 色階：brass 單一色相五分位，CSS 變數 `--pb-ramp-0..4`；暗色主題翻轉為高分＝亮色；人口 < 1000 淡色虛線
 - 底圖沿用 OSM（CARTO 已需 API key），暗色主題以 CSS 濾鏡壓暗
 - ⚠️ Vercel Preview 環境缺 Supabase 環境變數（只設 Production），非 main 分支的 Preview build 會失敗；需在 Vercel 設定勾選 Preview
+- **自訂指數與資料總覽（2026-10-04）**：
+  - 「資料總覽」頁籤：列出全部指標（村里 35 項、行政區 15 項、三個指數、手動資料）＋ 13 項時間序列；點選後村里資料畫地圖、行政區資料畫長條
+  - 「自訂指數」頁籤：選任意指標組合與權重（可反向）、即時預覽地圖／前 10 名／與預設指數相似度、高度重複（相關 ≥0.8）警告；儲存後可在村里指數頁選用
+  - 手動資料：村里或行政區層級，可貼上試算表（`行政區, 村里, 數值` 或 `村里代碼, 數值`）或逐格輸入
+  - AI 建議：`/api/potential-buyers/ai-weights`（Gemini Free tier，與 AI 問答共用密碼與限流，每次算 1 題），回傳指標、權重、理由，前端再以實際資料檢查重複
+  - 資料表：`supabase/migrations/20261007_custom_datasets_indices.sql`（`custom_datasets`、`custom_dataset_values`、`custom_indices`，RLS 全關）；API `/api/potential-buyers/custom` 需 `x-chat-password`
+  - 共用程式：`src/lib/aiGuard.ts`（Gemini、fallback、密碼、限流，chat route 也改用）、`src/lib/chatPassword.ts`（密碼存 localStorage，與 AI 問答共用）、`src/components/ChoroplethLegend.tsx`
 - **頁籤化（2026-10-04）**：村里指數／人口與家庭／就業與產業／房市與負擔／重大建設；行政區篩選跨頁籤共用；頁籤寫入網址 hash（如 `#房市與負擔`）可分享；桌面版頁籤列固定於導覽列下方、手機不固定；格線最小欄寬改為 `min(Npx, 100%)` 避免窄螢幕橫向溢出
 
 ### 7.3 第二期資料
