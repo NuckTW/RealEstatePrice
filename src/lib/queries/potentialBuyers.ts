@@ -7,12 +7,13 @@
  */
 import { cachedQuery, type Row } from './client'
 
-/** 村里指標 SQL；v4 MV 尚未執行時改用不含新指數欄位的版本 */
-const villageIndicatorSql = (v4: boolean) => `
+export function fetchVillageBuyerIndicators(): Promise<Row[]> {
+  return cachedQuery(`
     SELECT
       village_code, district, village, data_month, income_tax_year,
       first_buyer_index::float AS first_buyer_index,
-      ${v4 ? 'new_home_index::float AS new_home_index, resale_index::float AS resale_index,' : ''}
+      new_home_index::float    AS new_home_index,
+      resale_index::float      AS resale_index,
       pop_total, households,
       share_25_34::float AS share_25_34, share_35_44::float AS share_35_44,
       cohort_young_k::float AS cohort_young_k, cohort_mid_k::float AS cohort_mid_k,
@@ -34,20 +35,7 @@ const villageIndicatorSql = (v4: boolean) => `
       low_confidence, cohort_missing, income_from_parent
     FROM village_buyer_indicators
     ORDER BY village_code
-  `
-
-/**
- * 村里潛在客群指標（MV）
- * 新版 MV（v4，含換新屋／換二手指數）尚未執行時自動退回舊欄位，避免部署順序造成頁面全掛；
- * 前端會以相同公式自行計算三個指數，所以退回時畫面仍正常
- */
-export async function fetchVillageBuyerIndicators(): Promise<Row[]> {
-  try {
-    return await cachedQuery(villageIndicatorSql(true))
-  } catch (err) {
-    console.warn('[fetchVillageBuyerIndicators] v4 欄位不存在，改用舊版查詢', err)
-    return cachedQuery(villageIndicatorSql(false))
-  }
+  `)
 }
 
 /**
