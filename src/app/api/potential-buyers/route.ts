@@ -87,7 +87,7 @@ export async function GET() {
       village:  fixName(String(r.village)),
       // 官方三個指數（MV 計算；組成百分位由前端以同公式計算，見 src/lib/buyerIndex.ts）
       firstBuyer: Number(r.first_buyer_index),
-      newHome:    num(r.new_home_index),   // v4 MV 尚未執行時為 null
+      newHome:    num(r.new_home_index),
       resale:     num(r.resale_index),
       // 原始值（率皆為每千人・年；所得單位千元）
       raw: {

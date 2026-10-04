@@ -228,8 +228,8 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 - 老屋占比、平均屋齡、65 歲以上戶長、一宅多戶與二手交易量都是**負相關**（老屋多的是偏鄉、交易少），不能當二手需求正向指標
 - 首購：加入戶長年齡、就業等候選指標只多 0.01–0.02，不加；**v5（2026-10-04，使用者決定）結婚率 20 → 10**，釋出的權重給 25–34 占比、所得各 +5，預售相關 0.53 → 0.57（只有 37 區，差距可能部分是雜訊）
 - 表中首購欄為 v5 權重；MV 的 SQL 須由使用者執行才會更新資料庫的 `first_buyer_index`（前端已用新權重自行計算）
-- 前端以相同公式（`src/lib/buyerIndex.ts`，percent_rank、NULL→50）自行計算三個指數；MV 的 `upgrader_index` 僅為部署過渡保留
-- API 查詢在 v4 欄位不存在時自動退回舊欄位（`fetchVillageBuyerIndicators`），所以先部署程式、後執行 SQL 也不會壞
+- 前端以相同公式（`src/lib/buyerIndex.ts`，percent_rank、NULL→50）自行計算三個指數；MV 的 `upgrader_index` 為部署過渡保留，v6 已移除
+- v4 上線期間 API 曾在新欄位不存在時退回舊查詢；v6 起移除此退回機制（MV 已全面是新版）
 
 ### 7.2 前端「潛在客群」頁（✅ 已完成 2026-10-03，`/potential-buyers`）
 - 村里界線：內政部國土測繪中心 村(里)界 1150817 版 → `scripts/build_village_geojson.sh`（npx mapshaper，簡化 10 公尺）→ `public/geo/tainan_villages.json`（1.26 MB、gzip 約 300 KB）；VILLCODE 與 village_code 650 里全數對上

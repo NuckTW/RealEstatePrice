@@ -20,9 +20,10 @@
 --     驗證：近 24 月預售＋新成屋（屋齡 ≤3 年）交易／每千戶 ρ=0.79（二手 0.59）
 --   換二手指數 = 世代淨移入(35–44) 10 + 35–44 占比 20 + 26–45 歲戶長占比 20 + 所得 30 + 大學以上學歷 20
 --     驗證：近 24 月二手成屋（屋齡 >5 年）交易／每千戶 ρ=0.80（新屋 0.62）
---   upgrader_index（舊換屋指數）暫時保留，讓舊版前端在部署前不會壞；新版前端不再使用，之後可移除
+--   upgrader_index（舊換屋指數）於 v4、v5 暫時保留，v6 移除
 -- v5（2026-10-04）：首購結婚率權重 20 → 10，釋出的 10 分給 25–34 占比、所得各 5（使用者決定）
 --   依據：結婚率與各區近 24 月預售成交排名相關只有 0.26，是首購組成中最弱的一項；調整後預售相關 0.53 → 0.57
+-- v6：移除部署過渡用的 upgrader_index（新版前端自 PR #10 起不再使用）
 -- ============================================================
 
 DROP MATERIALIZED VIEW IF EXISTS village_buyer_indicators;
@@ -232,9 +233,6 @@ SELECT
        + 0.20 * p_income + 0.20 * p_dwellings_growth)::numeric, 1) AS new_home_index,
   round((0.10 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_head_26_45
        + 0.30 * p_income + 0.20 * p_edu_univ)::numeric, 1)        AS resale_index,
-  -- 舊換屋指數（v3 以前），僅為部署過渡保留
-  round((0.20 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_birth
-       + 0.30 * p_income + 0.10 * p_social)::numeric, 1)          AS upgrader_index,
   -- 各指標百分位
   round(p_cohort_young::numeric, 1) AS p_cohort_young, round(p_cohort_mid::numeric, 1) AS p_cohort_mid,
   round(p_share_25_34::numeric, 1)  AS p_share_25_34,  round(p_share_35_44::numeric, 1) AS p_share_35_44,
