@@ -73,7 +73,7 @@ export default function SchoolSection({ data, highlightDistrict }: { data: Schoo
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 18, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 18, alignItems: 'start' }}>
         <div style={{ overflowX: 'auto', maxHeight: 420 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)', color: 'var(--text-default)' }}>
             <thead style={{ position: 'sticky', top: 0, background: 'var(--surface-card)' }}>

@@ -109,7 +109,7 @@ export function AffordabilitySection({ market }: { market: MarketPoint[] }) {
   return (
     <div style={cardStyle}>
       <SectionTitle title="負擔能力與房貸條件" sub="臺南市 vs 全國；所得比、負擔率、利率越低越容易負擔；縣市級資料，不計入村里指數" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))', gap: 18 }}>
         {block('房價所得比', charts.pir, ' 倍', '倍', ' 倍')}
         {block('貸款負擔率', charts.burden, '%', '%', ' 個百分點')}
         {block('新增購屋貸款平均利率', charts.rate, '%', '%', ' 個百分點')}
@@ -150,7 +150,7 @@ export function TransfersSection({ data, highlightDistrict }: { data: TransfersD
   return (
     <div style={cardStyle}>
       <SectionTitle title="建物移轉（新屋交屋 × 買賣）" sub={`行政區月資料，最新 ${latest}；新屋交屋多 = 新入住家庭多，不計入村里指數`} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 18, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 18, alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 2 }}>全市每月件數（近 5 年）</div>
           <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginBottom: 6 }}>
@@ -218,7 +218,7 @@ export function LowUsageSection({ rows, highlightDistrict }: { rows: LowUsageRow
           <span style={{ color: 'var(--text-muted)' }}>（{city.rate - city.prevRate >= 0 ? '+' : ''}{(city.rate - city.prevRate).toFixed(2)} 個百分點）</span>
         )}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', columnGap: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))', columnGap: 24 }}>
         {view.map(r => {
           const d = r.prevRate != null ? r.rate! - r.prevRate : null
           return (

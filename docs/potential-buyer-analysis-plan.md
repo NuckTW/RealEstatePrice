@@ -218,6 +218,7 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
 - 色階：brass 單一色相五分位，CSS 變數 `--pb-ramp-0..4`；暗色主題翻轉為高分＝亮色；人口 < 1000 淡色虛線
 - 底圖沿用 OSM（CARTO 已需 API key），暗色主題以 CSS 濾鏡壓暗
 - ⚠️ Vercel Preview 環境缺 Supabase 環境變數（只設 Production），非 main 分支的 Preview build 會失敗；需在 Vercel 設定勾選 Preview
+- **頁籤化（2026-10-04）**：村里指數／人口與家庭／就業與產業／房市與負擔／重大建設；行政區篩選跨頁籤共用；頁籤寫入網址 hash（如 `#房市與負擔`）可分享；桌面版頁籤列固定於導覽列下方、手機不固定；格線最小欄寬改為 `min(Npx, 100%)` 避免窄螢幕橫向溢出
 
 ### 7.3 第二期資料
 

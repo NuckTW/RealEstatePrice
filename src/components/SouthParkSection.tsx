@@ -80,7 +80,7 @@ export default function SouthParkSection({ rows, industry = [] }: { rows: SouthP
         {eduShare != null && stat('碩博士占比', `${eduShare.toFixed(1)}%`, '高學歷 ≈ 高所得購屋族群')}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 16, alignItems: 'start' }}>
         <div style={{ gridColumn: 'span 2', minWidth: 0 }} className="sp-chart">
           <SouthParkChart rows={series} />
         </div>
@@ -113,7 +113,7 @@ export default function SouthParkSection({ rows, industry = [] }: { rows: SouthP
               合計 {ind.total?.toLocaleString() ?? '—'} 人
             </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', columnGap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))', columnGap: 24 }}>
             {ind.list.map(r => {
               const chg = r.now != null && r.then ? (r.now / r.then - 1) * 100 : null
               const max = ind.list[0].now ?? 1
