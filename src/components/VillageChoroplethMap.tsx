@@ -17,6 +17,14 @@ interface Props {
   onSelect: (code: string) => void
   /** 變更時將地圖縮放到這些村里（行政區篩選、表格點選） */
   focusCodes: string[] | null
+  /** 客源分析：點地圖任一處回傳座標（同時仍會觸發 onSelect） */
+  onMapClick?: (lat: number, lon: number) => void
+  /** 客源分析：標記分析位置，並畫出距離圈（公里） */
+  marker?: { lat: number; lon: number; label?: string } | null
+  rings?: number[]
+  /** 客源分析：建案小圓點，點選觸發 onPointClick */
+  points?: { id: string; lat: number; lon: number; label: string }[]
+  onPointClick?: (id: string) => void
 }
 
 // 與站內其他地圖相同用 OSM 底圖；暗色主題以 CSS 濾鏡壓暗（見元件底部 <style>）
@@ -29,6 +37,7 @@ function isLightTheme(): boolean {
 
 export default function VillageChoroplethMap({
   geojson, classByCode, lowConfidence, tooltipByCode, selected, onSelect, focusCodes,
+  onMapClick, marker, rings, points, onPointClick,
 }: Props) {
   const mapRef   = useRef<HTMLDivElement>(null)
   const mapInst  = useRef<L.Map | null>(null)
@@ -41,7 +50,13 @@ export default function VillageChoroplethMap({
   const tooltipRef  = useRef(tooltipByCode)
   const selectedRef = useRef(selected)
   const onSelectRef = useRef(onSelect)
+  const onMapClickRef = useRef(onMapClick)
+  const onPointClickRef = useRef(onPointClick)
+  const markerLayer = useRef<L.LayerGroup | null>(null)
+  const pointLayer  = useRef<L.LayerGroup | null>(null)
   useEffect(() => {
+    onMapClickRef.current   = onMapClick
+    onPointClickRef.current = onPointClick
     classRef.current    = classByCode
     lowRef.current      = lowConfidence
     tooltipRef.current  = tooltipByCode
@@ -98,6 +113,10 @@ export default function VillageChoroplethMap({
           lyr.on('click', () => onSelectRef.current(code))
         },
       }).addTo(map)
+      // 點選位置：村里多邊形的 click 會冒泡到地圖，所以點里內、里外都只在這裡處理
+      map.on('click', e => onMapClickRef.current?.(e.latlng.lat, e.latlng.lng))
+      pointLayer.current  = Lx.layerGroup().addTo(map)
+      markerLayer.current = Lx.layerGroup().addTo(map)
       geoLayer.current = layer
       map.fitBounds(layer.getBounds(), { padding: [8, 8] })
 
@@ -140,6 +159,49 @@ export default function VillageChoroplethMap({
       if (bounds.isValid()) mapInst.current!.flyToBounds(bounds, { padding: [16, 16], maxZoom: 14, duration: 0.6 })
     })
   }, [ready, focusCodes])
+
+  /* 建案小圓點 */
+  useEffect(() => {
+    if (!ready || !pointLayer.current) return
+    import('leaflet').then(mod => {
+      const Lx = mod.default as typeof L
+      const g = pointLayer.current!
+      g.clearLayers()
+      const light = isLightTheme()
+      for (const p of points ?? []) {
+        Lx.circleMarker([p.lat, p.lon], {
+          radius: 3, weight: 1, color: light ? '#1f2a2b' : '#e8eeec', fillColor: light ? '#1f7a6e' : '#4fbfae', fillOpacity: 0.9,
+          bubblingMouseEvents: false,
+        })
+          .bindTooltip(p.label, { direction: 'top' })
+          .on('click', () => onPointClickRef.current?.(p.id))
+          .addTo(g)
+      }
+    })
+  }, [ready, points])
+
+  /* 分析位置標記與距離圈 */
+  useEffect(() => {
+    if (!ready || !markerLayer.current) return
+    import('leaflet').then(mod => {
+      const Lx = mod.default as typeof L
+      const g = markerLayer.current!
+      g.clearLayers()
+      if (!marker) return
+      const light = isLightTheme()
+      const ink = light ? '#2a1f10' : '#f6f1e8'
+      for (const km of rings ?? []) {
+        Lx.circle([marker.lat, marker.lon], { radius: km * 1000, color: ink, weight: 1, dashArray: '4 4', fill: false, interactive: false })
+          .bindTooltip(`${km} 公里`, { permanent: false })
+          .addTo(g)
+      }
+      Lx.circleMarker([marker.lat, marker.lon], { radius: 8, weight: 3, color: ink, fillColor: '#d9534f', fillOpacity: 1, interactive: false })
+        .addTo(g)
+      if (marker.label) {
+        Lx.tooltip({ permanent: true, direction: 'right', offset: [10, 0] }).setLatLng([marker.lat, marker.lon]).setContent(marker.label).addTo(g)
+      }
+    })
+  }, [ready, marker, rings])
 
   return (
     <>

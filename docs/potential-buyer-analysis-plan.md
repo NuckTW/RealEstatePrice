@@ -245,6 +245,14 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
   - AI 建議：`/api/potential-buyers/ai-weights`（Gemini Free tier，與 AI 問答共用密碼與限流，每次算 1 題），回傳指標、權重、理由，前端再以實際資料檢查重複
   - 資料表：`supabase/migrations/20261007_custom_datasets_indices.sql`（`custom_datasets`、`custom_dataset_values`、`custom_indices`，RLS 全關）；API `/api/potential-buyers/custom` 需 `x-chat-password`
   - 共用程式：`src/lib/aiGuard.ts`（Gemini、fallback、密碼、限流，chat route 也改用）、`src/lib/chatPassword.ts`（密碼存 localStorage，與 AI 問答共用）、`src/components/ChoroplethLegend.tsx`
+- **客源分析（2026-10-04）**：「客源分析」頁籤，選預售建案或在地圖點位置，推估潛在買方來自哪些里
+  - 模型 `src/lib/catchment.ts`（Huff／重力模型簡化版）：村里分數 = 距離衰減（0.5^(距離÷減半距離)，預設 6 公里、可調）× 負擔能力（年房貸÷里所得中位數，≤50% 不扣、≥100% 剩 0.15）× [首購比重 × 25–34 歲人口 × (0.5+首購指數/100) ＋ 換屋比重 × 35–44 歲人口 × (0.5+換新屋或換二手指數/100)]
+  - 首購比重預設 = 0.25 + 0.6 × 2 房以下成交占比；預售用換新屋指數、成屋用換二手指數
+  - 建案清單 `/api/potential-buyers/projects`：預售成交 ≥3 筆且 building_locations 有座標（約 885 案），總價扣車位、坪數扣車位面積
+  - 就業地：普查從業員工依行政區人口重心距離加權，只列出參考、不計入村里占比
+  - AI 解讀 `/api/potential-buyers/catchment-ai`（Gemini Free tier，與 AI 問答共用密碼與限流）
+  - ⚠️ 沒有買方戶籍資料，距離衰減無法校準；結果是相對可能性，不是實際買方統計
+  - 地圖元件 `VillageChoroplethMap` 新增可選 props：`onMapClick`、`marker`、`rings`、`points`、`onPointClick`
 - **頁籤化（2026-10-04）**：村里指數／人口與家庭／就業與產業／房市與負擔／重大建設；行政區篩選跨頁籤共用；頁籤寫入網址 hash（如 `#房市與負擔`）可分享；桌面版頁籤列固定於導覽列下方、手機不固定；格線最小欄寬改為 `min(Npx, 100%)` 避免窄螢幕橫向溢出
 
 ### 7.3 第二期資料
