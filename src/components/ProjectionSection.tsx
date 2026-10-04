@@ -90,7 +90,7 @@ export default function ProjectionSection({ data, highlightDistrict }: { data: P
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 18, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 18, alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)' }}>全市總人口（{scope}）</div>
           <OneLineChart rows={view.totalSeries} name="總人口" unit=" 人" tickFormatter={wan} />

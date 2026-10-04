@@ -89,6 +89,22 @@ const COMPONENTS: Record<Mode, { key: PKey; raw: RawKey; label: string; weight: 
 
 const MODE_LABEL: Record<Mode, string> = { firstBuyer: '首購指數', upgrader: '換屋指數' }
 
+/** 頁籤：村里指數為主，其餘為行政區／縣市層級的背景資料（皆不計入村里指數） */
+type Tab = '村里指數' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設'
+const TABS: { key: Tab; desc: string }[] = [
+  { key: '村里指數',   desc: '村里首購／換屋指數地圖與排行' },
+  { key: '人口與家庭', desc: '未來人口推估、學區新生' },
+  { key: '就業與產業', desc: '各區就業結構、南科就業動能' },
+  { key: '房市與負擔', desc: '負擔能力、租金與房貸、建物移轉、空屋、屋齡' },
+  { key: '重大建設',   desc: '捷運、鐵路地下化、交流道、產業園區、重劃區' },
+]
+/** 從網址 hash 讀取頁籤（如 #房市與負擔），方便分享連結 */
+function tabFromHash(): Tab {
+  if (typeof window === 'undefined') return '村里指數'
+  const h = decodeURIComponent(window.location.hash.replace(/^#/, ''))
+  return TABS.some(t => t.key === h) ? (h as Tab) : '村里指數'
+}
+
 /**
  * 單一色相（brass）五分位色階，以 CSS 變數 --pb-ramp-0..4 定義（0 = 最低）
  * 亮色主題：淺 → 深；暗色主題翻轉為 深 → 亮，高分在深底圖上才會突出
@@ -144,6 +160,14 @@ export default function PotentialBuyersPanel() {
   const [selected, setSelected] = useState<string | null>(null)
   const [focusCodes, setFocusCodes] = useState<string[] | null>(null)
   const [assumption, setAssumption] = useState<MortgageAssumption>(DEFAULT_ASSUMPTION)
+  // 伺服器端渲染時資料尚未載入（只顯示「載入中」），因此直接以 hash 初始化不會造成 hydration 不一致
+  const [tab, setTab] = useState<Tab>(tabFromHash)
+  // 瀏覽器上一頁／下一頁或手動改 hash 時同步頁籤
+  useEffect(() => {
+    const onHash = () => setTab(tabFromHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -220,176 +244,230 @@ export default function PotentialBuyersPanel() {
     setDistrict(d)
     setFocusCodes(d ? villages.filter(v => v.district === d).map(v => v.code) : villages.map(v => v.code))
   }
+  const changeTab = (t: Tab) => {
+    setTab(t)
+    window.history.replaceState(null, '', t === '村里指數' ? window.location.pathname : `#${encodeURIComponent(t)}`)
+  }
   const pickFromTable = (code: string) => {
     setSelected(code)
     setFocusCodes([code])
   }
 
+  const hl = district || undefined
+
   return (
     <div style={{ padding: '12px 20px 0', display: 'flex', flexDirection: 'column', gap: 14, fontFamily: 'var(--font-sans)' }}>
 
-      {/* 篩選列 */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-        <div role="tablist" style={{ display: 'inline-flex', padding: 3, gap: 3, borderRadius: 'var(--radius-full)', background: 'var(--surface-control)', border: '1px solid var(--border-control)' }}>
-          {(['firstBuyer', 'upgrader'] as Mode[]).map(m => (
+      {/* 頁籤 + 共用篩選列（捲動時固定在導覽列下方） */}
+      <div className="pb-sticky" style={{
+        position: 'sticky', top: 'var(--nav-h)', zIndex: 1100,
+        background: 'var(--bg-app)', margin: '0 -20px', padding: '8px 20px 10px',
+        borderBottom: '1px solid var(--border-card)',
+      }}>
+        <div role="tablist" aria-label="潛在客群分析頁籤" className="pb-tabs" style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 8 }}>
+          {TABS.map(t => (
             <button
-              key={m} role="tab" aria-selected={mode === m}
-              onClick={() => setMode(m)}
+              key={t.key} role="tab" aria-selected={tab === t.key}
+              onClick={() => changeTab(t.key)}
+              title={t.desc}
               style={{
-                height: 'var(--control-h-sm)', padding: '0 14px', borderRadius: 'var(--radius-full)',
-                border: 'none', cursor: 'pointer',
-                fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)',
-                background: mode === m ? 'var(--accent)' : 'transparent',
-                color: mode === m ? 'var(--on-accent)' : 'var(--text-muted)',
+                height: 'var(--control-h-md)', padding: '0 14px', whiteSpace: 'nowrap', cursor: 'pointer',
+                fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)',
+                background: 'transparent', border: 'none',
+                borderBottom: `2px solid ${tab === t.key ? 'var(--accent)' : 'transparent'}`,
+                color: tab === t.key ? 'var(--text-strong)' : 'var(--text-muted)',
                 transition: 'var(--transition-base)',
               }}
-            >{MODE_LABEL[m]}</button>
+            >{t.key}</button>
           ))}
         </div>
 
-        <select
-          value={district}
-          onChange={e => changeDistrict(e.target.value)}
-          aria-label="行政區"
-          style={{
-            height: 'var(--control-h-md)', padding: '0 10px', borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-control)', color: 'var(--text-default)',
-            border: '1px solid var(--border-control)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)',
-          }}
-        >
-          <option value="">全市（{villages.length} 里）</option>
-          {districts.map(d => (
-            <option key={d.name} value={d.name}>{d.name}（平均 {fmt(d.avg)}）</option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+          {tab === '村里指數' && (
+            <div role="tablist" aria-label="指數類型" style={{ display: 'inline-flex', padding: 3, gap: 3, borderRadius: 'var(--radius-full)', background: 'var(--surface-control)', border: '1px solid var(--border-control)' }}>
+              {(['firstBuyer', 'upgrader'] as Mode[]).map(m => (
+                <button
+                  key={m} role="tab" aria-selected={mode === m}
+                  onClick={() => setMode(m)}
+                  style={{
+                    height: 'var(--control-h-sm)', padding: '0 14px', borderRadius: 'var(--radius-full)',
+                    border: 'none', cursor: 'pointer',
+                    fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)',
+                    background: mode === m ? 'var(--accent)' : 'transparent',
+                    color: mode === m ? 'var(--on-accent)' : 'var(--text-muted)',
+                    transition: 'var(--transition-base)',
+                  }}
+                >{MODE_LABEL[m]}</button>
+              ))}
+            </div>
+          )}
 
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-xs)', color: 'var(--text-muted)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={hideLow} onChange={e => setHideLow(e.target.checked)} />
-          排行榜隱藏人口未滿 1,000 的里
-        </label>
+          <select
+            value={district}
+            onChange={e => changeDistrict(e.target.value)}
+            aria-label="行政區"
+            style={{
+              height: 'var(--control-h-md)', padding: '0 10px', borderRadius: 'var(--radius-md)',
+              background: 'var(--surface-control)', color: 'var(--text-default)',
+              border: '1px solid var(--border-control)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)',
+            }}
+          >
+            <option value="">全市（{villages.length} 里）</option>
+            {districts.map(d => (
+              <option key={d.name} value={d.name}>{d.name}（{MODE_LABEL[mode]}平均 {fmt(d.avg)}）</option>
+            ))}
+          </select>
 
-        <span style={{ marginLeft: 'auto', fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>
-          人口 {rocMonth(data.meta.dataMonth)}・所得 {data.meta.incomeTaxYear} 年度
-        </span>
+          {tab === '村里指數' && (
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-xs)', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={hideLow} onChange={e => setHideLow(e.target.checked)} />
+              排行榜隱藏人口未滿 1,000 的里
+            </label>
+          )}
+
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>
+            {tab === '村里指數'
+              ? <span style={{ fontFamily: 'var(--font-mono)' }}>人口 {rocMonth(data.meta.dataMonth)}・所得 {data.meta.incomeTaxYear} 年度</span>
+              : TABS.find(t => t.key === tab)?.desc}
+            {district && tab !== '村里指數' && <span style={{ color: 'var(--accent-tint)' }}>；已標示{district}</span>}
+          </span>
+        </div>
       </div>
 
-      {/* 地圖 + 明細 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 14 }}>
-        <div style={{ ...cardStyle, padding: 8, gridColumn: 'span 2', minWidth: 0 }} className="pb-map-card">
-          <div className="pb-map-box" style={{ position: 'relative' }}>
-            <VillageChoroplethMap
-              geojson={geo}
-              classByCode={classByCode}
-              lowConfidence={lowConfidence}
-              tooltipByCode={tooltipByCode}
-              selected={selected}
-              onSelect={setSelected}
-              focusCodes={focusCodes}
+      {tab === '村里指數' && (
+        <>
+          {/* 地圖 + 明細 */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 14 }}>
+            <div style={{ ...cardStyle, padding: 8, gridColumn: 'span 2', minWidth: 0 }} className="pb-map-card">
+              <div className="pb-map-box" style={{ position: 'relative' }}>
+                <VillageChoroplethMap
+                  geojson={geo}
+                  classByCode={classByCode}
+                  lowConfidence={lowConfidence}
+                  tooltipByCode={tooltipByCode}
+                  selected={selected}
+                  onSelect={setSelected}
+                  focusCodes={focusCodes}
+                />
+                <Legend breaks={breaks} mode={mode} />
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, minWidth: 0 }}>
+              {sel
+                ? <VillageDetail
+                    v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length} meta={data.meta}
+                    rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
+                    assumption={assumption}
+                    onClose={() => setSelected(null)}
+                  />
+                : <TopList rows={ranking.slice(0, 10)} mode={mode} district={district} onPick={pickFromTable} />}
+            </div>
+          </div>
+
+          {/* 排行榜 */}
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>
+                {district || '全市'}・{MODE_LABEL[mode]}排行
+              </span>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+                前 30 名，點選列可在地圖上定位；率皆為每千人・年
+              </span>
+            </div>
+            <RankingTable rows={ranking.slice(0, 30)} mode={mode} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
+          </div>
+
+          <Methodology />
+        </>
+      )}
+
+      {tab === '人口與家庭' && (
+        <>
+          {/* 未來人口推估（行政區，僅計自然增減） */}
+          {data.projection.rows.length > 0 && <ProjectionSection data={data.projection} highlightDistrict={hl} />}
+          {/* 學區學生數（行政區・學年） */}
+          {data.schools.byDistrict.length > 0 && <SchoolSection data={data.schools} highlightDistrict={hl} />}
+        </>
+      )}
+
+      {tab === '就業與產業' && (
+        <>
+          {/* 產業與就業（普查 + 工商家數） */}
+          {data.industry.length > 0 && (
+            <IndustrySection data={data.industry} popByDistrict={popByDistrict} highlightDistrict={hl} />
+          )}
+          {/* 南科就業動能（台南最大外來購屋族群來源） */}
+          {data.southPark.length > 0 && (
+            <div style={cardStyle}>
+              <div style={{ marginBottom: 10 }}>
+                <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>南科就業動能</span>
+                <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+                  南科是台南最大的外來購屋族群來源；園區級資料，不計入村里指數
+                </span>
+              </div>
+              <SouthParkSection rows={data.southPark} industry={data.southParkIndustry} />
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === '房市與負擔' && (
+        <>
+          {/* 負擔能力、房貸條件、家庭收支（縣市級） */}
+          <AffordabilitySection market={data.market} />
+
+          {/* 租轉買：行政區租金 vs 房貸月付 */}
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>租金／房貸月付比（行政區）</span>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+                「租轉買」潛在客：月租越接近房貸月付，越容易從租屋轉為購屋；租賃資料只到行政區，不計入村里指數
+              </span>
+            </div>
+            <RentMortgageTable
+              rows={data.rent.rows}
+              rentPeriod={data.rent.rentPeriod}
+              salePeriod={data.rent.salePeriod}
+              assumption={assumption}
+              onAssumptionChange={setAssumption}
+              rateNote={(() => {
+                const r = data.market.filter(m => m.indicator === 'new_mortgage_rate' && m.area === '臺南市').at(-1)
+                return r ? `預設利率為臺南市 ${r.period} 新增購屋貸款平均利率` : undefined
+              })()}
+              highlightDistrict={hl}
             />
-            <Legend breaks={breaks} mode={mode} />
           </div>
-        </div>
 
-        <div style={{ ...cardStyle, minWidth: 0 }}>
-          {sel
-            ? <VillageDetail
-                v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length} meta={data.meta}
-                rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
-                assumption={assumption}
-                onClose={() => setSelected(null)}
-              />
-            : <TopList rows={ranking.slice(0, 10)} mode={mode} district={district} onPick={pickFromTable} />}
-        </div>
-      </div>
+          {/* 建物移轉、低度使用（行政區） */}
+          <TransfersSection data={data.transfers} highlightDistrict={hl} />
+          <LowUsageSection rows={data.lowUsage} highlightDistrict={hl} />
 
-      {/* 排行榜 */}
-      <div style={cardStyle}>
-        <div style={{ marginBottom: 10 }}>
-          <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>
-            {district || '全市'}・{MODE_LABEL[mode]}排行
-          </span>
-          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
-            前 30 名，點選列可在地圖上定位；率皆為每千人・年
-          </span>
-        </div>
-        <RankingTable rows={ranking.slice(0, 30)} mode={mode} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
-      </div>
-
-      {/* 重大建設時程表（人工整理） */}
-      <MajorProjectsSection highlightDistrict={district || undefined} />
-
-      {/* 租轉買：行政區租金 vs 房貸月付 */}
-      <div style={cardStyle}>
-        <div style={{ marginBottom: 10 }}>
-          <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>租金／房貸月付比（行政區）</span>
-          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
-            「租轉買」潛在客：月租越接近房貸月付，越容易從租屋轉為購屋；租賃資料只到行政區，不計入村里指數
-          </span>
-        </div>
-        <RentMortgageTable
-          rows={data.rent.rows}
-          rentPeriod={data.rent.rentPeriod}
-          salePeriod={data.rent.salePeriod}
-          assumption={assumption}
-          onAssumptionChange={setAssumption}
-          rateNote={(() => {
-            const r = data.market.filter(m => m.indicator === 'new_mortgage_rate' && m.area === '臺南市').at(-1)
-            return r ? `預設利率為臺南市 ${r.period} 新增購屋貸款平均利率` : undefined
-          })()}
-          highlightDistrict={district || undefined}
-        />
-      </div>
-
-      {/* 老屋換屋：行政區成交屋齡結構 */}
-      <div style={cardStyle}>
-        <div style={{ marginBottom: 10 }}>
-          <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>屋齡結構（行政區）</span>
-          <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
-            房屋稅籍住宅存量；老屋占比高的區，換屋需求潛力越大；不計入村里指數
-          </span>
-        </div>
-        <HouseAgeChart rows={data.houseAge.rows} period={data.houseAge.period} cityAvgAge={data.houseAge.cityAvgAge} highlightDistrict={district || undefined} />
-      </div>
-
-      {/* 市場環境：負擔能力、建物移轉、低度使用（縣市／行政區級，不計入村里指數） */}
-      <AffordabilitySection market={data.market} />
-      <TransfersSection data={data.transfers} highlightDistrict={district || undefined} />
-      <LowUsageSection rows={data.lowUsage} highlightDistrict={district || undefined} />
-
-      {/* 產業與就業（普查 + 工商家數） */}
-      {data.industry.length > 0 && (
-        <IndustrySection data={data.industry} popByDistrict={popByDistrict} highlightDistrict={district || undefined} />
-      )}
-
-      {/* 學區學生數（行政區・學年） */}
-      {data.schools.byDistrict.length > 0 && (
-        <SchoolSection data={data.schools} highlightDistrict={district || undefined} />
-      )}
-
-      {/* 未來人口推估（行政區，僅計自然增減） */}
-      {data.projection.rows.length > 0 && (
-        <ProjectionSection data={data.projection} highlightDistrict={district || undefined} />
-      )}
-
-      {/* 就業動能：南科（台南最大外來購屋族群來源） */}
-      {data.southPark.length > 0 && (
-        <div style={cardStyle}>
-          <div style={{ marginBottom: 10 }}>
-            <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>南科就業動能</span>
-            <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
-              南科是台南最大的外來購屋族群來源；園區級資料，不計入村里指數
-            </span>
+          {/* 屋齡結構（房屋稅籍存量） */}
+          <div style={cardStyle}>
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>屋齡結構（行政區）</span>
+              <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
+                房屋稅籍住宅存量；老屋占比高的區，換屋需求潛力越大；不計入村里指數
+              </span>
+            </div>
+            <HouseAgeChart rows={data.houseAge.rows} period={data.houseAge.period} cityAvgAge={data.houseAge.cityAvgAge} highlightDistrict={hl} />
           </div>
-          <SouthParkSection rows={data.southPark} industry={data.southParkIndustry} />
-        </div>
+        </>
       )}
 
-      <Methodology />
+      {tab === '重大建設' && <MajorProjectsSection highlightDistrict={hl} />}
 
       <style>{`
         ${RAMP_CSS}
         .pb-map-box { height: 620px; }
-        @media (max-width: 760px) { .pb-map-card { grid-column: auto !important; } .pb-map-box { height: 460px; } }
+        .pb-tabs::-webkit-scrollbar { display: none; }
+        @media (max-width: 760px) {
+          .pb-map-card { grid-column: auto !important; }
+          .pb-map-box { height: 460px; }
+          /* 手機不固定頁籤列，避免佔掉半個畫面 */
+          .pb-sticky { position: static !important; }
+        }
       `}</style>
     </div>
   )
