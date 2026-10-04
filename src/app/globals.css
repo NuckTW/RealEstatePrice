@@ -1,9 +1,27 @@
 @import "tailwindcss";
 
+/* ── 字型：Geist／Geist Mono 自架（latin 子集，可變字重 100–900）；Noto Sans TC 由 layout.tsx 執行時載入 ── */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-latin.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-latin.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 /* ─────────────────────────────────────────────────────────────────
    台南市不動產分析 · "Brass & Clay" Design System
    ─────────────────────────────────────────────────────────────────
-   字體由 layout.tsx next/font/google 載入（Geist、Geist Mono、Noto Sans TC）
+   字體：Geist／Geist Mono 自架於 public/fonts（見上方 @font-face），Noto Sans TC 由 layout.tsx 執行時向 Google Fonts 載入
    ───────────────────────────────────────────────────────────────── */
 
 :root {
