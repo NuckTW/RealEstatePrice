@@ -11,6 +11,10 @@
   B. 臺南市政府資料開放平台 data.tainan.gov.tw（每年一個資料集、每月一個 CSV 資源）
      - {年}年臺南市建物第一次移轉統計表：行政區・月（新屋交屋量）
      - {年}年臺南市不動產買賣統計表：行政區・月（建物買賣移轉件數）
+  B2. 臺南市政府資料開放平台（工務局）
+     - 臺南市政府建築物開工依用途別統計：行政區・年（112 年起；111 年只有全市），取住宅 H-2 類件／棟／戶／樓地板面積
+     - 臺南市政府使用執照資料：逐案（100～112 年 4 月，官方未再更新），住宅類依建築地點彙整到行政區
+     - 建造執照只有全市統計（無行政區），不收
   C. 主計總處 家庭收支調查（縣市・年，1998 年起；只取臺南市與臺灣地區）
      - 平均每戶可支配所得、消費支出、所得收入總計
 
@@ -303,6 +307,71 @@ def tainan_opendata(session, years: list[int]) -> list[dict]:
     return out
 
 
+# ── B2. 臺南市工務局：建築物開工（行政區・年）、使用執照逐案資料 ─────
+
+def count(v) -> float:
+    """統計表的 '-' 代表 0"""
+    v = num(v)
+    return 0.0 if v is None else v
+
+
+def tainan_construction(session) -> list[dict]:
+    out = []
+    # 開工：每年一個資源，欄位「地區別」+ 各用途的件／棟／戶／總樓地板面積
+    # （112 年起有行政區；111 年檔案只有全市用途別，沒有「地區別」欄，自動略過）
+    res = tn_resources(session, '臺南市政府建築物開工依用途別統計')
+    for rid, name in res:
+        y = re.match(r'(\d{3})年', name)
+        if not y:
+            continue
+        period = y.group(1)
+        n = 0
+        for r in tn_csv(session, rid):
+            area = (r.get('地區別') or '').strip()
+            if not area or area in ('主辦統計人員',):
+                continue
+            level, area = ('city', '臺南市') if area == '總計' else ('district', area)
+            for ind, col in (('construction_start_cases', '住宅[H-2類](件)'),
+                             ('construction_start_buildings', '住宅[H-2類](棟)'),
+                             ('construction_start_units', '住宅[H-2類](戶)'),
+                             ('construction_start_floor', '住宅[H-2類](總樓地板面積m2)')):
+                if col in r:
+                    out.append(row(ind, level, area, period, 'Y', count(r[col]), 'tainan_opendata'))
+                    n += 1
+        print(f'  開工 {period} 年：{n} 筆')
+        time.sleep(DELAY_SEC)
+
+    # 使用執照：逐案資料（100～112 年 4 月；112 年不完整不收）→ 住宅（用途含 H2）戶數、件數、樓地板面積按行政區加總
+    res = tn_resources(session, '臺南市政府使用執照資料')
+    for rid, name in res:
+        y = re.match(r'(\d{3})年', name)
+        if not y or '月底' in name:          # 「112年度4月底」為部分年度
+            continue
+        period = y.group(1)
+        agg: dict[str, list[float]] = {}
+        for r in tn_csv(session, rid):
+            # 用途：112 年起為「H2住宅」代碼，更早為「住宅」「集合住宅」等文字
+            if 'H2' not in (r.get('建築物用途') or '') and '住宅' not in (r.get('建築物用途') or ''):
+                continue
+            # 112 年起寫「臺南市安南區…」，更早只寫「仁德區…」
+            m = re.match(r'\s*(?:臺南市)?(.{1,3}?區)', r.get('建築地點') or '')
+            if not m:
+                continue
+            a = agg.setdefault(m.group(1), [0, 0, 0])
+            a[0] += 1
+            a[1] += count(r.get('戶數'))
+            a[2] += count(r.get('總樓地板面積'))
+        city = [sum(v[k] for v in agg.values()) for k in range(3)]
+        for area, (cases, units, floor) in list(agg.items()) + [('臺南市', city)]:
+            level = 'city' if area == '臺南市' else 'district'
+            out.append(row('usage_permit_cases', level, area, period, 'Y', cases, 'tainan_opendata'))
+            out.append(row('usage_permit_units', level, area, period, 'Y', units, 'tainan_opendata'))
+            out.append(row('usage_permit_floor', level, area, period, 'Y', floor, 'tainan_opendata'))
+        print(f'  使用執照 {period} 年：住宅 {int(city[0])} 件、{int(city[1])} 戶')
+        time.sleep(DELAY_SEC)
+    return out
+
+
 # ── C. 主計總處 家庭收支調查（縣市・年，1998 年起） ─────────────
 
 FIES = {
@@ -336,7 +405,7 @@ def fies(session) -> list[dict]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--backfill', action='store_true', help='台南開放資料從 104 年起全部回補')
-    ap.add_argument('--only', choices=['pip', 'tainan', 'fies'])
+    ap.add_argument('--only', choices=['pip', 'tainan', 'fies', 'construction'])
     ap.add_argument('--dry-run', action='store_true')
     args = ap.parse_args()
 
@@ -348,6 +417,8 @@ def main():
             got = fn(s)
             print(f'不動產資訊平台 {name}：{len(got)} 筆')
             rows += got
+    if args.only in (None, 'construction'):
+        rows += tainan_construction(gov_session(UA))
     if args.only in (None, 'fies'):
         got = fies(gov_session(UA))
         print(f'主計總處 家庭收支調查：{len(got)} 筆')
