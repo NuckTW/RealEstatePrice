@@ -12,6 +12,8 @@ import SouthParkSection, { type SouthParkRow, type IndustryRow } from './SouthPa
 import ProjectionSection, { type ProjectionData } from './ProjectionSection'
 import SchoolSection, { type SchoolData } from './SchoolSection'
 import IndustrySection, { type IndustryPoint } from './IndustrySection'
+import MajorProjectsSection, { StatusBadge } from './MajorProjectsSection'
+import { MAJOR_PROJECTS } from '@/lib/majorProjects'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 
 const VillageChoroplethMap = dynamic(() => import('./VillageChoroplethMap'), {
@@ -313,6 +315,9 @@ export default function PotentialBuyersPanel() {
         <RankingTable rows={ranking.slice(0, 30)} mode={mode} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
       </div>
 
+      {/* 重大建設時程表（人工整理） */}
+      <MajorProjectsSection highlightDistrict={district || undefined} />
+
       {/* 租轉買：行政區租金 vs 房貸月付 */}
       <div style={cardStyle}>
         <div style={{ marginBottom: 10 }}>
@@ -553,6 +558,24 @@ function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClos
           </dl>
         </>
       )}
+
+      {(() => {
+        const projects = MAJOR_PROJECTS.filter(p => p.districts.includes(v.district))
+        if (!projects.length) return null
+        return (
+          <>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>
+              {v.district}相關重大建設
+            </div>
+            {projects.map(p => (
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', fontSize: 'var(--text-2xs)', padding: '3px 0', borderBottom: '1px solid var(--border-card)' }}>
+                <span style={{ color: 'var(--text-default)' }}>{p.name}<span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>{p.expected}</span></span>
+                <StatusBadge status={p.status} />
+              </div>
+            ))}
+          </>
+        )
+      })()}
 
       <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>
         生活機能（里內點數，不計分）
