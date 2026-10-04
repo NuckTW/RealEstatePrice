@@ -7,7 +7,7 @@
 --
 -- 計分方式：各指標轉全市百分位（0–100）後加權相加
 --   首購指數 = 世代淨移入(25–34) 30 + 25–34 占比 20 + 結婚率 20 + 所得 20 + 社會增加 10
---   換屋指數 = 世代淨移入(35–44) 20 + 35–44 占比 20 + 出生率 20 + 所得 30 + 社會增加 10
+--   換屋指數 = 世代淨移入(35–44) 20 + 35–44 占比 20 + 出生率 20 + 所得 30 + 社會增加 10（v4 起拆成換新屋／換二手，見下）
 -- 時間窗：最新月份往前 12 個月
 -- 分戶速度、戶量、跨縣市／市內他區淨移入：僅供前端顯示，不計分
 -- v2（2026-10-03）：新增育齡婦女（15–49 歲女性）、離婚數（僅顯示，不計分）
@@ -15,6 +15,12 @@
 --   本檔可重複執行（DROP 後重建）
 -- v3（2026-10-04）：新增戶政年資料（教育程度、單獨生活戶）與平台村里季資料（戶長年齡、一宅多戶、獨居宅、宅數成長），僅顯示不計分
 --   前置：20261004_village_household_annual.sql（兩張表為空時新欄位為 NULL，不影響指數）
+-- v4（2026-10-04）：換屋指數拆成「換新屋」「換二手」兩個（共三個指數），依 37 區實際交易驗證
+--   換新屋指數 = 世代淨移入(35–44) 20 + 35–44 占比 20 + 出生率 20 + 所得 20 + 設籍宅數成長 20
+--     驗證：近 24 月預售＋新成屋（屋齡 ≤3 年）交易／每千戶 ρ=0.79（二手 0.59）
+--   換二手指數 = 世代淨移入(35–44) 10 + 35–44 占比 20 + 26–45 歲戶長占比 20 + 所得 30 + 大學以上學歷 20
+--     驗證：近 24 月二手成屋（屋齡 >5 年）交易／每千戶 ρ=0.80（新屋 0.62）
+--   upgrader_index（舊換屋指數）暫時保留，讓舊版前端在部署前不會壞；新版前端不再使用，之後可移除
 -- ============================================================
 
 DROP MATERIALIZED VIEW IF EXISTS village_buyer_indicators;
@@ -203,7 +209,14 @@ pct AS (
     CASE WHEN social_k IS NULL THEN 50
          ELSE percent_rank() OVER (PARTITION BY social_k IS NULL ORDER BY social_k) * 100 END             AS p_social,
     CASE WHEN income_median IS NULL THEN 50
-         ELSE percent_rank() OVER (PARTITION BY income_median IS NULL ORDER BY income_median) * 100 END   AS p_income
+         ELSE percent_rank() OVER (PARTITION BY income_median IS NULL ORDER BY income_median) * 100 END   AS p_income,
+    -- v4：換新屋／換二手用（來源資料表為空時全部給中性值 50）
+    CASE WHEN dwellings_growth_pct IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY dwellings_growth_pct IS NULL ORDER BY dwellings_growth_pct) * 100 END AS p_dwellings_growth,
+    CASE WHEN head_26_45_share IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY head_26_45_share IS NULL ORDER BY head_26_45_share) * 100 END         AS p_head_26_45,
+    CASE WHEN edu_univ_plus_share IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY edu_univ_plus_share IS NULL ORDER BY edu_univ_plus_share) * 100 END   AS p_edu_univ
   FROM shrunk s
 )
 SELECT
@@ -214,12 +227,19 @@ SELECT
   round((0.30 * p_cohort_young + 0.20 * p_share_25_34 + 0.20 * p_marriage
        + 0.20 * p_income + 0.10 * p_social)::numeric, 1)          AS first_buyer_index,
   round((0.20 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_birth
+       + 0.20 * p_income + 0.20 * p_dwellings_growth)::numeric, 1) AS new_home_index,
+  round((0.10 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_head_26_45
+       + 0.30 * p_income + 0.20 * p_edu_univ)::numeric, 1)        AS resale_index,
+  -- 舊換屋指數（v3 以前），僅為部署過渡保留
+  round((0.20 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_birth
        + 0.30 * p_income + 0.10 * p_social)::numeric, 1)          AS upgrader_index,
   -- 各指標百分位
   round(p_cohort_young::numeric, 1) AS p_cohort_young, round(p_cohort_mid::numeric, 1) AS p_cohort_mid,
   round(p_share_25_34::numeric, 1)  AS p_share_25_34,  round(p_share_35_44::numeric, 1) AS p_share_35_44,
   round(p_marriage::numeric, 1)     AS p_marriage,     round(p_birth::numeric, 1)       AS p_birth,
   round(p_income::numeric, 1)       AS p_income,       round(p_social::numeric, 1)      AS p_social,
+  round(p_dwellings_growth::numeric, 1) AS p_dwellings_growth, round(p_head_26_45::numeric, 1) AS p_head_26_45,
+  round(p_edu_univ::numeric, 1)     AS p_edu_univ,
   -- 原始值
   pop_total, households, share_25_34, share_35_44,
   cohort_young_k, cohort_mid_k, cohort_young_n, cohort_mid_n,

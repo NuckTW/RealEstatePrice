@@ -16,7 +16,7 @@ export default function PotentialBuyersPage() {
             <span style={{
               fontSize: 'var(--text-sm)', fontWeight: 400,
               color: 'var(--text-muted)', marginLeft: 12,
-            }}>村里級首購・換屋需求指數（人口結構 × 遷徙 × 所得）</span>
+            }}>村里級首購・換新屋・換二手需求指數（人口結構 × 遷徙 × 所得）</span>
           </h2>
         </div>
         <PotentialBuyersPanel />

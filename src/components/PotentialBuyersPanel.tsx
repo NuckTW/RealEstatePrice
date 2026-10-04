@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { VillageGeo } from './VillageChoroplethMap'
 import HouseAgeChart, { type HouseAgeRow } from './HouseAgeChart'
@@ -14,45 +14,24 @@ import SchoolSection, { type SchoolData } from './SchoolSection'
 import IndustrySection, { type IndustryPoint } from './IndustrySection'
 import SupplyPipelineSection, { type SupplyData } from './SupplyPipelineSection'
 import MajorProjectsSection, { StatusBadge } from './MajorProjectsSection'
+import DataCatalogSection from './DataCatalogSection'
+import CustomIndexSection from './CustomIndexSection'
 import { MAJOR_PROJECTS } from '@/lib/majorProjects'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
+import {
+  buildCatalog, computeIndex, partOf, fmtValue, PRESET_INDICES, POI_LABELS,
+  type Village, type Meta, type IndexDef, type IndexResult, type Catalog, type CustomDataset,
+} from '@/lib/buyerIndex'
+import { usePassword, savePassword } from '@/lib/chatPassword'
+import { Legend, RAMP_CSS, quintileBreaks, classOf } from './ChoroplethLegend'
 
 const VillageChoroplethMap = dynamic(() => import('./VillageChoroplethMap'), {
   ssr: false, loading: () => <div style={centerStyle('100%')}>地圖載入中…</div>,
 })
 
 /* ── 型別（對應 /api/potential-buyers） ───────────────────────── */
-interface Village {
-  code: string
-  district: string
-  village: string
-  firstBuyer: number
-  upgrader: number
-  p: Record<'cohortYoung' | 'cohortMid' | 'share2534' | 'share3544' | 'marriage' | 'birth' | 'income' | 'social', number>
-  raw: {
-    pop: number; households: number
-    share2534: number | null; share3544: number | null
-    cohortYoung: number | null; cohortMid: number | null
-    marriage: number | null; birth: number | null
-    social: number | null; income: number | null
-    hhSize: number | null; splitSpeed: number | null
-    netOtherCity: number | null; netOtherTown: number | null; netSameTown: number | null
-    women1549: number | null; women1549Share: number | null
-    divorces: number | null; divorceKDistrict: number | null
-    eduUnivPlus: number | null; eduGrad: number | null; singleHh: number | null
-    headAvgAge: number | null; head2645: number | null; head2645Chg: number | null; head65p: number | null
-    multiHh: number | null; multiHhChg: number | null; soloDwelling: number | null; dwellingsGrowth: number | null
-  }
-  poi: Record<string, number>   // 生活機能（OSM，里內點數）
-  lowConfidence: boolean
-  cohortMissing: boolean
-  incomeFromParent: boolean
-}
-interface ApiData {
-  meta: {
-    dataMonth: string | null; incomeTaxYear: number | null
-    eduYear: number | null; hhYear: number | null; hhqPeriod: string | null
-  }
+export interface ApiData {
+  meta: Meta
   villages: Village[]
   rent: { rentPeriod: string | null; salePeriod: string | null; rows: RentRow[] }
   southPark: SouthParkRow[]
@@ -67,38 +46,24 @@ interface ApiData {
   transfers: TransfersData
 }
 
-type Mode = 'firstBuyer' | 'upgrader'
-type PKey = keyof Village['p']
-type RawKey = keyof Village['raw']
-
-/** 指數組成：權重與 supabase/migrations/20261003_village_buyer_indicators.sql 一致 */
-const COMPONENTS: Record<Mode, { key: PKey; raw: RawKey; label: string; weight: number; unit: string; hint: string }[]> = {
-  firstBuyer: [
-    { key: 'cohortYoung', raw: 'cohortYoung', label: '世代淨移入（25–34 歲）', weight: 30, unit: '‰', hint: '同一批人一年後的人數變化，≈ 年輕人淨搬入' },
-    { key: 'share2534',   raw: 'share2534',   label: '25–34 歲人口占比',      weight: 20, unit: '%', hint: '首購主力年齡層' },
-    { key: 'marriage',    raw: 'marriage',    label: '結婚率',                 weight: 20, unit: '‰', hint: '每千人・年，已往行政區平均收縮' },
-    { key: 'income',      raw: 'income',      label: '所得中位數（購買力）',   weight: 20, unit: '千元', hint: '綜所稅申報，代表購買力；只做相對排名' },
-    { key: 'social',      raw: 'social',      label: '社會增加率',             weight: 10, unit: '‰', hint: '淨遷入（含同區跨里）' },
-  ],
-  upgrader: [
-    { key: 'cohortMid',   raw: 'cohortMid',   label: '世代淨移入（35–44 歲）', weight: 20, unit: '‰', hint: '同一批人一年後的人數變化' },
-    { key: 'share3544',   raw: 'share3544',   label: '35–44 歲人口占比',      weight: 20, unit: '%', hint: '換屋主力年齡層' },
-    { key: 'birth',       raw: 'birth',       label: '出生率',                 weight: 20, unit: '‰', hint: '每千人・年，已往行政區平均收縮' },
-    { key: 'income',      raw: 'income',      label: '所得中位數（購買力）',   weight: 30, unit: '千元', hint: '綜所稅申報，代表購買力；只做相對排名' },
-    { key: 'social',      raw: 'social',      label: '社會增加率',             weight: 10, unit: '‰', hint: '淨遷入（含同區跨里）' },
-  ],
+/** 手動資料與自訂指數（/api/potential-buyers/custom，需密碼） */
+export interface CustomStore {
+  status: 'idle' | 'loading' | 'ready' | 'error'
+  error?: string
+  datasets: CustomDataset[]
+  indices: IndexDef[]
 }
 
-const MODE_LABEL: Record<Mode, string> = { firstBuyer: '首購指數', upgrader: '換屋指數' }
-
 /** 頁籤：村里指數為主，其餘為行政區／縣市層級的背景資料（皆不計入村里指數） */
-type Tab = '村里指數' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設'
+type Tab = '村里指數' | '自訂指數' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
 const TABS: { key: Tab; desc: string }[] = [
-  { key: '村里指數',   desc: '村里首購／換屋指數地圖與排行' },
+  { key: '村里指數',   desc: '村里首購／換新屋／換二手指數地圖與排行' },
+  { key: '自訂指數',   desc: '手動加入資料、自訂指數權重、AI 建議配方' },
   { key: '人口與家庭', desc: '未來人口推估、學區新生' },
   { key: '就業與產業', desc: '各區就業結構、南科就業動能' },
   { key: '房市與負擔', desc: '負擔能力、租金與房貸、建物移轉、空屋、屋齡' },
   { key: '重大建設',   desc: '捷運、鐵路地下化、交流道、產業園區、重劃區' },
+  { key: '資料總覽',   desc: '所有資料清單，點選即可在地圖或圖表上顯示' },
 ]
 /** 從網址 hash 讀取頁籤（如 #房市與負擔），方便分享連結 */
 function tabFromHash(): Tab {
@@ -106,17 +71,6 @@ function tabFromHash(): Tab {
   const h = decodeURIComponent(window.location.hash.replace(/^#/, ''))
   return TABS.some(t => t.key === h) ? (h as Tab) : '村里指數'
 }
-
-/**
- * 單一色相（brass）五分位色階，以 CSS 變數 --pb-ramp-0..4 定義（0 = 最低）
- * 亮色主題：淺 → 深；暗色主題翻轉為 深 → 亮，高分在深底圖上才會突出
- */
-const RAMP = [0, 1, 2, 3, 4].map(i => `var(--pb-ramp-${i})`)
-const RAMP_CSS = `
-  :root { --pb-ramp-0: #6a4312; --pb-ramp-1: #8f5a16; --pb-ramp-2: #b9761d; --pb-ramp-3: #e8ad3f; --pb-ramp-4: #f7dca2; }
-  :root[data-theme="light"] { --pb-ramp-0: #f7dca2; --pb-ramp-1: #f0c86e; --pb-ramp-2: #d9912a; --pb-ramp-3: #a8661a; --pb-ramp-4: #6a4312; }
-`
-const RAMP_LABEL = ['後 20%', '20–40%', '40–60%', '60–80%', '前 20%']
 
 /* ── 小工具 ───────────────────────────────────────────────────── */
 function centerStyle(h: number | string): React.CSSProperties {
@@ -140,23 +94,12 @@ function rocMonth(iso: string | null): string {
   const [y, m] = iso.split('-')
   return `${Number(y) - 1911} 年 ${Number(m)} 月`
 }
-/** 五分位切點（20/40/60/80%） */
-function quintileBreaks(values: number[]): number[] {
-  const s = [...values].sort((a, b) => a - b)
-  return [0.2, 0.4, 0.6, 0.8].map(q => s[Math.floor(q * (s.length - 1))])
-}
-function classOf(v: number, breaks: number[]): number {
-  let i = 0
-  while (i < breaks.length && v > breaks[i]) i++
-  return i
-}
-
 /* ── 主元件 ───────────────────────────────────────────────────── */
 export default function PotentialBuyersPanel() {
   const [data, setData]       = useState<ApiData | null>(null)
   const [geo, setGeo]         = useState<VillageGeo | null>(null)
   const [error, setError]     = useState(false)
-  const [mode, setMode]       = useState<Mode>('firstBuyer')
+  const [indexId, setIndexId] = useState<string>('firstBuyer')
   const [district, setDistrict] = useState<string>('')        // '' = 全市
   const [hideLow, setHideLow] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
@@ -186,49 +129,91 @@ export default function PotentialBuyersPanel() {
       .catch(() => setError(true))
   }, [])
 
+  // 手動資料與自訂指數：與 AI 問答共用密碼，有密碼才載入
+  const password = usePassword()
+  const [customState, setCustom] = useState<CustomStore>({ status: 'loading', datasets: [], indices: [] })
+  const [reloadTick, setReloadTick] = useState(0)
+  useEffect(() => {
+    if (!password) return
+    let cancelled = false
+    fetch('/api/potential-buyers/custom', { headers: { 'x-chat-password': password } })
+      .then(async r => {
+        const j = await r.json()
+        if (cancelled) return
+        if (r.status === 401) { savePassword(''); return }     // 密碼錯誤 → 清掉重問
+        if (!r.ok) { setCustom({ status: 'error', error: j.error ?? '讀取失敗', datasets: [], indices: [] }); return }
+        setCustom({
+          status: 'ready',
+          datasets: j.datasets,
+          indices: (j.indices as Omit<IndexDef, 'short' | 'preset'>[]).map(x => ({ ...x, short: x.name, preset: false })),
+        })
+      })
+      .catch(() => { if (!cancelled) setCustom({ status: 'error', error: '讀取失敗', datasets: [], indices: [] }) })
+    return () => { cancelled = true }
+  }, [password, reloadTick])
+  const reloadCustom = useCallback(() => setReloadTick(t => t + 1), [])
+  // 沒密碼時一律視為空（不顯示上一位使用者的資料）
+  const custom: CustomStore = useMemo(
+    () => (password ? customState : { status: 'idle', datasets: [], indices: [] }),
+    [password, customState],
+  )
+
   const villages = useMemo(() => data?.villages ?? [], [data])
   const byCode = useMemo(() => new Map(villages.map(v => [v.code, v])), [villages])
+  const codes = useMemo(() => villages.map(v => v.code), [villages])
+
+  // 指標目錄（含手動資料）與百分位快取：目錄變了才重算
+  const catalog = useMemo<Catalog | null>(() => (data ? buildCatalog(data, custom.datasets) : null), [data, custom.datasets])
+  const rankCache = useMemo(() => new Map<string, Map<string, number>>(), [catalog])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const allIndices = useMemo(() => [...PRESET_INDICES, ...custom.indices], [custom.indices])
+  const def = allIndices.find(i => i.id === indexId) ?? PRESET_INDICES[0]
+  const result = useMemo<IndexResult | null>(
+    () => (catalog ? computeIndex(def, catalog, codes, rankCache) : null),
+    [def, catalog, codes, rankCache],
+  )
+  const score = useCallback((code: string) => result?.scores.get(code) ?? 50, [result])
 
   const districts = useMemo(() => {
     // 依行政區平均指數排序，前面的區潛在客群較強
     const agg = new Map<string, { sum: number; n: number }>()
     for (const v of villages) {
       const a = agg.get(v.district) ?? { sum: 0, n: 0 }
-      a.sum += v[mode]; a.n += 1
+      a.sum += score(v.code); a.n += 1
       agg.set(v.district, a)
     }
     return [...agg.entries()]
       .map(([name, a]) => ({ name, avg: a.sum / a.n, n: a.n }))
       .sort((a, b) => b.avg - a.avg)
-  }, [villages, mode])
+  }, [villages, score])
 
   // 全市排名（不受篩選影響）
   const cityRank = useMemo(() => {
-    const sorted = [...villages].sort((a, b) => b[mode] - a[mode])
+    const sorted = [...villages].sort((a, b) => score(b.code) - score(a.code))
     return new Map(sorted.map((v, i) => [v.code, i + 1]))
-  }, [villages, mode])
+  }, [villages, score])
 
-  const breaks = useMemo(() => quintileBreaks(villages.map(v => v[mode])), [villages, mode])
+  const breaks = useMemo(() => quintileBreaks(villages.map(v => score(v.code))), [villages, score])
 
   const classByCode = useMemo(() => {
     const m = new Map<string, number>()
     for (const v of villages) {
       if (district && v.district !== district) continue
-      m.set(v.code, classOf(v[mode], breaks))
+      m.set(v.code, classOf(score(v.code), breaks))
     }
     return m
-  }, [villages, mode, breaks, district])
+  }, [villages, score, breaks, district])
 
   // 各區人口（村里加總），產業區塊算「每千居民工作數」用
   const popByDistrict = useMemo(() => {
     const m = new Map<string, number>()
-    for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + v.raw.pop)
+    for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + (v.raw.pop ?? 0))
     return m
   }, [villages])
   // 各區戶數（村里加總），住宅供給區塊算「每千戶開工」用
   const householdsByDistrict = useMemo(() => {
     const m = new Map<string, number>()
-    for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + v.raw.households)
+    for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + (v.raw.households ?? 0))
     return m
   }, [villages])
 
@@ -236,15 +221,15 @@ export default function PotentialBuyersPanel() {
 
   const tooltipByCode = useMemo(() => new Map(villages.map(v => [
     v.code,
-    `${v.district} ${v.village}｜${MODE_LABEL[mode]} ${fmt(v[mode])}（全市第 ${cityRank.get(v.code)} 名）${v.lowConfidence ? '｜人口少，僅供參考' : ''}`,
-  ])), [villages, mode, cityRank])
+    `${v.district} ${v.village}｜${def.name} ${fmt(score(v.code))}（全市第 ${cityRank.get(v.code)} 名）${v.lowConfidence ? '｜人口少，僅供參考' : ''}`,
+  ])), [villages, def.name, score, cityRank])
 
   const ranking = useMemo(() => villages
     .filter(v => (!district || v.district === district) && (!hideLow || !v.lowConfidence))
-    .sort((a, b) => b[mode] - a[mode]), [villages, mode, district, hideLow])
+    .sort((a, b) => score(b.code) - score(a.code)), [villages, score, district, hideLow])
 
   if (error) return <div style={centerStyle(300)}>資料載入失敗，請稍後再試</div>
-  if (!data || !geo) return <div style={centerStyle(300)}>載入中…</div>
+  if (!data || !geo || !catalog || !result) return <div style={centerStyle(300)}>載入中…</div>
 
   const sel = selected ? byCode.get(selected) ?? null : null
 
@@ -260,8 +245,11 @@ export default function PotentialBuyersPanel() {
     setSelected(code)
     setFocusCodes([code])
   }
+  /** 自訂指數頁「在地圖上看」：切回村里指數頁並選這個指數 */
+  const viewIndexOnMap = (id: string) => { setIndexId(id); changeTab('村里指數') }
 
   const hl = district || undefined
+  const customIndices = allIndices.filter(i => !i.preset)
 
   return (
     <div style={{ padding: '12px 20px 0', display: 'flex', flexDirection: 'column', gap: 14, fontFamily: 'var(--font-sans)' }}>
@@ -293,21 +281,39 @@ export default function PotentialBuyersPanel() {
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
           {tab === '村里指數' && (
             <div role="tablist" aria-label="指數類型" style={{ display: 'inline-flex', padding: 3, gap: 3, borderRadius: 'var(--radius-full)', background: 'var(--surface-control)', border: '1px solid var(--border-control)' }}>
-              {(['firstBuyer', 'upgrader'] as Mode[]).map(m => (
+              {PRESET_INDICES.map(m => (
                 <button
-                  key={m} role="tab" aria-selected={mode === m}
-                  onClick={() => setMode(m)}
+                  key={m.id} role="tab" aria-selected={indexId === m.id}
+                  onClick={() => setIndexId(m.id)}
+                  title={m.desc}
                   style={{
                     height: 'var(--control-h-sm)', padding: '0 14px', borderRadius: 'var(--radius-full)',
                     border: 'none', cursor: 'pointer',
                     fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)',
-                    background: mode === m ? 'var(--accent)' : 'transparent',
-                    color: mode === m ? 'var(--on-accent)' : 'var(--text-muted)',
+                    background: indexId === m.id ? 'var(--accent)' : 'transparent',
+                    color: indexId === m.id ? 'var(--on-accent)' : 'var(--text-muted)',
                     transition: 'var(--transition-base)',
                   }}
-                >{MODE_LABEL[m]}</button>
+                >{m.name}</button>
               ))}
             </div>
+          )}
+          {tab === '村里指數' && customIndices.length > 0 && (
+            <select
+              value={def.preset ? '' : def.id}
+              onChange={e => setIndexId(e.target.value || 'firstBuyer')}
+              aria-label="自訂指數"
+              style={{
+                height: 'var(--control-h-md)', padding: '0 10px', borderRadius: 'var(--radius-md)',
+                background: def.preset ? 'var(--surface-control)' : 'var(--accent-wash)',
+                color: def.preset ? 'var(--text-muted)' : 'var(--accent-tint)',
+                border: `1px solid ${def.preset ? 'var(--border-control)' : 'var(--accent-wash-border)'}`,
+                fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)',
+              }}
+            >
+              <option value="">自訂指數…</option>
+              {customIndices.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
           )}
 
           <select
@@ -322,7 +328,7 @@ export default function PotentialBuyersPanel() {
           >
             <option value="">全市（{villages.length} 里）</option>
             {districts.map(d => (
-              <option key={d.name} value={d.name}>{d.name}（{MODE_LABEL[mode]}平均 {fmt(d.avg)}）</option>
+              <option key={d.name} value={d.name}>{d.name}（{def.short}平均 {fmt(d.avg)}）</option>
             ))}
           </select>
 
@@ -357,19 +363,20 @@ export default function PotentialBuyersPanel() {
                   onSelect={setSelected}
                   focusCodes={focusCodes}
                 />
-                <Legend breaks={breaks} mode={mode} />
+                <Legend breaks={breaks} title={def.name} />
               </div>
             </div>
 
             <div style={{ ...cardStyle, minWidth: 0 }}>
               {sel
                 ? <VillageDetail
-                    v={sel} mode={mode} rank={cityRank.get(sel.code) ?? 0} total={villages.length} meta={data.meta}
+                    v={sel} def={def} result={result} catalog={catalog}
+                    rank={cityRank.get(sel.code) ?? 0} total={villages.length} meta={data.meta}
                     rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
                     assumption={assumption}
                     onClose={() => setSelected(null)}
                   />
-                : <TopList rows={ranking.slice(0, 10)} mode={mode} district={district} onPick={pickFromTable} />}
+                : <TopList rows={ranking.slice(0, 10)} score={score} def={def} district={district} onPick={pickFromTable} />}
             </div>
           </div>
 
@@ -377,17 +384,32 @@ export default function PotentialBuyersPanel() {
           <div style={cardStyle}>
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)' }}>
-                {district || '全市'}・{MODE_LABEL[mode]}排行
+                {district || '全市'}・{def.name}排行
               </span>
               <span style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginLeft: 10 }}>
                 前 30 名，點選列可在地圖上定位；率皆為每千人・年
               </span>
             </div>
-            <RankingTable rows={ranking.slice(0, 30)} mode={mode} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
+            <RankingTable rows={ranking.slice(0, 30)} def={def} result={result} catalog={catalog} score={score} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
           </div>
 
           <Methodology />
         </>
+      )}
+
+      {tab === '自訂指數' && (
+        <CustomIndexSection
+          catalog={catalog}
+          villages={villages}
+          geo={geo}
+          presets={PRESET_INDICES}
+          store={custom}
+          password={password}
+          onPassword={savePassword}
+          onChanged={reloadCustom}
+          onViewOnMap={viewIndexOnMap}
+          highlightDistrict={hl}
+        />
       )}
 
       {tab === '人口與家庭' && (
@@ -471,6 +493,18 @@ export default function PotentialBuyersPanel() {
 
       {tab === '重大建設' && <MajorProjectsSection highlightDistrict={hl} />}
 
+      {tab === '資料總覽' && (
+        <DataCatalogSection
+          catalog={catalog}
+          villages={villages}
+          geo={geo}
+          indices={allIndices}
+          customStatus={custom.status}
+          onGoTab={(t: string) => changeTab(t as Tab)}
+          highlightDistrict={hl}
+        />
+      )}
+
       <style>{`
         ${RAMP_CSS}
         .pb-map-box { height: 620px; }
@@ -486,47 +520,16 @@ export default function PotentialBuyersPanel() {
   )
 }
 
-/* ── 圖例 ─────────────────────────────────────────────────────── */
-function Legend({ breaks, mode }: { breaks: number[]; mode: Mode }) {
-  const ranges = RAMP.map((_, i) => {
-    const lo = i === 0 ? null : breaks[i - 1]
-    const hi = i === RAMP.length - 1 ? null : breaks[i]
-    return lo == null ? `≤ ${fmt(hi)}` : hi == null ? `> ${fmt(lo)}` : `${fmt(lo)}–${fmt(hi)}`
-  })
-  return (
-    <div style={{
-      position: 'absolute', left: 10, bottom: 24, zIndex: 1000,
-      background: 'var(--surface-overlay)', border: '1px solid var(--border-card)',
-      borderRadius: 'var(--radius-md)', padding: '8px 10px', boxShadow: 'var(--shadow-pop)',
-      fontSize: 'var(--text-2xs)', color: 'var(--text-default)',
-    }}>
-      <div style={{ fontWeight: 600, color: 'var(--text-strong)', marginBottom: 4 }}>{MODE_LABEL[mode]}（全市五分位）</div>
-      {[...RAMP].reverse().map((c, ri) => {
-        const i = RAMP.length - 1 - ri
-        return (
-          <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1.7 }}>
-            <span style={{ width: 14, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />
-            <span style={{ minWidth: 48 }}>{RAMP_LABEL[i]}</span>
-            <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{ranges[i]}</span>
-          </div>
-        )
-      })}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, color: 'var(--text-muted)' }}>
-        <span style={{ width: 14, height: 10, borderRadius: 2, border: '1px dashed var(--text-muted)', display: 'inline-block' }} />
-        人口未滿 1,000（淡色，僅供參考）
-      </div>
-    </div>
-  )
-}
-
 /* ── 前 10 名（未選取村里時） ──────────────────────────────────── */
-function TopList({ rows, mode, district, onPick }: { rows: Village[]; mode: Mode; district: string; onPick: (c: string) => void }) {
+function TopList({ rows, score, def, district, onPick }: {
+  rows: Village[]; score: (c: string) => number; def: IndexDef; district: string; onPick: (c: string) => void
+}) {
   return (
     <div>
       <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 2 }}>
-        {district || '全市'}前 10 名
+        {district || '全市'}前 10 名・{def.short}
       </div>
-      <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginBottom: 10 }}>點地圖上的村里看指標拆解</div>
+      <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', marginBottom: 10 }}>{def.desc || '點地圖上的村里看指標拆解'}</div>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
         {rows.map((v, i) => (
           <li key={v.code}>
@@ -543,7 +546,7 @@ function TopList({ rows, mode, district, onPick }: { rows: Village[]; mode: Mode
                 <span style={{ color: 'var(--text-muted)' }}>{v.district}</span> {v.village}
                 {v.lowConfidence && <span title="人口未滿 1,000，指標雜訊較大" style={{ marginLeft: 6, fontSize: 'var(--text-3xs)', color: 'var(--warning)' }}>⚠ 小里</span>}
               </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600 }}>{fmt(v[mode])}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-strong)', fontWeight: 600 }}>{fmt(score(v.code))}</span>
             </button>
           </li>
         ))}
@@ -553,12 +556,13 @@ function TopList({ rows, mode, district, onPick }: { rows: Village[]; mode: Mode
 }
 
 /* ── 村里明細 ─────────────────────────────────────────────────── */
-function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClose }: {
-  v: Village; mode: Mode; rank: number; total: number; meta: ApiData['meta']
+function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, assumption, onClose }: {
+  v: Village; def: IndexDef; result: IndexResult; catalog: Catalog
+  rank: number; total: number; meta: Meta
   rentRow: RentRow | null; assumption: MortgageAssumption; onClose: () => void
 }) {
-  const comps = COMPONENTS[mode]
   const ratio = rentRow ? rentRatio(rentRow, assumption) : null
+  const scoreOf = (d: IndexDef) => d.id === 'firstBuyer' ? v.firstBuyer : d.id === 'newHome' ? v.newHome : d.id === 'resale' ? v.resale : null
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -573,11 +577,22 @@ function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClos
       </div>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, margin: '10px 0 4px' }}>
-        <span style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)' }}>{fmt(v[mode])}</span>
-        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{MODE_LABEL[mode]}・全市第 {rank} / {total} 名</span>
+        <span style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)' }}>{fmt(result.scores.get(v.code))}</span>
+        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{def.name}・全市第 {rank} / {total} 名</span>
+      </div>
+      {/* 三個預設指數並列，方便比較 */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+        {PRESET_INDICES.map(p => (
+          <span key={p.id} style={{
+            fontSize: 'var(--text-2xs)', padding: '2px 8px', borderRadius: 'var(--radius-full)',
+            border: `1px solid ${p.id === def.id ? 'var(--accent-wash-border)' : 'var(--border-control)'}`,
+            background: p.id === def.id ? 'var(--accent-wash)' : 'transparent',
+            color: p.id === def.id ? 'var(--accent-tint)' : 'var(--text-muted)',
+          }}>{p.short} <b style={{ fontFamily: 'var(--font-mono)' }}>{fmt(scoreOf(p) ?? computeIndex(p, catalog, [v.code]).scores.get(v.code))}</b></span>
+        ))}
       </div>
       <div style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-faint)', marginBottom: 12 }}>
-        人口 {v.raw.pop.toLocaleString()}・{v.raw.households.toLocaleString()} 戶
+        人口 {(v.raw.pop ?? 0).toLocaleString()}・{(v.raw.households ?? 0).toLocaleString()} 戶
       </div>
 
       {(v.lowConfidence || v.cohortMissing || v.incomeFromParent) && (
@@ -592,15 +607,20 @@ function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClos
       )}
 
       <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 6 }}>指標拆解（全市百分位）</div>
-      {comps.map(c => {
-        const p = v.p[c.key]
-        const raw = v.raw[c.raw]
-        const rawText = c.unit === '千元' ? `${fmt(raw, 0)} 千元` : c.unit === '%' ? `${fmt(raw, 1)}%` : `${signed(raw, 1)}‰`
+      {result.used.map(c => {
+        const ind = catalog.byKey.get(c.key)
+        const p = partOf(result, c, v.code)
+        const raw = catalog.values.get(c.key)?.get(v.code) ?? null
+        const w = Math.round(c.weight / result.totalWeight * 100)
         return (
-          <div key={c.key} title={c.hint} style={{ marginBottom: 9 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-2xs)', marginBottom: 3 }}>
-              <span style={{ color: 'var(--text-default)' }}>{c.label} <span style={{ color: 'var(--text-faint)' }}>× {c.weight}%</span></span>
-              <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{rawText}</span>
+          <div key={c.key + (c.invert ? 'i' : '')} title={ind ? `${ind.desc}（${ind.source}・${ind.period}）` : ''} style={{ marginBottom: 9 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 'var(--text-2xs)', marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-default)' }}>
+                {ind?.label ?? c.key}{ind?.level === '行政區' && <span style={{ color: 'var(--text-faint)' }}>（區）</span>}
+                {c.invert && <span style={{ color: 'var(--warning)' }}> ↓越低越好</span>}
+                <span style={{ color: 'var(--text-faint)' }}> × {w}%</span>
+              </span>
+              <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{fmtValue(ind, raw)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ flex: 1, height: 6, borderRadius: 'var(--radius-full)', background: 'var(--surface-control)', overflow: 'hidden' }}>
@@ -630,7 +650,7 @@ function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClos
       {v.raw.headAvgAge != null && (
         <>
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>
-            家戶結構（不計分）
+            家戶結構
             <span style={{ fontWeight: 400, color: 'var(--text-faint)', marginLeft: 6, fontSize: 'var(--text-2xs)' }}>
               {meta.hhqPeriod}・教育 {meta.eduYear} 年・戶數 {meta.hhYear} 年
             </span>
@@ -688,20 +708,16 @@ function VillageDetail({ v, mode, rank, total, meta, rentRow, assumption, onClos
     </div>
   )
 }
-/** 生活機能類別（對應 poi_points.category） */
-const POI_LABELS: [string, string][] = [
-  ['school', '學校'], ['park', '公園'], ['supermarket', '超市'], ['mall', '量販／百貨'],
-  ['hospital', '醫院'], ['library', '圖書館'], ['station', '車站'],
-]
 const ddStyle: React.CSSProperties = { margin: 0, textAlign: 'right', color: 'var(--text-default)', fontFamily: 'var(--font-mono)' }
 
-/* ── 排行榜表格 ───────────────────────────────────────────────── */
-function RankingTable({ rows, mode, cityRank, selected, onPick }: {
-  rows: Village[]; mode: Mode; cityRank: Map<string, number>; selected: string | null; onPick: (c: string) => void
+/* ── 排行榜表格（欄位跟著指數的組成變動） ───────────────────────── */
+function RankingTable({ rows, def, result, catalog, score, cityRank, selected, onPick }: {
+  rows: Village[]; def: IndexDef; result: IndexResult; catalog: Catalog; score: (c: string) => number
+  cityRank: Map<string, number>; selected: string | null; onPick: (c: string) => void
 }) {
-  const young = mode === 'firstBuyer'
   const th: React.CSSProperties = { padding: '6px 8px', fontWeight: 600, color: 'var(--text-muted)', fontSize: 'var(--text-2xs)', textAlign: 'right', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border-card)' }
   const td: React.CSSProperties = { padding: '6px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }
+  const cols = result.used.map(c => ({ c, ind: catalog.byKey.get(c.key) }))
   return (
     <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-xs)', color: 'var(--text-default)' }}>
@@ -709,13 +725,13 @@ function RankingTable({ rows, mode, cityRank, selected, onPick }: {
           <tr>
             <th style={{ ...th, textAlign: 'left' }}>全市排名</th>
             <th style={{ ...th, textAlign: 'left' }}>村里</th>
-            <th style={th}>{MODE_LABEL[mode]}</th>
+            <th style={th}>{def.name}</th>
             <th style={th}>人口</th>
-            <th style={th}>世代淨移入 {young ? '25–34' : '35–44'}</th>
-            <th style={th}>{young ? '25–34' : '35–44'} 占比</th>
-            <th style={th}>{young ? '結婚率' : '出生率'}</th>
-            <th style={th}>所得中位數（購買力，千元）</th>
-            <th style={th}>社會增加率</th>
+            {cols.map(({ c, ind }) => (
+              <th key={c.key} style={th} title={ind?.desc}>
+                {ind?.label ?? c.key}{ind?.unit && !['%', '‰'].includes(ind.unit) ? `（${ind.unit}）` : ''}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -730,13 +746,14 @@ function RankingTable({ rows, mode, cityRank, selected, onPick }: {
                 <span style={{ color: 'var(--text-muted)' }}>{v.district}</span> {v.village}
                 {v.lowConfidence && <span title="人口未滿 1,000" style={{ marginLeft: 6, color: 'var(--warning)', fontSize: 'var(--text-3xs)' }}>⚠</span>}
               </td>
-              <td style={{ ...td, color: 'var(--text-strong)', fontWeight: 600 }}>{fmt(v[mode])}</td>
-              <td style={td}>{v.raw.pop.toLocaleString()}</td>
-              <td style={td}>{signed(young ? v.raw.cohortYoung : v.raw.cohortMid)}‰</td>
-              <td style={td}>{fmt(young ? v.raw.share2534 : v.raw.share3544)}%</td>
-              <td style={td}>{fmt(young ? v.raw.marriage : v.raw.birth, 2)}‰</td>
-              <td style={td}>{fmt(v.raw.income, 0)}</td>
-              <td style={td}>{signed(v.raw.social)}‰</td>
+              <td style={{ ...td, color: 'var(--text-strong)', fontWeight: 600 }}>{fmt(score(v.code))}</td>
+              <td style={td}>{(v.raw.pop ?? 0).toLocaleString()}</td>
+              {cols.map(({ c, ind }) => {
+                const raw = catalog.values.get(c.key)?.get(v.code) ?? null
+                // 只顯示數字（單位放在表頭），% 與 ‰ 保留在數字後
+                const text = fmtValue(ind ? { ...ind, unit: ['%', '‰'].includes(ind.unit) ? ind.unit : '' } : undefined, raw)
+                return <td key={c.key} style={td}>{text}</td>
+              })}
             </tr>
           ))}
         </tbody>
@@ -754,12 +771,14 @@ function Methodology() {
       <ul style={{ margin: '10px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li style={li}>每項指標先換算成全市 650 里的百分位（0–100），再依權重加總；指數 50 約為全市中間水準。</li>
         <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 20% + 結婚率 20% + 所得（購買力）20% + 社會增加率 10%。</li>
-        <li style={li}><b>換屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得（購買力）30% + 社會增加率 10%。</li>
+        <li style={li}><b>換新屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得（購買力）20% + 設籍宅數成長 20%。和各區近 24 月預售＋新成屋交易量的排名相關 0.79。</li>
+        <li style={li}><b>換二手指數</b> = 世代淨移入（35–44）10% + 35–44 歲占比 20% + 26–45 歲戶長占比 20% + 所得（購買力）30% + 大學以上學歷 20%。和各區近 24 月二手成屋（屋齡 5 年以上）交易量的排名相關 0.80。</li>
         <li style={li}><b>世代淨移入</b>：比較同一批人一年前後的人數（例如去年 25–34 歲 vs 今年 26–35 歲），這個年齡層死亡很少，差額約等於淨搬入。</li>
         <li style={li}><b>社會增加率</b>含同區跨里遷移；新社區的住戶常來自同區隔壁里，不加回會被低估。</li>
         <li style={li}><b>結婚率、出生率</b>在小里波動很大，已往所屬行政區的平均收縮（人口越少收縮越多）。</li>
         <li style={li}><b>所得（購買力）</b>為財政部綜所稅申報資料，用來代表各里的購買力；不含免稅與分離課稅所得，且落後約 2–3 年，只做相對排名。</li>
-        <li style={li}>時間窗為最近 12 個月；人口未滿 1,000 的里雜訊大，地圖以淡色虛線標示。</li>
+        <li style={li}><b>設籍宅數成長</b>、<b>26–45 歲戶長占比</b>為內政部戶政平台村里季資料；沒有資料的里以中性值 50 計。</li>
+        <li style={li}>時間窗為最近 12 個月；人口未滿 1,000 的里雜訊大，地圖以淡色虛線標示。想用自己的權重，到「自訂指數」頁籤。</li>
       </ul>
     </details>
   )
