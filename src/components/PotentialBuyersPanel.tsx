@@ -12,6 +12,7 @@ import SouthParkSection, { type SouthParkRow, type IndustryRow } from './SouthPa
 import ProjectionSection, { type ProjectionData } from './ProjectionSection'
 import SchoolSection, { type SchoolData } from './SchoolSection'
 import IndustrySection, { type IndustryPoint } from './IndustrySection'
+import SupplyPipelineSection, { type SupplyData } from './SupplyPipelineSection'
 import MajorProjectsSection, { StatusBadge } from './MajorProjectsSection'
 import { MAJOR_PROJECTS } from '@/lib/majorProjects'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
@@ -59,6 +60,7 @@ interface ApiData {
   projection: ProjectionData
   schools: SchoolData
   industry: IndustryPoint[]
+  supply: SupplyData
   houseAge: { period: string | null; cityAvgAge: number | null; rows: HouseAgeRow[] }
   market: MarketPoint[]
   lowUsage: LowUsageRow[]
@@ -221,6 +223,12 @@ export default function PotentialBuyersPanel() {
   const popByDistrict = useMemo(() => {
     const m = new Map<string, number>()
     for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + v.raw.pop)
+    return m
+  }, [villages])
+  // 各區戶數（村里加總），住宅供給區塊算「每千戶開工」用
+  const householdsByDistrict = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const v of villages) m.set(v.district, (m.get(v.district) ?? 0) + v.raw.households)
     return m
   }, [villages])
 
@@ -438,6 +446,11 @@ export default function PotentialBuyersPanel() {
               highlightDistrict={hl}
             />
           </div>
+
+          {/* 住宅供給動能：開工 → 使照 → 新屋交屋 → 待售新成屋（行政區） */}
+          {data.supply.stats.length > 0 && (
+            <SupplyPipelineSection data={data.supply} transfers={data.transfers} householdsByDistrict={householdsByDistrict} highlightDistrict={hl} />
+          )}
 
           {/* 建物移轉、低度使用（行政區） */}
           <TransfersSection data={data.transfers} highlightDistrict={hl} />

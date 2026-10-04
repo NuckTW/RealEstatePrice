@@ -4,8 +4,9 @@ import {
   fetchMarketSeries, fetchLowUsageByDistrict, fetchStockAgeByDistrict,
   fetchTransfersByDistrict, fetchTransfersCitySeries,
   fetchSouthParkIndustry, fetchPopulationProjection,
-  fetchSchoolByDistrict, fetchSchoolGrowth, fetchPoiByVillage, fetchIndustryStats,
+  fetchSchoolByDistrict, fetchSchoolGrowth, fetchPoiByVillage, fetchIndustryStats, fetchConstructionStats,
 } from '@/lib/queries/potentialBuyers'
+import { fetchUnsoldByDistrict } from '@/lib/queries/supply'
 import type { Row } from '@/lib/queries/client'
 
 /**
@@ -35,7 +36,7 @@ const AGE_BANDS: Record<string, string[]> = {
 export async function GET() {
   try {
     const [rows, rentRows, parkRows, seriesRows, lowRows, stockRows, transferRows, transferCity, industryRows, projRows,
-           schoolRows, schoolGrowthRows, poiRows, industryStatRows] = await Promise.all([
+           schoolRows, schoolGrowthRows, poiRows, industryStatRows, constructionRows, unsoldRows] = await Promise.all([
       fetchVillageBuyerIndicators(),
       fetchDistrictRentVsPrice(),
       optional('南科', fetchSouthParkEmployees()),
@@ -50,6 +51,8 @@ export async function GET() {
       optional('學校成長', fetchSchoolGrowth()),
       optional('生活機能', fetchPoiByVillage()),
       optional('產業與就業', fetchIndustryStats()),
+      optional('住宅供給', fetchConstructionStats()),
+      optional('新建餘屋', fetchUnsoldByDistrict()),
     ])
 
     // 生活機能：village_code → { 類別: 點數 }
@@ -183,6 +186,15 @@ export async function GET() {
         indicator: String(r.indicator), level: String(r.area_level), area: String(r.area),
         period: String(r.period), value: Number(r.value),
       })),
+      // 住宅供給：開工戶數、使照戶數（行政區・年）＋ 最新一季待售新成屋
+      supply: {
+        stats: constructionRows.map(r => ({
+          indicator: String(r.indicator), level: String(r.area_level), area: String(r.area),
+          period: String(r.period), value: Number(r.value),
+        })),
+        unsoldPeriod: unsoldRows.length ? String(unsoldRows[0].source_period) : null,
+        unsold: unsoldRows.map(r => ({ district: String(r.district), units: Number(r.unsold_units) })),
+      },
       // 國中小學生數：行政區 × 學年 × 學制；各校新生成長
       schools: {
         byDistrict: schoolRows.map(r => ({

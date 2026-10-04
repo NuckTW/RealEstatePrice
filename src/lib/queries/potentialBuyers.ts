@@ -302,3 +302,17 @@ export function fetchIndustryStats(): Promise<Row[]> {
 /** 普查與工商家數共同的大行業代號（對應 scripts/fetch_industry_census.py） */
 const INDUSTRY_KEYS = ['mfg', 'electricity', 'water', 'construction', 'trade', 'transport', 'accommodation',
   'ict', 'finance', 'realestate', 'professional', 'support', 'education', 'health', 'arts', 'other']
+
+/**
+ * 住宅供給（臺南市工務局，由 fetch_housing_stats.py --only construction 匯入）
+ * - construction_start_units：住宅開工戶數（行政區・年，112 年起）
+ * - usage_permit_units：住宅使用執照戶數（行政區・年，100～111 年；官方逐案資料停在 112 年 4 月）
+ */
+export function fetchConstructionStats(): Promise<Row[]> {
+  return cachedQuery(`
+    SELECT indicator, area_level, area, period, value::float AS value
+    FROM housing_market_stats
+    WHERE indicator IN ('construction_start_units', 'usage_permit_units')
+    ORDER BY period_date
+  `)
+}
