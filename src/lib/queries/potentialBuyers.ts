@@ -313,3 +313,44 @@ export function fetchConstructionStats(): Promise<Row[]> {
     ORDER BY period_date
   `)
 }
+
+/**
+ * 客源分析用：預售建案清單（有座標、至少 3 筆住宅成交）
+ * - 總價扣除車位價、坪數扣除車位面積；排除特殊關係交易與純車位交易
+ * - small_share：2 房以下的成交占比，前端用來預設「首購比重」
+ * - 座標取 building_locations 預售建案座標（建案名稱不分大小寫、去頭尾空白比對）
+ */
+export function fetchPresaleProjectProfiles(): Promise<Row[]> {
+  return cachedQuery(`
+    WITH t AS (
+      SELECT lower(btrim(project_name)) AS k, project_name, district, transaction_date,
+             (total_price - coalesce(parking_price, 0)) / 10000.0 AS price_wan,
+             (building_area_sqm - coalesce(parking_area_sqm, 0)) / 3.3058 AS ping,
+             rooms
+      FROM transactions
+      WHERE is_presale AND project_name IS NOT NULL AND btrim(project_name) <> ''
+        AND coalesce(notes, '') NOT LIKE '%特殊關係%'
+        AND transaction_target LIKE '%建物%'
+        AND rooms > 0 AND building_area_sqm > 0 AND total_price > 0
+    ),
+    agg AS (
+      SELECT k, min(project_name) AS name, mode() WITHIN GROUP (ORDER BY district) AS district,
+             count(*)::int AS n, min(transaction_date)::text AS first_date, max(transaction_date)::text AS last_date,
+             round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price_wan)::numeric, 0)::float AS price_wan,
+             round(percentile_cont(0.5) WITHIN GROUP (ORDER BY ping)::numeric, 1)::float AS ping,
+             round(percentile_cont(0.5) WITHIN GROUP (ORDER BY rooms)::numeric, 0)::int AS rooms,
+             round(avg((rooms <= 2)::int)::numeric, 2)::float AS small_share,
+             round(percentile_cont(0.5) WITHIN GROUP (ORDER BY price_wan / nullif(ping, 0))::numeric, 1)::float AS unit_wan
+      FROM t GROUP BY k HAVING count(*) >= 3
+    )
+    SELECT a.name, a.district, a.n, a.first_date, a.last_date, a.price_wan, a.ping, a.rooms, a.small_share, a.unit_wan,
+           l.lat::float AS lat, l.lon::float AS lon
+    FROM agg a
+    JOIN LATERAL (
+      SELECT lat, lon FROM building_locations b
+      WHERE b.location_type = 'presale' AND lower(btrim(b.location_key)) = a.k AND b.lat IS NOT NULL
+      LIMIT 1
+    ) l ON true
+    ORDER BY a.last_date DESC
+  `)
+}

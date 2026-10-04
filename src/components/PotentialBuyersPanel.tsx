@@ -16,6 +16,7 @@ import SupplyPipelineSection, { type SupplyData } from './SupplyPipelineSection'
 import MajorProjectsSection, { StatusBadge } from './MajorProjectsSection'
 import DataCatalogSection from './DataCatalogSection'
 import CustomIndexSection from './CustomIndexSection'
+import CatchmentSection from './CatchmentSection'
 import { MAJOR_PROJECTS } from '@/lib/majorProjects'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 import {
@@ -55,10 +56,11 @@ export interface CustomStore {
 }
 
 /** 頁籤：村里指數為主，其餘為行政區／縣市層級的背景資料（皆不計入村里指數） */
-type Tab = '村里指數' | '自訂指數' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
+type Tab = '村里指數' | '自訂指數' | '客源分析' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
 const TABS: { key: Tab; desc: string }[] = [
   { key: '村里指數',   desc: '村里首購／換新屋／換二手指數地圖與排行' },
   { key: '自訂指數',   desc: '手動加入資料、自訂指數權重、AI 建議配方' },
+  { key: '客源分析',   desc: '選建案或在地圖點位置，推估潛在買方來自哪些里' },
   { key: '人口與家庭', desc: '未來人口推估、學區新生' },
   { key: '就業與產業', desc: '各區就業結構、南科就業動能' },
   { key: '房市與負擔', desc: '負擔能力、租金與房貸、建物移轉、空屋、屋齡' },
@@ -218,6 +220,11 @@ export default function PotentialBuyersPanel() {
   }, [villages])
 
   const lowConfidence = useMemo(() => new Set(villages.filter(v => v.lowConfidence).map(v => v.code)), [villages])
+
+  // 客源分析：各區從業員工（普查）
+  const employeesByDistrict = useMemo(() => new Map((data?.industry ?? [])
+    .filter(r => r.level === 'district' && r.indicator === 'census_employees:all')
+    .map(r => [r.area, r.value])), [data])
 
   const tooltipByCode = useMemo(() => new Map(villages.map(v => [
     v.code,
@@ -409,6 +416,16 @@ export default function PotentialBuyersPanel() {
           onChanged={reloadCustom}
           onViewOnMap={viewIndexOnMap}
           highlightDistrict={hl}
+        />
+      )}
+
+      {tab === '客源分析' && (
+        <CatchmentSection
+          villages={villages}
+          geo={geo}
+          catalog={catalog}
+          employeesByDistrict={employeesByDistrict}
+          defaultRate={assumption.ratePct}
         />
       )}
 
