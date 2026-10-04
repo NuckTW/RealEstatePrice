@@ -17,6 +17,7 @@ import MajorProjectsSection, { StatusBadge } from './MajorProjectsSection'
 import DataCatalogSection from './DataCatalogSection'
 import CustomIndexSection from './CustomIndexSection'
 import CatchmentSection from './CatchmentSection'
+import IndexGuideSection from './IndexGuideSection'
 import { MAJOR_PROJECTS } from '@/lib/majorProjects'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 import {
@@ -56,9 +57,10 @@ export interface CustomStore {
 }
 
 /** 頁籤：村里指數為主，其餘為行政區／縣市層級的背景資料（皆不計入村里指數） */
-type Tab = '村里指數' | '自訂指數' | '客源分析' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
+type Tab = '村里指數' | '指數說明' | '自訂指數' | '客源分析' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
 const TABS: { key: Tab; desc: string }[] = [
   { key: '村里指數',   desc: '村里首購／換新屋／換二手指數地圖與排行' },
+  { key: '指數說明',   desc: '三個指數怎麼算、每項資料的來源' },
   { key: '自訂指數',   desc: '手動加入資料、自訂指數權重、AI 建議配方' },
   { key: '客源分析',   desc: '選建案或在地圖點位置，推估潛在買方來自哪些里' },
   { key: '人口與家庭', desc: '未來人口推估、學區新生' },
@@ -400,9 +402,18 @@ export default function PotentialBuyersPanel() {
             <RankingTable rows={ranking.slice(0, 30)} def={def} result={result} catalog={catalog} score={score} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
           </div>
 
-          <Methodology />
+          {/* 方法說明移到「指數說明」頁籤 */}
+          <button onClick={() => changeTab('指數說明')} style={{
+            ...cardStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
+            fontFamily: 'var(--font-sans)', color: 'var(--text-default)',
+          }}>
+            <span><b style={{ color: 'var(--text-strong)' }}>指數怎麼算？</b><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginLeft: 8 }}>圖解三個指數的算法與每項資料來源</span></span>
+            <span style={{ color: 'var(--accent-tint)', fontSize: 'var(--text-sm)' }}>看指數說明 →</span>
+          </button>
         </>
       )}
+
+      {tab === '指數說明' && <IndexGuideSection villages={villages} catalog={catalog} />}
 
       {tab === '自訂指數' && (
         <CustomIndexSection
@@ -775,27 +786,5 @@ function RankingTable({ rows, def, result, catalog, score, cityRank, selected, o
         </tbody>
       </table>
     </div>
-  )
-}
-
-/* ── 方法說明 ─────────────────────────────────────────────────── */
-function Methodology() {
-  const li: React.CSSProperties = { marginBottom: 4 }
-  return (
-    <details style={{ ...cardStyle, fontSize: 'var(--text-xs)', color: 'var(--text-default)' }}>
-      <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>指數怎麼算？</summary>
-      <ul style={{ margin: '10px 0 0', paddingLeft: 18, lineHeight: 1.7 }}>
-        <li style={li}>每項指標先換算成全市 650 里的百分位（0–100），再依權重加總；指數 50 約為全市中間水準。</li>
-        <li style={li}><b>首購指數</b> = 世代淨移入（25–34）30% + 25–34 歲占比 25% + 結婚率 10% + 所得（購買力）25% + 社會增加率 10%。結婚率與各區預售成交的相關較弱，權重較低。</li>
-        <li style={li}><b>換新屋指數</b> = 世代淨移入（35–44）20% + 35–44 歲占比 20% + 出生率 20% + 所得（購買力）20% + 設籍宅數成長 20%。和各區近 24 月預售＋新成屋交易量的排名相關 0.79。</li>
-        <li style={li}><b>換二手指數</b> = 世代淨移入（35–44）10% + 35–44 歲占比 20% + 26–45 歲戶長占比 20% + 所得（購買力）30% + 大學以上學歷 20%。和各區近 24 月二手成屋（屋齡 5 年以上）交易量的排名相關 0.80。</li>
-        <li style={li}><b>世代淨移入</b>：比較同一批人一年前後的人數（例如去年 25–34 歲 vs 今年 26–35 歲），這個年齡層死亡很少，差額約等於淨搬入。</li>
-        <li style={li}><b>社會增加率</b>含同區跨里遷移；新社區的住戶常來自同區隔壁里，不加回會被低估。</li>
-        <li style={li}><b>結婚率、出生率</b>在小里波動很大，已往所屬行政區的平均收縮（人口越少收縮越多）。</li>
-        <li style={li}><b>所得（購買力）</b>為財政部綜所稅申報資料，用來代表各里的購買力；不含免稅與分離課稅所得，且落後約 2–3 年，只做相對排名。</li>
-        <li style={li}><b>設籍宅數成長</b>、<b>26–45 歲戶長占比</b>為內政部戶政平台村里季資料；沒有資料的里以中性值 50 計。</li>
-        <li style={li}>時間窗為最近 12 個月；人口未滿 1,000 的里雜訊大，地圖以淡色虛線標示。想用自己的權重，到「自訂指數」頁籤。</li>
-      </ul>
-    </details>
   )
 }
