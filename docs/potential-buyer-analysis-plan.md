@@ -245,6 +245,7 @@ SQL：`supabase/migrations/20261003_village_buyer_indicators.sql`（materialized
   - AI 建議：`/api/potential-buyers/ai-weights`（Gemini Free tier，與 AI 問答共用密碼與限流，每次算 1 題），回傳指標、權重、理由，前端再以實際資料檢查重複
   - 資料表：`supabase/migrations/20261007_custom_datasets_indices.sql`（`custom_datasets`、`custom_dataset_values`、`custom_indices`，RLS 全關）；API `/api/potential-buyers/custom` 需 `x-chat-password`
   - 共用程式：`src/lib/aiGuard.ts`（Gemini、fallback、密碼、限流，chat route 也改用）、`src/lib/chatPassword.ts`（密碼存 localStorage，與 AI 問答共用）、`src/components/ChoroplethLegend.tsx`
+- **指數說明（2026-10-04）**：「指數說明」頁籤（`IndexGuideSection`），圖解三個指數算法、9 項材料各附資料來源連結、即時計算的國平里範例、驗證結果、全站資料來源表；村里指數頁底部改為連到此頁籤的按鈕（原「指數怎麼算？」移除）
 - **客源分析（2026-10-04）**：「客源分析」頁籤，選預售建案或在地圖點位置，推估潛在買方來自哪些里
   - 模型 `src/lib/catchment.ts`（Huff／重力模型簡化版）：村里分數 = 距離衰減（0.5^(距離÷減半距離)，預設 6 公里、可調）× 負擔能力（年房貸÷里所得中位數，≤50% 不扣、≥100% 剩 0.15）× [首購比重 × 25–34 歲人口 × (0.5+首購指數/100) ＋ 換屋比重 × 35–44 歲人口 × (0.5+換新屋或換二手指數/100)]
   - 首購比重預設 = 0.25 + 0.6 × 2 房以下成交占比；預售用換新屋指數、成屋用換二手指數
