@@ -151,7 +151,7 @@ function villageIndicators(meta: Meta): (Omit<Indicator, 'level'> & { raw: RawKe
     { raw: 'share3544', key: 'share3544', label: '35–44 歲人口占比', unit: '%', group: '人口結構', desc: '換屋主力年齡層占全里人口比例', source: RIS, period: m, digits: 1 },
     { raw: 'women1549Share', key: 'women1549Share', label: '育齡婦女占比', unit: '%', group: '人口結構', desc: '15–49 歲女性占全里人口比例', source: RIS, period: m, digits: 1 },
     { raw: 'hhSize', key: 'hhSize', label: '戶量', unit: '人／戶', group: '人口結構', desc: '平均每戶人數，越小代表小家庭越多', source: RIS, period: m, digits: 2 },
-    { raw: 'splitSpeed', key: 'splitSpeed', label: '分戶速度', unit: '%', group: '人口結構', desc: '戶數成長減人口成長，正值代表分戶（成家、獨立）', source: RIS, period: w12, digits: 2, signed: true },
+    { raw: 'splitSpeed', key: 'splitSpeed', label: '分戶速度', unit: '百分點', group: '人口結構', desc: '戶數成長減人口成長，正值代表分戶（成家、獨立）', source: RIS, period: w12, digits: 2, signed: true },
 
     { raw: 'cohortYoung', key: 'cohortYoung', label: '世代淨移入（25–34 歲）', unit: '‰', group: '遷徙', desc: '同一批年輕人一年後多了或少了多少，約等於淨搬入', source: RIS, period: w12, digits: 1, signed: true },
     { raw: 'cohortMid', key: 'cohortMid', label: '世代淨移入（35–44 歲）', unit: '‰', group: '遷徙', desc: '同一批中年家庭一年後多了或少了多少', source: RIS, period: w12, digits: 1, signed: true },

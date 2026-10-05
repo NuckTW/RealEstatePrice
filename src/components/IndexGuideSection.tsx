@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { computeIndex, partOf, PRESET_INDICES, type Catalog, type Village } from '@/lib/buyerIndex'
+import { FIELD_GUIDE } from '@/lib/fieldGuide'
 
 /**
  * 指數說明頁籤：以圖解說明三個購屋指數怎麼算、每樣材料的資料來源，並附全站資料來源表
@@ -15,7 +16,8 @@ const GUIDE_CSS = `
   :root[data-theme="light"] { --ig-fb: #1f7a6e; --ig-nh: #4a4fa3; --ig-rs: #8a3f74; --ig-fb-soft: #d6ebe7; --ig-nh-soft: #dfe0f3; --ig-rs-soft: #f1dfeb; }
   .ig-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
   .ig-row { display: grid; grid-template-columns: 8em 1fr 9em; gap: 12px; align-items: center; }
-  @media (max-width: 560px) { .ig-row { grid-template-columns: 1fr; gap: 4px } .ig-row .ig-math { text-align: left !important } }
+  .ig-field { display: grid; grid-template-columns: 11em 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .ig-row { grid-template-columns: 1fr; gap: 4px } .ig-row .ig-math { text-align: left !important } .ig-field { grid-template-columns: 1fr; gap: 2px } }
 `
 type Seg = 'fb' | 'nh' | 'rs'
 const SEG_COLOR: Record<Seg, string> = { fb: 'var(--ig-fb)', nh: 'var(--ig-nh)', rs: 'var(--ig-rs)' }
@@ -166,7 +168,7 @@ export default function IndexGuideSection({ villages, catalog }: { villages: Vil
   const partLabel: Record<string, string> = { cohortYoung: '年輕人搬進來', share2534: '年輕人多不多', marriage: '結婚', income: '所得（購買力）', social: '淨流入' }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div id="guide-top" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <style>{GUIDE_CSS}</style>
 
       {/* 1. 三張成績單 */}
@@ -338,14 +340,27 @@ export default function IndexGuideSection({ villages, catalog }: { villages: Vil
       </section>
 
       {/* 8. 不計分 */}
-      <section style={cardStyle}>
+      <section id="field-guide" style={cardStyle}>
         <h2 style={h2}>看得到、但不算分的</h2>
-        <p style={lead}>這些跟已經在算的材料太像，或跟實際交易沒有正向關係（老屋多、高齡戶長多的里多在偏鄉、交易少）。</p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {['戶量、分戶速度', '跨縣市／市內他區淨移入', '育齡婦女', '離婚', '戶長平均年齡', '一宅多戶、獨居宅', '生活機能', '南科員工', '租金與房貸', '開工、使照', '重大建設'].map(c => (
-            <span key={c} style={{ fontSize: 'var(--text-xs)', padding: '3px 12px', borderRadius: 'var(--radius-full)', border: '1px solid var(--border-control)', color: 'var(--text-muted)' }}>{c}</span>
-          ))}
-        </div>
+        <p style={lead}>這些跟已經在算的材料太像，或跟實際交易沒有正向關係（老屋多、高齡戶長多的里多在偏鄉、交易少）。點村里後明細下半部就是這些數字，點欄位名稱也能看到同樣的說明。</p>
+        {FIELD_GUIDE.map(g => (
+          <div key={g.title} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 4 }}>
+              {g.title}<span style={{ fontWeight: 400, color: 'var(--text-faint)', marginLeft: 8, fontSize: 'var(--text-xs)' }}>{g.period}</span>
+            </div>
+            {g.items.map(it => (
+              <div key={it.key} className="ig-field" style={{ padding: '8px 0', borderTop: '1px solid var(--border-card)', fontSize: 'var(--text-xs)', lineHeight: 1.7 }}>
+                <div>
+                  <b style={{ color: 'var(--text-strong)' }}>{it.label}</b>
+                  <div style={{ color: 'var(--text-faint)', fontFamily: 'var(--font-mono)' }}>{it.unit}</div>
+                </div>
+                <div style={{ color: 'var(--text-default)' }}>{it.how}</div>
+                <div style={{ color: 'var(--text-muted)' }}>{it.read}</div>
+              </div>
+            ))}
+          </div>
+        ))}
+        <p style={{ ...lead, margin: 0 }}>其他頁籤也有不算分的資料：南科員工（就業與產業）、開工與使照（房市與負擔）、重大建設。</p>
       </section>
 
       {/* 9. 全部資料來源 */}

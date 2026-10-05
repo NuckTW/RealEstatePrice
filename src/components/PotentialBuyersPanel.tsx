@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { VillageGeo } from './VillageChoroplethMap'
 import HouseAgeChart, { type HouseAgeRow } from './HouseAgeChart'
@@ -19,6 +19,7 @@ import CustomIndexSection from './CustomIndexSection'
 import CatchmentSection from './CatchmentSection'
 import IndexGuideSection from './IndexGuideSection'
 import { MAJOR_PROJECTS } from '@/lib/majorProjects'
+import { FIELD_GUIDE_BY_KEY } from '@/lib/fieldGuide'
 import RentMortgageTable, { DEFAULT_ASSUMPTION, rentRatio, type MortgageAssumption, type RentRow } from './RentMortgageTable'
 import {
   buildCatalog, computeIndex, partOf, fmtValue, PRESET_INDICES, POI_LABELS,
@@ -250,6 +251,20 @@ export default function PotentialBuyersPanel() {
     setTab(t)
     window.history.replaceState(null, '', t === '村里指數' ? window.location.pathname : `#${encodeURIComponent(t)}`)
   }
+  // 明細面板的「怎麼看？」：切到說明頁籤後捲到對應段落（等頁籤渲染完再捲）
+  const openGuide = (anchor: string) => {
+    changeTab('指數說明')
+    setTimeout(() => {
+      const el = document.getElementById(anchor)
+      if (!el) return
+      // 扣掉頂部固定的導覽列／頁籤列，避免標題被蓋住；手機版頁籤列不固定，只算真的 sticky/fixed 的
+      const top = Math.max(0, ...[...document.querySelectorAll<HTMLElement>('header, .pb-sticky')].map(e => {
+        const cs = getComputedStyle(e)
+        return cs.position === 'sticky' || cs.position === 'fixed' ? (parseFloat(cs.top) || 0) + e.offsetHeight : 0
+      }))
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - top - 12, behavior: 'smooth' })
+    }, 50)
+  }
   const pickFromTable = (code: string) => {
     setSelected(code)
     setFocusCodes([code])
@@ -384,6 +399,7 @@ export default function PotentialBuyersPanel() {
                     rentRow={data.rent.rows.find(r => r.district === sel.district && r.btype === '大樓華廈') ?? null}
                     assumption={assumption}
                     onClose={() => setSelected(null)}
+                    onGuide={openGuide}
                   />
                 : <TopList rows={ranking.slice(0, 10)} score={score} def={def} district={district} onPick={pickFromTable} />}
             </div>
@@ -584,12 +600,26 @@ function TopList({ rows, score, def, district, onPick }: {
 }
 
 /* ── 村里明細 ─────────────────────────────────────────────────── */
-function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, assumption, onClose }: {
+function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, assumption, onClose, onGuide }: {
   v: Village; def: IndexDef; result: IndexResult; catalog: Catalog
   rank: number; total: number; meta: Meta
   rentRow: RentRow | null; assumption: MortgageAssumption; onClose: () => void
+  onGuide: (anchor: string) => void
 }) {
   const ratio = rentRow ? rentRatio(rentRow, assumption) : null
+  // 點欄位名稱展開白話說明（手機沒有 hover，所以不靠 title）；一次只開一個
+  const [open, setOpen] = useState<string | null>(null)
+  const toggle = (k: string) => setOpen(o => (o === k ? null : k))
+  const row = (k: string, label: React.ReactNode, value: React.ReactNode) => {
+    const g = FIELD_GUIDE_BY_KEY.get(k)
+    return (
+      <Fragment key={k}>
+        <dt><button onClick={() => toggle(k)} aria-expanded={open === k} style={labelBtn}>{label}<span style={infoMark}>ⓘ</span></button></dt>
+        <dd style={ddStyle}>{value}</dd>
+        {open === k && g && <dd style={explainStyle}>{g.how}{g.read}</dd>}
+      </Fragment>
+    )
+  }
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
@@ -633,20 +663,25 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
         </div>
       )}
 
-      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 6 }}>指標拆解（全市百分位）</div>
+      <div style={sectionHead}>
+        <span>指標拆解（全市百分位）</span>
+        <button onClick={() => onGuide('guide-top')} style={guideLink}>怎麼算？→</button>
+      </div>
       {result.used.map(c => {
         const ind = catalog.byKey.get(c.key)
         const p = partOf(result, c, v.code)
         const raw = catalog.values.get(c.key)?.get(v.code) ?? null
         const w = Math.round(c.weight / result.totalWeight * 100)
+        const ok = 'i:' + c.key + (c.invert ? 'i' : '')
         return (
           <div key={c.key + (c.invert ? 'i' : '')} title={ind ? `${ind.desc}（${ind.source}・${ind.period}）` : ''} style={{ marginBottom: 9 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 'var(--text-2xs)', marginBottom: 3 }}>
-              <span style={{ color: 'var(--text-default)' }}>
+              <button onClick={() => toggle(ok)} aria-expanded={open === ok} style={{ ...labelBtn, color: 'var(--text-default)' }}>
                 {ind?.label ?? c.key}{ind?.level === '行政區' && <span style={{ color: 'var(--text-faint)' }}>（區）</span>}
                 {c.invert && <span style={{ color: 'var(--warning)' }}> ↓越低越好</span>}
                 <span style={{ color: 'var(--text-faint)' }}> × {w}%</span>
-              </span>
+                <span style={infoMark}>ⓘ</span>
+              </button>
               <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{fmtValue(ind, raw)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -655,23 +690,29 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
               </div>
               <span style={{ width: 30, textAlign: 'right', fontSize: 'var(--text-2xs)', color: 'var(--text-strong)', fontFamily: 'var(--font-mono)' }}>{Math.round(p)}</span>
             </div>
+            {open === ok && ind && (
+              <div style={{ ...explainStyle, marginTop: 4 }}>
+                {ind.desc}。下方 {Math.round(p)} 分＝這項比全市約 {Math.round(p)}% 的里好{c.invert ? '（越低越好，已反過來算）' : ''}。
+                <span style={{ color: 'var(--text-faint)', marginLeft: 6 }}>{ind.source}・{ind.period}</span>
+              </div>
+            )}
           </div>
         )
       })}
 
-      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', margin: '14px 0 6px' }}>其他觀察（不計分）</div>
+      <div style={{ ...sectionHead, marginTop: 14 }}>
+        <span>其他觀察（不計分）</span>
+        <button onClick={() => onGuide('field-guide')} style={guideLink}>怎麼看？→</button>
+      </div>
       <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 12, margin: 0, fontSize: 'var(--text-2xs)' }}>
-        <dt style={{ color: 'var(--text-muted)' }}>戶量（人／戶）</dt><dd style={ddStyle}>{fmt(v.raw.hhSize, 2)}</dd>
-        <dt style={{ color: 'var(--text-muted)' }}>分戶速度（戶數 − 人口成長）</dt><dd style={ddStyle}>{signed(v.raw.splitSpeed, 2)}%</dd>
-        <dt style={{ color: 'var(--text-muted)' }}>跨縣市淨移入</dt><dd style={ddStyle}>{signed(v.raw.netOtherCity)}‰</dd>
-        <dt style={{ color: 'var(--text-muted)' }}>市內他區淨移入</dt><dd style={ddStyle}>{signed(v.raw.netOtherTown)}‰</dd>
-        <dt style={{ color: 'var(--text-muted)' }}>同區跨里淨移入</dt><dd style={ddStyle}>{signed(v.raw.netSameTown)}‰</dd>
-        <dt style={{ color: 'var(--text-muted)' }}>育齡婦女（15–49 歲）</dt>
-        <dd style={ddStyle}>{v.raw.women1549?.toLocaleString() ?? '—'}（{fmt(v.raw.women1549Share)}%）</dd>
-        <dt style={{ color: 'var(--text-muted)' }} title="村里間離婚率差異經檢定為隨機波動，故以行政區離婚率代表">近 12 月離婚對數／{v.district}離婚率</dt>
-        <dd style={ddStyle}>{v.raw.divorces ?? '—'} 對／{fmt(v.raw.divorceKDistrict, 2)}‰</dd>
-        <dt style={{ color: 'var(--text-muted)' }}>{v.district}大樓租金／房貸月付比</dt>
-        <dd style={ddStyle}>{ratio != null ? fmt(ratio, 2) : '樣本不足'}</dd>
+        {row('hhSize', '戶量', `${fmt(v.raw.hhSize, 2)} 人／戶`)}
+        {row('splitSpeed', '分戶速度（戶數 − 人口成長）', `${signed(v.raw.splitSpeed, 2)} 百分點`)}
+        {row('netOtherCity', '跨縣市淨移入', `${signed(v.raw.netOtherCity)}‰`)}
+        {row('netOtherTown', '市內他區淨移入', `${signed(v.raw.netOtherTown)}‰`)}
+        {row('netSameTown', '同區跨里淨移入', `${signed(v.raw.netSameTown)}‰`)}
+        {row('women1549', '育齡婦女（15–49 歲）', <>{v.raw.women1549 != null ? `${v.raw.women1549.toLocaleString()} 人` : '—'}（占人口 {fmt(v.raw.women1549Share)}%）</>)}
+        {row('divorce', <>近 12 月離婚對數／{v.district}離婚率</>, `${v.raw.divorces ?? '—'} 對／${fmt(v.raw.divorceKDistrict, 2)}‰`)}
+        {row('rentRatio', <>{v.district}大樓租金／房貸月付比</>, ratio != null ? `${fmt(ratio, 2)} 倍` : '樣本不足')}
       </dl>
 
       {v.raw.headAvgAge != null && (
@@ -683,16 +724,14 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
             </span>
           </div>
           <dl style={{ display: 'grid', gridTemplateColumns: '1fr auto', rowGap: 4, columnGap: 12, margin: 0, fontSize: 'var(--text-2xs)' }}>
-            <dt style={{ color: 'var(--text-muted)' }}>戶長平均年齡</dt><dd style={ddStyle}>{fmt(v.raw.headAvgAge)} 歲</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>26–45 歲戶長占比（較一年前）</dt>
-            <dd style={ddStyle}>{fmt(v.raw.head2645)}%（{signed(v.raw.head2645Chg)}）</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>65 歲以上戶長占比</dt><dd style={ddStyle}>{fmt(v.raw.head65p)}%</dd>
-            <dt style={{ color: 'var(--text-muted)' }} title="同一住宅設籍 2 戶以上。市區多為成年子女與父母同住（潛在分戶購屋需求）；偏鄉偏高多為三代同堂，與購屋需求呈負相關，需搭配年齡結構判讀">一宅多戶占比（較一年前）</dt>
-            <dd style={ddStyle}>{fmt(v.raw.multiHh)}%（{signed(v.raw.multiHhChg)}）</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>1 人一宅占比</dt><dd style={ddStyle}>{fmt(v.raw.soloDwelling)}%</dd>
-            <dt style={{ color: 'var(--text-muted)' }} title="設有戶籍的住宅數年增率，反映新住宅入住">設籍宅數年增</dt><dd style={ddStyle}>{signed(v.raw.dwellingsGrowth)}%</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>大學以上學歷占比（15 歲以上）</dt><dd style={ddStyle}>{fmt(v.raw.eduUnivPlus)}%</dd>
-            <dt style={{ color: 'var(--text-muted)' }}>單獨生活戶占比</dt><dd style={ddStyle}>{fmt(v.raw.singleHh)}%</dd>
+            {row('headAvgAge', '戶長平均年齡', `${fmt(v.raw.headAvgAge)} 歲`)}
+            {row('head2645', '26–45 歲戶長占比（較一年前）', `${fmt(v.raw.head2645)}%（${signed(v.raw.head2645Chg)} 百分點）`)}
+            {row('head65p', '65 歲以上戶長占比', `${fmt(v.raw.head65p)}%`)}
+            {row('multiHh', '一宅多戶占比（較一年前）', `${fmt(v.raw.multiHh)}%（${signed(v.raw.multiHhChg)} 百分點）`)}
+            {row('soloDwelling', '1 人一宅占比', `${fmt(v.raw.soloDwelling)}%`)}
+            {row('dwellingsGrowth', '設籍宅數年增', `${signed(v.raw.dwellingsGrowth, 2)}%`)}
+            {row('eduUnivPlus', '大學以上學歷占比（15 歲以上）', `${fmt(v.raw.eduUnivPlus)}%`)}
+            {row('singleHh', '單獨生活戶占比', `${fmt(v.raw.singleHh)}%`)}
           </dl>
         </>
       )}
@@ -726,7 +765,7 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
             background: v.poi[k] ? 'var(--accent-wash)' : 'var(--surface-control)',
             color: v.poi[k] ? 'var(--accent-tint)' : 'var(--text-faint)',
             border: `1px solid ${v.poi[k] ? 'var(--accent-wash-border)' : 'var(--border-control)'}`,
-          }}>{label} {v.poi[k] ?? 0}</span>
+          }}>{label} {v.poi[k] ?? 0} 處</span>
         ))}
       </div>
       <div style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', marginTop: 4 }}>
@@ -736,6 +775,25 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
   )
 }
 const ddStyle: React.CSSProperties = { margin: 0, textAlign: 'right', color: 'var(--text-default)', fontFamily: 'var(--font-mono)' }
+/** 可點的欄位名稱（看起來跟原本文字一樣，只多一個 ⓘ） */
+const labelBtn: React.CSSProperties = {
+  background: 'none', border: 0, padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left',
+  font: 'inherit', fontSize: 'inherit', color: 'var(--text-muted)',
+}
+const infoMark: React.CSSProperties = { color: 'var(--text-faint)', marginLeft: 4, fontSize: '0.9em' }
+/** 展開的白話說明：橫跨兩欄 */
+const explainStyle: React.CSSProperties = {
+  gridColumn: '1 / -1', margin: '0 0 4px', padding: '6px 8px', borderRadius: 'var(--radius-md)',
+  background: 'var(--surface-control)', color: 'var(--text-default)', fontSize: 'var(--text-2xs)', lineHeight: 1.6,
+}
+const sectionHead: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8,
+  fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 6,
+}
+const guideLink: React.CSSProperties = {
+  background: 'none', border: 0, padding: 0, cursor: 'pointer', fontFamily: 'var(--font-sans)',
+  fontSize: 'var(--text-2xs)', fontWeight: 400, color: 'var(--accent-tint)',
+}
 
 /* ── 排行榜表格（欄位跟著指數的組成變動） ───────────────────────── */
 function RankingTable({ rows, def, result, catalog, score, cityRank, selected, onPick }: {
