@@ -30,6 +30,16 @@ interface Props {
 // 與站內其他地圖相同用 OSM 底圖；暗色主題以 CSS 濾鏡壓暗（見元件底部 <style>）
 const BASE_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 
+/** 色塊濃度：使用者可調，記在瀏覽器（四張村里地圖共用同一個設定） */
+const OPACITY_KEY = 'tra-map-opacity'
+const DEFAULT_OPACITY = 0.8
+function loadOpacity(): number {
+  try {
+    const v = Number(localStorage.getItem(OPACITY_KEY))
+    return v >= 0.1 && v <= 1 ? v : DEFAULT_OPACITY
+  } catch { return DEFAULT_OPACITY }
+}
+
 /** 站內主題：<html data-theme="light"> 為亮色，未設定為暗色（見 ThemeToggle） */
 function isLightTheme(): boolean {
   return document.documentElement.getAttribute('data-theme') === 'light'
@@ -43,12 +53,14 @@ export default function VillageChoroplethMap({
   const mapInst  = useRef<L.Map | null>(null)
   const geoLayer = useRef<L.GeoJSON | null>(null)
   const [ready, setReady] = useState(false)
+  const [opacity, setOpacity] = useState(loadOpacity)
 
   // Leaflet 的 style / tooltip / click 只在建立圖層時綁一次，透過 ref 讀最新值
   const classRef    = useRef(classByCode)
   const lowRef      = useRef(lowConfidence)
   const tooltipRef  = useRef(tooltipByCode)
   const selectedRef = useRef(selected)
+  const opacityRef  = useRef(opacity)
   const onSelectRef = useRef(onSelect)
   const onMapClickRef = useRef(onMapClick)
   const onPointClickRef = useRef(onPointClick)
@@ -61,6 +73,7 @@ export default function VillageChoroplethMap({
     lowRef.current      = lowConfidence
     tooltipRef.current  = tooltipByCode
     selectedRef.current = selected
+    opacityRef.current  = opacity
     onSelectRef.current = onSelect
   })
 
@@ -74,7 +87,7 @@ export default function VillageChoroplethMap({
     const light = isLightTheme()
     return {
       fillColor:   fill ?? (light ? '#d8d2c6' : '#3a3226'),
-      fillOpacity: fill ? (isLow ? 0.4 : 0.78) : 0.25,
+      fillOpacity: (fill ? (isLow ? 0.51 : 1) : 0.32) * opacityRef.current,
       color:       isSel ? (light ? '#2a1f10' : '#f6f1e8') : (light ? 'rgba(42,31,16,0.35)' : 'rgba(12,10,6,0.55)'),
       weight:      isSel ? 3 : 0.6,
       dashArray:   isLow && !isSel ? '2 3' : undefined,
@@ -143,7 +156,12 @@ export default function VillageChoroplethMap({
       path.setStyle(styleFor(code))
       if (code === selected) path.bringToFront()
     })
-  }, [ready, classByCode, lowConfidence, selected])
+  }, [ready, classByCode, lowConfidence, selected, opacity])
+
+  const changeOpacity = (v: number) => {
+    setOpacity(v)
+    try { localStorage.setItem(OPACITY_KEY, String(v)) } catch { /* 無痕模式等存不了就算了 */ }
+  }
 
   /* 縮放到指定村里 */
   useEffect(() => {
@@ -204,13 +222,27 @@ export default function VillageChoroplethMap({
   }, [ready, marker, rings])
 
   return (
-    <>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }} />
+      {/* 色塊濃度滑桿：放在地圖容器外層（不是 Leaflet 控制項），拖曳時不會連帶拖動地圖 */}
+      <label className="vcm-opacity" title="調淡一點可以看清楚底圖的路名、地名">
+        <span>色塊濃度</span>
+        <input type="range" min={0.1} max={1} step={0.05} value={opacity}
+          onChange={e => changeOpacity(Number(e.target.value))} aria-label="色塊濃度" />
+        <span style={{ fontFamily: 'var(--font-mono)', minWidth: '3ch', textAlign: 'right' }}>{Math.round(opacity * 100)}%</span>
+      </label>
       <style>{`
         /* 暗色主題（未設 data-theme）：OSM 底圖轉灰階並反相，讓填色成為視覺主體 */
         :root:not([data-theme="light"]) .vcm-tiles { filter: grayscale(1) invert(1) brightness(0.75) contrast(0.9); }
         :root[data-theme="light"] .vcm-tiles { filter: grayscale(0.85) brightness(1.03); }
+        .vcm-opacity {
+          position: absolute; top: 10px; right: 10px; z-index: 1000;
+          display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+          background: var(--surface-card); border: 1px solid var(--border-control); border-radius: var(--radius-full);
+          font-size: var(--text-2xs); color: var(--text-muted); box-shadow: 0 1px 4px rgba(0,0,0,0.18); cursor: default;
+        }
+        .vcm-opacity input { width: 90px; accent-color: var(--accent); margin: 0; cursor: pointer; }
       `}</style>
-    </>
+    </div>
   )
 }
