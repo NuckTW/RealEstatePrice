@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { VillageGeo } from './VillageChoroplethMap'
 import { quintileBreaks, classOf, RAMP, RAMP_LABEL } from './ChoroplethLegend'
-import { computeIndex, PRESET_INDICES, type Catalog, type Village } from '@/lib/buyerIndex'
+import { computeIndex, presetById, type Catalog, type Village } from '@/lib/buyerIndex'
 import {
   villageCentroids, computeCatchment, defaultFbShare,
   type Site, type Product, type ProductType, type CatchmentResult,
@@ -84,8 +84,9 @@ export default function CatchmentSection({ villages, geo, catalog, employeesByDi
   const centroids = useMemo(() => villageCentroids(geo), [geo])
   const scores = useMemo(() => {
     const cache = new Map<string, Map<string, number>>()
-    const [fb, nh, rs] = PRESET_INDICES.map(p => computeIndex(p, catalog, codes, cache).scores)
-    return { firstBuyer: fb, newHome: nh, resale: rs }
+    // 只取三個客群指數（依 id，不靠陣列順序）；新屋熱度是「人往哪搬」的目的地訊號，不當客源強度
+    const s = (id: string) => computeIndex(presetById(id), catalog, codes, cache).scores
+    return { firstBuyer: s('firstBuyer'), newHome: s('newHome'), resale: s('resale') }
   }, [catalog, codes])
 
   const result = useMemo<CatchmentResult | null>(() => site ? computeCatchment({

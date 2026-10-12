@@ -1,28 +1,31 @@
 'use client'
 
 import { useMemo } from 'react'
-import { computeIndex, partOf, PRESET_INDICES, type Catalog, type Village } from '@/lib/buyerIndex'
+import { computeIndex, partOf, presetById, type Catalog, type Village } from '@/lib/buyerIndex'
 import { FIELD_GUIDE } from '@/lib/fieldGuide'
 
 /**
- * 指數說明頁籤：以圖解說明三個購屋指數怎麼算、每樣材料的資料來源，並附全站資料來源表
+ * 指數說明頁籤：以圖解說明三個客群指數＋新屋熱度怎麼算、每樣材料的資料來源，並附全站資料來源表
  * 文字原則：每段 3 句話內，重要事項才多寫
- * 範例村里（安平區國平里）的分數以目前資料即時計算，不會因權重或資料更新而過時
+ * 範例村里（安平區國平里）的分數與全市分布以目前資料即時計算，不會因權重或資料更新而過時
+ * v7（2026-10-12）：客群指數只看「住在這裡的人」；搬進來、新住宅入住移到新屋熱度；驗證改成跨期
  */
 
-/* ── 顏色：首購＝青綠、換新屋＝靛藍、換二手＝梅紫、所得＝站內 accent（暗色為預設，亮色另設） ── */
+/* ── 顏色：首購＝青綠、換新屋＝靛藍、換二手＝梅紫、熱度＝珊瑚紅（避開所得用的琥珀 accent）、所得＝站內 accent（暗色為預設，亮色另設） ── */
 const GUIDE_CSS = `
-  :root { --ig-fb: #4fbfae; --ig-nh: #9ea2f0; --ig-rs: #e09ccb; --ig-fb-soft: rgba(79,191,174,.16); --ig-nh-soft: rgba(158,162,240,.16); --ig-rs-soft: rgba(224,156,203,.16); }
-  :root[data-theme="light"] { --ig-fb: #1f7a6e; --ig-nh: #4a4fa3; --ig-rs: #8a3f74; --ig-fb-soft: #d6ebe7; --ig-nh-soft: #dfe0f3; --ig-rs-soft: #f1dfeb; }
+  :root { --ig-fb: #4fbfae; --ig-nh: #9ea2f0; --ig-rs: #e09ccb; --ig-ht: #f0846a; --ig-fb-soft: rgba(79,191,174,.16); --ig-nh-soft: rgba(158,162,240,.16); --ig-rs-soft: rgba(224,156,203,.16); --ig-ht-soft: rgba(240,132,106,.16); }
+  :root[data-theme="light"] { --ig-fb: #1f7a6e; --ig-nh: #4a4fa3; --ig-rs: #8a3f74; --ig-ht: #a8402a; --ig-fb-soft: #d6ebe7; --ig-nh-soft: #dfe0f3; --ig-rs-soft: #f1dfeb; --ig-ht-soft: #f6dcd5; }
   .ig-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
   .ig-row { display: grid; grid-template-columns: 8em 1fr 9em; gap: 12px; align-items: center; }
   .ig-field { display: grid; grid-template-columns: 11em 1fr 1fr; gap: 12px; }
   @media (max-width: 560px) { .ig-row { grid-template-columns: 1fr; gap: 4px } .ig-row .ig-math { text-align: left !important } .ig-field { grid-template-columns: 1fr; gap: 2px } }
 `
-type Seg = 'fb' | 'nh' | 'rs'
-const SEG_COLOR: Record<Seg, string> = { fb: 'var(--ig-fb)', nh: 'var(--ig-nh)', rs: 'var(--ig-rs)' }
-const SEG_SOFT: Record<Seg, string> = { fb: 'var(--ig-fb-soft)', nh: 'var(--ig-nh-soft)', rs: 'var(--ig-rs-soft)' }
-const SEG_NAME: Record<Seg, string> = { fb: '首購', nh: '換新屋', rs: '換二手' }
+type Seg = 'fb' | 'nh' | 'rs' | 'ht'
+const SEG_COLOR: Record<Seg, string> = { fb: 'var(--ig-fb)', nh: 'var(--ig-nh)', rs: 'var(--ig-rs)', ht: 'var(--ig-ht)' }
+const SEG_SOFT: Record<Seg, string> = { fb: 'var(--ig-fb-soft)', nh: 'var(--ig-nh-soft)', rs: 'var(--ig-rs-soft)', ht: 'var(--ig-ht-soft)' }
+const SEG_NAME: Record<Seg, string> = { fb: '首購', nh: '換新屋', rs: '換二手', ht: '新屋熱度' }
+/** 指數名稱：客群三個叫「○○指數」，熱度本身就是名稱 */
+const segTitle = (s: Seg) => (s === 'ht' ? SEG_NAME[s] : `${SEG_NAME[s]}指數`)
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--surface-card)', border: '1px solid var(--border-card)', borderRadius: 'var(--radius-lg)', padding: 16,
@@ -39,77 +42,88 @@ interface Ingredient {
 const RIS_URL = 'https://www.ris.gov.tw/app/portal/346'
 const PIP_URL = 'https://pip.moi.gov.tw/'
 const INGREDIENTS: Ingredient[] = [
+  /* ── 客群材料：住在這裡的人 ── */
   {
-    key: 'cohort', name: '搬進來（世代淨移入）', weights: { fb: 30, nh: 20, rs: 10 },
-    text: '比較同一批人一年前後的人數：去年 25–34 歲 1,000 人，今年同一批人（26–35 歲）1,100 人，就是多搬來 100 人。換屋看 35–44 歲。',
-    source: '內政部戶政司 村里單一年齡人口（ODRP014）', freq: '每月', url: RIS_URL,
-    icon: <svg viewBox="0 0 44 44"><rect x="4" y="18" width="20" height="20" rx="3" fill="var(--ig-fb-soft)" /><path d="M4 20 14 10 24 20" fill="none" stroke="var(--ig-fb)" strokeWidth="3" strokeLinejoin="round" /><circle cx="36" cy="16" r="5" fill="var(--accent)" /><path d="M36 22v10M30 28l-4-2" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" /></svg>,
-  },
-  {
-    key: 'share', name: '年齡層多不多', weights: { fb: 25, nh: 20, rs: 20 },
-    text: '里內每 100 人有幾個是 25–34 歲（首購）或 35–44 歲（換屋）。',
+    key: 'share', name: '年齡層多不多', weights: { fb: 70, nh: 45 },
+    text: '里內每 100 人有幾個是 25–34 歲（首購）或 35–44 歲（換新屋）。這是客群指數裡最重的一項，預測力也最好。',
     source: '內政部戶政司 村里人口（ODRP014）', freq: '每月', url: RIS_URL,
     icon: <svg viewBox="0 0 44 44"><circle cx="10" cy="14" r="5" fill="var(--border-control)" /><circle cx="22" cy="14" r="5" fill="var(--ig-fb)" /><circle cx="34" cy="14" r="5" fill="var(--border-control)" /><path d="M4 36c0-6 3-10 6-10s6 4 6 10M28 36c0-6 3-10 6-10s6 4 6 10" fill="none" strokeWidth="3" stroke="var(--border-control)" /><path d="M16 36c0-6 3-10 6-10s6 4 6 10" fill="none" strokeWidth="3" stroke="var(--ig-fb)" /></svg>,
   },
   {
-    key: 'income', name: '所得（購買力）', weights: { fb: 25, nh: 20, rs: 30 },
-    text: '里內報稅家戶所得排正中間那一戶的金額，代表買不買得起。政府約晚 2–3 年公布。',
+    key: 'income', name: '所得（購買力）', weights: { fb: 15, nh: 15, rs: 20 },
+    text: '里內綜所稅申報戶（不是家戶）所得總額排正中間的金額，代表買不買得起，約晚 2–3 年公布。它和新屋成交關係不大、和二手成交較有關；客源分析另外會用它算房貸負擔。',
     source: '財政部財政資訊中心 綜合所得稅村里統計', freq: '每年', url: 'https://data.gov.tw/dataset/103066',
     icon: <svg viewBox="0 0 44 44"><ellipse cx="22" cy="34" rx="14" ry="5" fill="none" stroke="var(--accent)" strokeWidth="3" /><ellipse cx="22" cy="25" rx="14" ry="5" fill="none" stroke="var(--accent)" strokeWidth="3" /><ellipse cx="22" cy="16" rx="14" ry="5" fill="var(--accent)" /></svg>,
   },
   {
-    key: 'marriage', name: '結婚', weights: { fb: 10 },
-    text: '最近 12 個月每 1,000 人結婚對數。它和實際預售成交的關係最弱，所以只占 10%。',
+    key: 'marriage', name: '結婚', weights: { fb: 15 },
+    text: '最近 12 個月每 1,000 人結婚對數。結婚常是第一次買房的契機，但和實際成交的關係比年齡結構弱，所以只占 15%。',
     source: '內政部戶政司 村里婚姻（ODRP060／ODRP010）', freq: '每月', url: RIS_URL,
     icon: <svg viewBox="0 0 44 44"><circle cx="16" cy="24" r="10" fill="none" stroke="var(--ig-fb)" strokeWidth="3.5" /><circle cx="28" cy="24" r="10" fill="none" stroke="var(--accent)" strokeWidth="3.5" /></svg>,
   },
   {
-    key: 'birth', name: '生小孩', weights: { nh: 20 },
+    key: 'birth', name: '生小孩', weights: { nh: 40 },
     text: '最近 12 個月每 1,000 人出生數。家裡人變多，就想換大一點的新房子。',
     source: '內政部戶政司 村里出生（ODRP060／ODRP010）', freq: '每月', url: RIS_URL,
     icon: <svg viewBox="0 0 44 44"><circle cx="22" cy="16" r="8" fill="var(--ig-nh-soft)" stroke="var(--ig-nh)" strokeWidth="3" /><path d="M10 38c0-7 5-12 12-12s12 5 12 12" fill="var(--ig-nh-soft)" stroke="var(--ig-nh)" strokeWidth="3" /></svg>,
   },
   {
-    key: 'dwellings', name: '新住宅入住', weights: { nh: 20 },
-    text: '有人設戶籍的住宅數比一年前多了幾 %。數字高代表新大樓、新社區正在交屋入住。',
-    source: '內政部不動產資訊平台 村里宅數（E4041）', freq: '每季', url: PIP_URL,
-    icon: <svg viewBox="0 0 44 44"><rect x="6" y="20" width="14" height="18" rx="2" fill="var(--ig-nh-soft)" stroke="var(--ig-nh)" strokeWidth="2.5" /><rect x="24" y="10" width="14" height="28" rx="2" fill="var(--ig-nh)" /><path d="M28 16h6M28 22h6M28 28h6" stroke="var(--surface-card)" strokeWidth="2" /></svg>,
-  },
-  {
-    key: 'head', name: '年輕戶長', weights: { rs: 20 },
-    text: '每 100 戶有幾戶的戶長是 26–45 歲，也就是正在成家、換屋階段的家庭。',
+    key: 'head', name: '年輕戶長', weights: { rs: 35 },
+    text: '每 100 戶有幾戶的戶長是 26–45 歲，也就是正在成家、換屋階段的家庭。它和「35–44 歲占比」幾乎是同一群人，所以只放在換二手。',
     source: '內政部不動產資訊平台 村里戶長年齡（E4041）', freq: '每季', url: PIP_URL,
     icon: <svg viewBox="0 0 44 44"><path d="M6 22 22 8l16 14" fill="none" stroke="var(--ig-rs)" strokeWidth="3" strokeLinejoin="round" /><rect x="11" y="20" width="22" height="18" rx="2" fill="var(--ig-rs-soft)" /><circle cx="22" cy="27" r="4" fill="var(--ig-rs)" /><path d="M15 38c0-4 3-6 7-6s7 2 7 6" fill="var(--ig-rs)" /></svg>,
   },
   {
-    key: 'edu', name: '大學以上學歷', weights: { rs: 20 },
-    text: '15 歲以上每 100 人有幾個大學以上畢業。二手屋交易熱的成熟市區，這個比例通常高。',
+    key: 'edu', name: '大學以上學歷', weights: { rs: 45 },
+    text: '15 歲以上每 100 人有幾個大學以上畢業。二手屋交易熱的成熟市區這個比例通常高，是預測二手成交最準的一項。',
     source: '內政部戶政司 村里教育程度（ODRP020）', freq: '每年', url: RIS_URL,
     icon: <svg viewBox="0 0 44 44"><path d="M4 18 22 10l18 8-18 8z" fill="var(--ig-rs)" /><path d="M12 22v9c0 3 5 5 10 5s10-2 10-5v-9" fill="none" stroke="var(--ig-rs)" strokeWidth="3" /></svg>,
   },
+  /* ── 熱度材料：人往哪裡搬、新屋在哪交屋（多是買完房才遷戶籍的結果） ── */
   {
-    key: 'social', name: '淨流入', weights: { fb: 10 },
-    text: '最近 12 個月所有年齡的遷入減遷出，含同一區跨里搬家。',
+    key: 'cohort', name: '搬進來（世代淨移入）', weights: { ht: 50 },
+    text: '比較同一批人一年前後的人數：去年 25–34 歲 1,000 人，今年同一批人（26–35 歲）1,100 人，就是淨搬來 100 人（25–34 歲占 30%、35–44 歲占 20%）。台灣多半是買房交屋後才遷戶籍，所以這比較像「剛買完、搬進來」。',
+    source: '內政部戶政司 村里單一年齡人口（ODRP014）', freq: '每月', url: RIS_URL,
+    icon: <svg viewBox="0 0 44 44"><rect x="4" y="18" width="20" height="20" rx="3" fill="var(--ig-ht-soft)" /><path d="M4 20 14 10 24 20" fill="none" stroke="var(--ig-ht)" strokeWidth="3" strokeLinejoin="round" /><circle cx="36" cy="16" r="5" fill="var(--accent)" /><path d="M36 22v10M30 28l-4-2" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" /></svg>,
+  },
+  {
+    key: 'social', name: '淨流入', weights: { ht: 20 },
+    text: '最近 12 個月所有年齡的遷入減遷出，含同一區跨里搬家。和「搬進來」一樣，多是交屋後遷入。',
     source: '內政部戶政司 村里遷徙（ODRP011）', freq: '每月', url: RIS_URL,
-    icon: <svg viewBox="0 0 44 44"><path d="M6 16h24l-6-6" fill="none" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" stroke="var(--ig-fb)" /><path d="M38 28H14l6 6" fill="none" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" stroke="var(--border-control)" /></svg>,
+    icon: <svg viewBox="0 0 44 44"><path d="M6 16h24l-6-6" fill="none" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" stroke="var(--ig-ht)" /><path d="M38 28H14l6 6" fill="none" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" stroke="var(--border-control)" /></svg>,
+  },
+  {
+    key: 'dwellings', name: '新住宅入住', weights: { ht: 30 },
+    text: '有人設戶籍的住宅數比一年前多了幾 %。數字高代表新大樓、新社區正在交屋入住，是供給面的訊號。',
+    source: '內政部不動產資訊平台 村里宅數（E4041）', freq: '每季', url: PIP_URL,
+    icon: <svg viewBox="0 0 44 44"><rect x="6" y="20" width="14" height="18" rx="2" fill="var(--ig-ht-soft)" stroke="var(--ig-ht)" strokeWidth="2.5" /><rect x="24" y="10" width="14" height="28" rx="2" fill="var(--ig-ht)" /><path d="M28 16h6M28 22h6M28 28h6" stroke="var(--surface-card)" strokeWidth="2" /></svg>,
   },
 ]
 
 /** 食譜長條：與 PRESET_INDICES 一致（標籤用口語） */
 const RECIPES: { seg: Seg; who: string; parts: { label: string; w: number; income?: boolean }[] }[] = [
-  { seg: 'fb', who: '25–34 歲年輕人，第一次買房', parts: [
-    { label: '年輕人搬進來', w: 30 }, { label: '年輕人多不多', w: 25 }, { label: '結婚', w: 10 }, { label: '所得', w: 25, income: true }, { label: '淨流入', w: 10 }] },
-  { seg: 'nh', who: '35–44 歲家庭，換預售屋或新成屋', parts: [
-    { label: '家庭搬進來', w: 20 }, { label: '家庭多不多', w: 20 }, { label: '生小孩', w: 20 }, { label: '所得', w: 20, income: true }, { label: '新住宅入住', w: 20 }] },
-  { seg: 'rs', who: '35–44 歲家庭，在成熟市區換二手屋', parts: [
-    { label: '搬進來', w: 10 }, { label: '家庭多不多', w: 20 }, { label: '年輕戶長', w: 20 }, { label: '所得', w: 30, income: true }, { label: '大學以上', w: 20 }] },
+  { seg: 'fb', who: '住在這裡的 25–34 歲年輕人，第一次買房', parts: [
+    { label: '年輕人多不多', w: 70 }, { label: '結婚', w: 15 }, { label: '所得', w: 15, income: true }] },
+  { seg: 'nh', who: '住在這裡的 35–44 歲家庭，換預售屋或新成屋', parts: [
+    { label: '家庭多不多', w: 45 }, { label: '生小孩', w: 40 }, { label: '所得', w: 15, income: true }] },
+  { seg: 'rs', who: '住在這裡的成家家庭，在成熟市區換二手屋', parts: [
+    { label: '年輕戶長', w: 35 }, { label: '大學以上', w: 45 }, { label: '所得', w: 20, income: true }] },
+  { seg: 'ht', who: '人正往這裡搬、新屋在這裡交屋', parts: [
+    { label: '年輕人搬進來', w: 30 }, { label: '家庭搬進來', w: 20 }, { label: '淨流入', w: 20 }, { label: '新住宅入住', w: 30 }] },
 ]
 
-/** 驗證（2026-10，37 區排名相關） */
-const VALIDATION: { seg: Seg; rows: [string, number][]; note: string }[] = [
-  { seg: 'fb', rows: [['預售成交', 0.57], ['新屋交屋', 0.90]], note: '近 24 月預售成交、近 12 月新屋交屋（每千戶）' },
-  { seg: 'nh', rows: [['新屋交易', 0.79], ['二手交易', 0.59]], note: '新屋＝預售＋屋齡 3 年內成屋（近 24 月、每千戶）' },
-  { seg: 'rs', rows: [['二手交易', 0.80], ['新屋交易', 0.62]], note: '二手＝屋齡 5 年以上成屋（近 24 月、每千戶）' },
+/**
+ * 驗證（v7，2026-10-12，scripts/validate_buyer_indices.py）：跨期——用 2021–2024 年 7 月的分數，
+ * 預測之後 24 個月各區每千戶交易的排名相關；全 37 區 vs 都市 18 區（戶數前一半）。
+ * 新屋＝預售＋屋齡 3 年內成屋；二手＝屋齡 5 年以上成屋。
+ * 新屋熱度只用 2021、2022 兩個時點（不動產資訊平台 2022Q4–2023Q4 季資料缺，宅數成長算不出來）。
+ * match＝這個指數該對應的交易；other＝另一種交易（越接近 0 代表越分得清新屋／二手客群）
+ */
+const VALIDATION: { seg: Seg; match: string; other: string; all: [number, number]; urban: [number, number] }[] = [
+  { seg: 'fb', match: '新屋', other: '二手', all: [0.81, 0.64], urban: [0.60, 0.14] },
+  { seg: 'nh', match: '新屋', other: '二手', all: [0.81, 0.64], urban: [0.70, -0.01] },
+  { seg: 'rs', match: '二手', other: '新屋', all: [0.86, 0.71], urban: [0.82, 0.01] },
+  { seg: 'ht', match: '新屋', other: '二手', all: [0.77, 0.46], urban: [0.77, -0.01] },
 ]
 
 /** 全站資料來源（依頁籤） */
@@ -150,59 +164,69 @@ const SOURCES: { tab: string; items: { name: string; org: string; freq: string; 
 ]
 
 export default function IndexGuideSection({ villages, catalog }: { villages: Village[]; catalog: Catalog }) {
-  // 範例：安平區國平里（以目前資料即時計算首購指數拆解）；中位數、最低分也即時計算
+  // 範例：安平區國平里（以目前資料即時計算首購指數拆解）；中位數、前 10% 門檻、最低分也即時計算
   const example = useMemo(() => {
     const codes = villages.map(v => v.code)
-    const fb = PRESET_INDICES[0]
+    const fb = presetById('firstBuyer')
     const res = computeIndex(fb, catalog, codes)
     const v = villages.find(x => x.district === '安平區' && x.village === '國平里') ?? villages[0]
     const sorted = [...res.scores.entries()].sort((a, b) => a[1] - b[1])
     const minV = villages.find(x => x.code === sorted[0]?.[0])
+    // 總分是加權平均，分布會往中間擠：前 10% 的門檻通常只有 70 多分（不是 90 分）
+    const p90 = sorted[Math.floor((sorted.length - 1) * 0.9)]?.[1] ?? null
     return {
       v, score: res.scores.get(v.code) ?? 0,
       parts: fb.components.map(c => ({ c, p: partOf(res, c, v.code) })),
       median: sorted[Math.floor((sorted.length - 1) / 2)]?.[1] ?? null,
+      p90,
       min: minV ? { name: `${minV.district}${minV.village}`, score: sorted[0][1] } : null,
     }
   }, [villages, catalog])
-  const partLabel: Record<string, string> = { cohortYoung: '年輕人搬進來', share2534: '年輕人多不多', marriage: '結婚', income: '所得（購買力）', social: '淨流入' }
+  const partLabel: Record<string, string> = { share2534: '年輕人多不多', marriage: '結婚', income: '所得（購買力）' }
 
   return (
     <div id="guide-top" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <style>{GUIDE_CSS}</style>
 
-      {/* 1. 三張成績單 */}
+      {/* 1. 三張客群成績單＋一張熱度 */}
       <section style={cardStyle}>
-        <h2 style={{ ...h2, fontSize: 'var(--text-xl)' }}>每個里都有三張「想買房」成績單</h2>
-        <p style={lead}>分數 0 到 100，越高代表這個里最近越多人可能要買房。</p>
+        <h2 style={{ ...h2, fontSize: 'var(--text-xl)' }}>每個里有三張「客群」成績單，外加一張「新屋熱度」</h2>
+        <p style={lead}>
+          分數 0 到 100 是跟全市 650 個里比的相對排名，不是買房的機率。
+          客群指數看「住在這裡的人」有多少購屋潛力；新屋熱度看「人最近往哪裡搬、新屋在哪裡交屋」。
+        </p>
         <div className="ig-grid">
           {RECIPES.map(r => (
             <div key={r.seg} style={{ background: SEG_SOFT[r.seg], borderRadius: 'var(--radius-md)', padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'center' }}>
               <Persona seg={r.seg} />
               <div>
-                <div style={{ fontWeight: 700, color: SEG_COLOR[r.seg], fontSize: 'var(--text-base)' }}>{SEG_NAME[r.seg]}指數</div>
+                <div style={{ fontWeight: 700, color: SEG_COLOR[r.seg], fontSize: 'var(--text-base)' }}>{segTitle(r.seg)}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-default)' }}>{r.who}</div>
               </div>
             </div>
           ))}
         </div>
+        <p style={{ ...lead, margin: '12px 0 0' }}>
+          <b style={{ color: 'var(--text-strong)' }}>怎麼用：</b>找客源（派報、廣告、客源分析）看客群指數；看哪裡正熱（選址、推案時機）看新屋熱度。
+          剛大量交屋的重劃區熱度很高，但住戶多半剛買完房，不一定是下一批客源。
+        </p>
       </section>
 
       {/* 2. 三步驟 */}
       <section style={cardStyle}>
         <h2 style={h2}>三個步驟算出分數</h2>
         <div className="ig-grid" style={{ marginTop: 10 }}>
-          <Step n={1} title="量幾樣東西" text="每個里量：多少人搬進來、結婚生小孩、賺多少錢、學歷、新住宅。">
+          <Step n={1} title="量幾樣東西" text="每個里量：年齡結構、結婚生小孩、賺多少錢、學歷、戶長年齡；熱度另外量搬進來和新住宅。">
             <svg viewBox="0 0 200 64" style={{ width: '100%', height: 64 }}>
-              {(['fb', 'nh', 'rs'] as Seg[]).map((s, i) => (
-                <g key={s} transform={`translate(${10 + i * 66},6)`}>
-                  <rect width="44" height="52" rx="6" fill={SEG_SOFT[s]} />
-                  {[14, 24, 34].map((y, k) => <rect key={k} x="10" y={y} width={[22, 16, 20][(k + i) % 3]} height="4" rx="2" fill={SEG_COLOR[s]} />)}
+              {(['fb', 'nh', 'rs', 'ht'] as Seg[]).map((s, i) => (
+                <g key={s} transform={`translate(${8 + i * 48},6)`}>
+                  <rect width="40" height="52" rx="6" fill={SEG_SOFT[s]} />
+                  {[14, 24, 34].map((y, k) => <rect key={k} x="9" y={y} width={[22, 16, 20][(k + i) % 3]} height="4" rx="2" fill={SEG_COLOR[s]} />)}
                 </g>
               ))}
             </svg>
           </Step>
-          <Step n={2} title="全市排排站" text="每一樣把 650 個里排名次換成 0–100 分，贏過 83% 的里就是 83 分。">
+          <Step n={2} title="全市排排站" text="每一樣材料把 650 個里排名次換成 0–100 分：這一項贏過 83% 的里，就是 83 分。">
             <svg viewBox="0 0 200 64" style={{ width: '100%', height: 64 }}>
               {[14, 22, 30, 38, 48, 56].map((h, i) => (
                 <rect key={i} x={14 + i * 30} y={62 - h} width="22" height={h} rx="3" fill={i === 4 ? 'var(--accent)' : 'var(--border-control)'} />
@@ -210,7 +234,7 @@ export default function IndexGuideSection({ villages, catalog }: { villages: Vil
               <text x="145" y="10" fontSize="11" textAnchor="middle" fill="var(--accent)" fontFamily="var(--font-mono)" fontWeight="700">83</text>
             </svg>
           </Step>
-          <Step n={3} title="照比重加起來" text="像學校算總成績，重要的科目比重大，加完就是那個里的分數。">
+          <Step n={3} title="照比重加起來" text="像學校算總成績，重要的科目比重大。加完的總分會往中間擠，所以總分 83 不等於贏過 83% 的里（下面範例有全市分布）。">
             <svg viewBox="0 0 200 64" style={{ width: '100%', height: 64 }}>
               <rect x="10" y="20" width="54" height="24" rx="5" fill="var(--ig-fb)" />
               <rect x="66" y="20" width="44" height="24" rx="5" fill="var(--ig-fb)" opacity=".7" />
@@ -224,13 +248,16 @@ export default function IndexGuideSection({ villages, catalog }: { villages: Vil
 
       {/* 3. 三份食譜 */}
       <section style={cardStyle}>
-        <h2 style={h2}>三份「食譜」：每樣材料放多少</h2>
-        <p style={lead}>換新屋看生小孩和新住宅入住，換二手看年輕戶長和學歷，兩者各自對應新屋和二手市場。</p>
+        <h2 style={h2}>四份「食譜」：每樣材料放多少</h2>
+        <p style={lead}>
+          客群指數只用「住在這裡的人」的條件：換新屋看家庭和生小孩，換二手看年輕戶長和學歷，各自對應新屋和二手市場。
+          搬進來、新住宅入住多半是「買完房才遷戶籍」的結果，集中放在新屋熱度。
+        </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {RECIPES.map(r => (
             <div key={r.seg}>
-              <div style={{ fontWeight: 700, color: SEG_COLOR[r.seg], marginBottom: 6, fontSize: 'var(--text-sm)' }}>{SEG_NAME[r.seg]}指數</div>
-              <div role="img" aria-label={`${SEG_NAME[r.seg]}指數：${r.parts.map(p => `${p.label} ${p.w}%`).join('、')}`}
+              <div style={{ fontWeight: 700, color: SEG_COLOR[r.seg], marginBottom: 6, fontSize: 'var(--text-sm)' }}>{segTitle(r.seg)}</div>
+              <div role="img" aria-label={`${segTitle(r.seg)}：${r.parts.map(p => `${p.label} ${p.w}%`).join('、')}`}
                 style={{ display: 'flex', height: 56, borderRadius: 'var(--radius-md)', overflow: 'hidden', gap: 3 }}>
                 {r.parts.map((p, i) => (
                   <div key={p.label} style={{
@@ -291,7 +318,8 @@ export default function IndexGuideSection({ villages, catalog }: { villages: Vil
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderTop: '2px solid var(--text-strong)', marginTop: 12, paddingTop: 10, flexWrap: 'wrap', gap: 8 }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            全市中間的里約 {example.median?.toFixed(1)} 分{example.min && `；最低是${example.min.name} ${example.min.score.toFixed(1)} 分`}
+            全市中間的里約 {example.median?.toFixed(1)} 分；{example.p90 != null && `前 10% 的里約在 ${example.p90.toFixed(1)} 分以上`}
+            {example.min && `；最低是${example.min.name} ${example.min.score.toFixed(1)} 分`}
           </span>
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'var(--text-3xl)', color: 'var(--ig-fb)', lineHeight: 1 }}>{example.score.toFixed(1)}</span>
         </div>
@@ -316,33 +344,48 @@ export default function IndexGuideSection({ villages, catalog }: { villages: Vil
       {/* 7. 準不準 */}
       <section style={cardStyle}>
         <h2 style={h2}>準不準？</h2>
-        <p style={lead}>把各里分數平均到 37 區，和實際交易量比排名，1 代表排名完全一樣。每個指數都和它該對應的交易比。</p>
+        <p style={lead}>
+          用 2021–2024 年的分數，預測「之後 24 個月」各區每千戶的實際交易，比排名（1 代表排名完全一樣）。
+          「另一種」越接近 0，代表這個指數越分得清新屋客和二手客。
+        </p>
         <div className="ig-grid">
-          {VALIDATION.map(v => (
-            <div key={v.seg} style={{ background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontWeight: 700, color: SEG_COLOR[v.seg] }}>{SEG_NAME[v.seg]}指數</span>
-              {v.rows.map(([k, r], i) => (
-                <div key={k} style={{ display: 'grid', gridTemplateColumns: '4.5em 1fr 2.6em', gap: 8, alignItems: 'center', fontSize: 'var(--text-xs)' }}>
-                  <span style={{ color: i === 0 ? 'var(--text-strong)' : 'var(--text-muted)' }}>{k}</span>
-                  <div style={{ height: 10, borderRadius: 'var(--radius-full)', background: SEG_SOFT[v.seg], overflow: 'hidden' }}>
-                    <div style={{ width: `${r * 100}%`, height: '100%', background: SEG_COLOR[v.seg], opacity: i === 0 ? 1 : 0.5, borderRadius: 'var(--radius-full)' }} />
+          {VALIDATION.map(v => {
+            const rows: [string, number, boolean][] = [
+              [`${v.match}・全 37 區`, v.all[0], true],
+              [`${v.match}・都市 18 區`, v.urban[0], true],
+              [`${v.other}・都市 18 區`, v.urban[1], false],
+            ]
+            return (
+              <div key={v.seg} style={{ background: 'var(--bg-sunken)', borderRadius: 'var(--radius-md)', padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <span style={{ fontWeight: 700, color: SEG_COLOR[v.seg] }}>{segTitle(v.seg)}</span>
+                {rows.map(([k, r, main]) => (
+                  <div key={k} style={{ display: 'grid', gridTemplateColumns: '9em 1fr 2.8em', gap: 8, alignItems: 'center', fontSize: 'var(--text-xs)' }}>
+                    <span style={{ color: main ? 'var(--text-strong)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>{k}</span>
+                    <div style={{ height: 10, borderRadius: 'var(--radius-full)', background: SEG_SOFT[v.seg], overflow: 'hidden' }}>
+                      {/* 負相關不畫長條（寬度 0），數字照實顯示 */}
+                      <div style={{ width: `${Math.max(0, r) * 100}%`, height: '100%', background: SEG_COLOR[v.seg], opacity: main ? 1 : 0.5, borderRadius: 'var(--radius-full)' }} />
+                    </div>
+                    <span style={{ fontFamily: 'var(--font-mono)', textAlign: 'right', color: 'var(--text-strong)' }}>{r.toFixed(2)}</span>
                   </div>
-                  <span style={{ fontFamily: 'var(--font-mono)', textAlign: 'right', color: 'var(--text-strong)' }}>{r.toFixed(2)}</span>
-                </div>
-              ))}
-              <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)' }}>{v.note}</span>
-            </div>
-          ))}
+                ))}
+              </div>
+            )
+          })}
         </div>
         <p style={{ ...lead, margin: '12px 0 0', fontSize: 'var(--text-xs)' }}>
-          驗證資料：實價登錄（2026-10 分析）。預售成交還受建商在哪裡推案影響，人口數字看不到這部分。
+          新屋＝預售＋屋齡 3 年內成屋；二手＝屋齡 5 年以上成屋。全 37 區的數字有城鄉差距撐腰，只看都市 18 區（戶數前一半）比較看得出真正的鑑別力。
+          這是區的平均，不代表區內每個里都一樣準；客群指數量的是「住在這裡的人」，交易卻發生在「房子蓋在哪裡」，所以只能間接驗證，預售還受建商推案位置影響。
+          新屋熱度只用 2021、2022 兩年驗證（2022 年底到 2023 年的村里季資料缺）。
         </p>
       </section>
 
       {/* 8. 不計分 */}
       <section id="field-guide" style={cardStyle}>
         <h2 style={h2}>看得到、但不算分的</h2>
-        <p style={lead}>這些跟已經在算的材料太像，或跟實際交易沒有正向關係（老屋多、高齡戶長多的里多在偏鄉、交易少）。點村里後明細下半部就是這些數字，點欄位名稱也能看到同樣的說明。</p>
+        <p style={lead}>
+          這些跟已經在算的材料太像，或跟實際交易沒有正向關係（老屋多、高齡戶長多的里多在偏鄉、交易少）。點村里後明細下半部就是這些數字，點欄位名稱也能看到同樣的說明。
+          家戶結構裡的 26–45 歲戶長、大學以上學歷、設籍宅數年增有計分，列在這裡方便對照，說明裡有寫計入哪個指數。
+        </p>
         {FIELD_GUIDE.map(g => (
           <div key={g.title} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)', marginBottom: 4 }}>
@@ -402,6 +445,8 @@ function Persona({ seg }: { seg: Seg }) {
       {seg === 'fb' && <><circle cx="24" cy="15" r="7" fill={c} /><path d="M12 40c0-8 5-13 12-13s12 5 12 13" fill={c} /><path d="M36 10l4-4M38 16h5" stroke={c} strokeWidth="2.5" strokeLinecap="round" /></>}
       {seg === 'nh' && <><path d="M6 24 24 8l18 16" fill="none" stroke={c} strokeWidth="3" strokeLinejoin="round" /><rect x="12" y="22" width="24" height="18" rx="2" fill={c} /><path d="M38 6l1.5 3 3 1.5-3 1.5L38 15l-1.5-3-3-1.5 3-1.5z" fill="var(--accent)" /></>}
       {seg === 'rs' && <><path d="M6 24 24 8l18 16" fill="none" stroke={c} strokeWidth="3" strokeLinejoin="round" /><rect x="12" y="22" width="24" height="18" rx="2" fill="none" stroke={c} strokeWidth="3" /><rect x="20" y="30" width="8" height="10" fill={c} /><path d="M16 16v-6h4" fill="none" stroke={c} strokeWidth="2.5" /></>}
+      {/* 熱度：新大樓＋往右的搬入箭頭 */}
+      {seg === 'ht' && <><rect x="22" y="10" width="16" height="30" rx="2" fill={c} /><path d="M26 16h8M26 22h8M26 28h8" stroke="var(--surface-card)" strokeWidth="2" /><path d="M4 30h13l-5-5M17 30l-5 5" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></>}
     </svg>
   )
 }

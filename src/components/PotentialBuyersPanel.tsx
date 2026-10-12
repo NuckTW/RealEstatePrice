@@ -60,8 +60,8 @@ export interface CustomStore {
 /** 頁籤：村里指數為主，其餘為行政區／縣市層級的背景資料（皆不計入村里指數） */
 type Tab = '村里指數' | '指數說明' | '自訂指數' | '客源分析' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
 const TABS: { key: Tab; desc: string }[] = [
-  { key: '村里指數',   desc: '村里首購／換新屋／換二手指數地圖與排行' },
-  { key: '指數說明',   desc: '三個指數怎麼算、每項資料的來源' },
+  { key: '村里指數',   desc: '村里首購／換新屋／換二手指數與新屋熱度地圖與排行' },
+  { key: '指數說明',   desc: '客群指數與新屋熱度怎麼算、每項資料的來源' },
   { key: '自訂指數',   desc: '手動加入資料、自訂指數權重、AI 建議配方' },
   { key: '客源分析',   desc: '選建案或在地圖點位置，推估潛在買方來自哪些里' },
   { key: '人口與家庭', desc: '未來人口推估、學區新生' },
@@ -423,7 +423,7 @@ export default function PotentialBuyersPanel() {
             ...cardStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
             fontFamily: 'var(--font-sans)', color: 'var(--text-default)',
           }}>
-            <span><b style={{ color: 'var(--text-strong)' }}>指數怎麼算？</b><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginLeft: 8 }}>圖解三個指數的算法與每項資料來源</span></span>
+            <span><b style={{ color: 'var(--text-strong)' }}>指數怎麼算？</b><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginLeft: 8 }}>圖解三個客群指數＋新屋熱度的算法與每項資料來源</span></span>
             <span style={{ color: 'var(--accent-tint)', fontSize: 'var(--text-sm)' }}>看指數說明 →</span>
           </button>
         </>
@@ -637,7 +637,7 @@ function VillageDetail({ v, def, result, catalog, rank, total, meta, rentRow, as
         <span style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--accent-tint)', fontFamily: 'var(--font-mono)' }}>{fmt(result.scores.get(v.code))}</span>
         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{def.name}・全市第 {rank} / {total} 名</span>
       </div>
-      {/* 三個預設指數並列，方便比較 */}
+      {/* 預設指數（三個客群＋新屋熱度）並列，方便比較 */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
         {PRESET_INDICES.map(p => (
           <span key={p.id} style={{
