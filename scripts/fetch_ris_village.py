@@ -11,6 +11,9 @@ API 文件：https://www.ris.gov.tw/rs-opendata/api/Main/docs/v1
 106 年資料沒有 district_code：以 107/01（ODRP014）的「行政區＋里名 → 代碼」對照；
 107/01 前已整併消失的里對不到，略過（約 28 里）。戶政 API 最早只到 106/01。
 官方約落後 1–2 個月發布；查無資料的月份自動跳過。
+官方格式異常的月份（2026-10 查證）由 fetch() 自動退回：
+  - 11308 三個資料集欄名發布成中文 → API 的 COUNTY 篩選失效（查無）；改抓全國、依欄位順序換回英文欄名
+  - ODRP060 11103 API 整月查無 → 改抓 data.gov.tw 同資料集（131138）該月 CSV（與 API 同源，11307 逐里比對一致）
 
 用法（執行路徑：專案根目錄）：
   python3 scripts/fetch_ris_village.py                  # 最近 4 個月（月排程用）
@@ -25,7 +28,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import os
+import re
 import sys
 import time
 from datetime import date, datetime, timezone
@@ -47,6 +52,31 @@ RECENT_MONTHS = 4
 DELAY_SEC = 1.0
 CITY_KEYS = ['ntp', 'tp', 'ty', 'tc', 'tn', 'kh', 'tw', 'fu', 'other']
 PREVIEW_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'ris_preview')
+
+# 官方欄名發布成中文時，依欄位順序換回的英文欄名（順序同正常月份的 API 回應）
+_HEAD = ['statistic_yyymm', 'district_code', 'site_id', 'village']
+_MIG_IN = [f'in_{k}' for k in ['total', 'foreign', *CITY_KEYS, 'other_city', 'other_town']] + ['first_reg', 'move_in_other']
+_MIG_OUT = [f'out_{k}' for k in ['total', 'foreign', *CITY_KEYS, 'other_city', 'other_town']] + ['deleted_reg', 'move_out_other']
+EN_COLS = {
+    'ODRP014': _HEAD + ['household_no', 'people_total', 'people_total_m', 'people_total_f']
+               + [f'people_age_{a}_{s}' for a in [f'{n:03d}' for n in range(100)] + ['100up'] for s in 'mf'],
+    'ODRP060': _HEAD + ['birth_total', 'birth_total_m', 'birth_total_f', 'death_total', 'death_m', 'death_f']
+               + [f'{k}_pair_{x}' for k in ('marry', 'divorce') for x in ('OppositeSex', 'SameSex', 'SameSex_m', 'SameSex_f')],
+    'ODRP011': _HEAD + [f'{k}_{s}' for k in _MIG_IN + _MIG_OUT + ['in_migrants', 'out_migrants', 'vlg_chg_add', 'vlg_chg_dec']
+                        for s in 'mf'],
+}
+# 防呆：中文欄名須含這些字（欄位順序若被官方調動就中止，不靜默錯位）
+ZH_ANCHORS = {
+    'ODRP014': {'household_no': '戶數', 'people_total': '人口數', 'people_age_000_m': '0歲',
+                'people_age_100up_f': '100歲以上'},
+    'ODRP060': {'birth_total': '出生', 'death_total': '死亡', 'marry_pair_OppositeSex': '結婚對數_異性',
+                'divorce_pair_SameSex_f': '離婚對數_同性'},
+    'ODRP011': {'in_total_m': '遷入人數_合計', 'in_foreign_m': '國外', 'in_tn_m': '臺南市', 'in_other_town_m': '他鄉',
+                'out_total_m': '遷出人數_合計', 'out_kh_f': '高雄市', 'in_migrants_m': '住址變更人數_入',
+                'vlg_chg_dec_f': '行政區域調整人數_減'},
+}
+# API 整月缺時的備援：data.gov.tw 同資料集（每月一個 CSV，欄名中文）
+OPENDATA_ID = {'ODRP060': 131138}
 
 
 # ── 工具 ──────────────────────────────────────────────────────────
@@ -92,26 +122,74 @@ def split_site(site_id: str) -> str:
 
 # ── 抓取 ──────────────────────────────────────────────────────────
 
-def fetch(session: requests.Session, code: str, ym: str) -> list[dict]:
-    """抓單一資料集單一月份的台南市全部村里（自動翻頁）。查無資料回傳 []。"""
+def fetch_pages(session: requests.Session, code: str, ym: str, county: str | None) -> list[dict]:
+    """抓單一資料集單一月份（自動翻頁）；county=None 為全國。查無資料回傳 []。"""
     rows, page = [], 1
     while True:
+        params = {'PAGE': page, **({'COUNTY': county} if county else {})}
         try:
-            r = session.get(API.format(code=code, ym=ym),
-                            params={'COUNTY': COUNTY, 'PAGE': page}, timeout=60)
-            data = r.json()
+            data = session.get(API.format(code=code, ym=ym), params=params, timeout=60).json()
         except Exception as e:
             print(f'  {code} {ym} p{page}: 抓取失敗（{e}）')
             return rows
         if data.get('responseCode') != 'OD-0101-S':
             return rows   # 'OD-0102-S' 查無資料
-        # 部分舊資料集欄名帶 BOM（如 '\ufeffstatistic_yyymm'）
-        rows += [{k.lstrip('\ufeff'): v for k, v in x.items()} for x in data.get('responseData') or []
-                 if str(x.get('site_id', '')).startswith(COUNTY)]
+        # 部分舊資料集欄名帶 BOM（如 '﻿statistic_yyymm'）
+        rows += [{k.lstrip('﻿'): v for k, v in x.items()} for x in data.get('responseData') or []]
         if page >= i(data.get('totalPage')):
             return rows
         page += 1
         time.sleep(DELAY_SEC)
+
+
+def fetch_opendata(session: requests.Session, code: str, ym: str) -> list[dict]:
+    """data.gov.tw 同資料集該月 CSV（全國）。找不到該月回傳 []。"""
+    try:
+        meta = session.get(f'https://data.gov.tw/api/v2/rest/dataset/{OPENDATA_ID[code]}', timeout=60).json()
+        url = next((d['resourceDownloadUrl'] for d in meta['result']['distribution']
+                    if re.match(r'\d{5}', d.get('resourceDescription') or '')
+                    and d['resourceDescription'][:5] == ym), None)
+        if not url:
+            return []
+        text = session.get(url, timeout=180).content.decode('utf-8-sig')
+    except Exception as e:
+        print(f'  {code} {ym} data.gov.tw 抓取失敗（{e}）')
+        return []
+    rows = list(csv.reader(io.StringIO(text)))
+    return [dict(zip(rows[0], r)) for r in rows[1:] if len(r) == len(rows[0])]
+
+
+def to_english(code: str, row: dict) -> dict:
+    """中文欄名 → 英文欄名（依欄位順序，並以 ZH_ANCHORS、男女欄確認順序沒變）"""
+    if 'statistic_yyymm' in row:
+        return row
+    zh, en = list(row), EN_COLS[code]
+    if len(zh) != len(en):
+        raise RuntimeError(f'{code} 中文欄位數 {len(zh)} ≠ 預期 {len(en)}：{zh[:6]}…')
+    pos = {k: n for n, k in enumerate(en)}
+    bad = [k for k, word in ZH_ANCHORS[code].items() if word not in zh[pos[k]]]
+    bad += [k for k, z in zip(en, zh) if k.endswith('_m') != z.endswith('男') or k.endswith('_f') != z.endswith('女')]
+    if bad or zh[:3] != ['統計年月', '區域別代碼', '區域別']:
+        raise RuntimeError(f'{code} 中文欄名與預期順序不符（{bad[:5]}）：{zh[:6]}…')
+    return dict(zip(en, row.values()))
+
+
+def fetch(session: requests.Session, code: str, ym: str) -> list[dict]:
+    """抓單一資料集單一月份的台南市全部村里。查無資料回傳 []。
+    官方格式異常時依序退回（僅 EN_COLS 內的月資料集）：
+      1. 欄名發布成中文（11308）→ COUNTY 篩選查無 → 改抓全國，換回英文欄名
+      2. API 整月缺（ODRP060 11103）→ data.gov.tw 該月 CSV"""
+    rows = fetch_pages(session, code, ym, COUNTY)
+    if not rows and code in EN_COLS:
+        rows = fetch_pages(session, code, ym, None)
+        if rows:
+            print(f'  {code} {ym}: 縣市篩選查無、全國有 {len(rows)} 列（欄名格式異常），改抓全國轉換')
+        elif code in OPENDATA_ID:
+            rows = fetch_opendata(session, code, ym)
+            if rows:
+                print(f'  {code} {ym}: API 查無，改用 data.gov.tw {OPENDATA_ID[code]} CSV（全國 {len(rows)} 列）')
+        rows = [to_english(code, r) for r in rows]
+    return [r for r in rows if str(r.get('site_id', '')).startswith(COUNTY)]
 
 
 # ── 轉換 ──────────────────────────────────────────────────────────
