@@ -191,7 +191,7 @@ function IndexEditor({ catalog, villages, geo, presets, saved, password, onChang
   // 高度重複的組成（排名相關 ≥ 0.8）
   const redundant = useMemo(() => redundantPairs(res.used.map(c => c.key), catalog), [res.used, catalog])
 
-  // 預覽：地圖、前 10 名、與三個預設指數的相似度
+  // 預覽：地圖、前 10 名、與預設指數（三個客群＋新屋熱度）的相似度
   const scores = res.scores
   const breaks = useMemo(() => quintileBreaks([...scores.values()]), [scores])
   const classByCode = useMemo(() => new Map([...scores].map(([k, v]) => [k, classOf(v, breaks)])), [scores, breaks])

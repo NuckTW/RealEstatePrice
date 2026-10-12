@@ -3,7 +3,7 @@
  *  - 指標目錄：所有可顯示、可放進指數的資料（村里層級 + 行政區層級 + 手動資料）
  *  - 百分位：與 MV 相同的 percent_rank 定義（NULL 不參與排名、給中性值 50）
  *  - 指數：各組成百分位 × 權重 ÷ 權重總和
- * 預設三個指數的權重須與 supabase/migrations/20261003_village_buyer_indicators.sql（v5）一致
+ * 預設四個指數的權重須與 supabase/migrations/20261003_village_buyer_indicators.sql（v7）一致
  */
 import type { IndustryPoint } from '@/components/IndustrySection'
 import type { SupplyData } from '@/components/SupplyPipelineSection'
@@ -107,33 +107,52 @@ export interface Catalog {
   districtValues: Map<string, Map<string, number | null>>
 }
 
-/* ── 預設三個指數 ─────────────────────────────────────────────── */
+/* ── 預設四個指數 ─────────────────────────────────────────────── */
+/**
+ * v7（2026-10-12）：分成兩種用途
+ *  - 三個「客群」指數（首購／換新屋／換二手）只看「住在這裡的人」的條件 → 客源分析用它當客源強度
+ *  - 「新屋熱度」收納世代淨移入、社會增加、設籍宅數成長 → 這些多是「交屋後才遷入設籍」的結果，
+ *    代表人正往哪裡搬、新屋在哪裡交屋（選址看動能用），不再混進客群指數
+ * 權重依跨期驗證（2021–2024 年分數 vs 之後 24 個月各區交易）挑選，見 scripts/validate_buyer_indices.py
+ */
 export const PRESET_INDICES: IndexDef[] = [
   {
     id: 'firstBuyer', name: '首購指數', short: '首購', preset: true,
-    desc: '25–34 歲年輕人第一次買房的需求強度',
+    desc: '住在這裡的 25–34 歲年輕人，第一次買房的潛力',
     components: [
-      { key: 'cohortYoung', weight: 30 }, { key: 'share2534', weight: 25 }, { key: 'marriage', weight: 10 },
-      { key: 'income', weight: 25 }, { key: 'social', weight: 10 },
+      { key: 'share2534', weight: 70 }, { key: 'marriage', weight: 15 }, { key: 'income', weight: 15 },
     ],
   },
   {
     id: 'newHome', name: '換新屋指數', short: '換新屋', preset: true,
-    desc: '35–44 歲家庭換屋、偏好預售與新成屋的需求強度',
+    desc: '住在這裡的 35–44 歲家庭，換預售屋或新成屋的潛力',
     components: [
-      { key: 'cohortMid', weight: 20 }, { key: 'share3544', weight: 20 }, { key: 'birth', weight: 20 },
-      { key: 'income', weight: 20 }, { key: 'dwellingsGrowth', weight: 20 },
+      { key: 'share3544', weight: 45 }, { key: 'birth', weight: 40 }, { key: 'income', weight: 15 },
     ],
   },
   {
     id: 'resale', name: '換二手指數', short: '換二手', preset: true,
-    desc: '35–44 歲家庭在成熟市區換購二手屋的需求強度',
+    desc: '住在這裡的成家階段家庭，在成熟市區換二手屋的潛力',
     components: [
-      { key: 'cohortMid', weight: 10 }, { key: 'share3544', weight: 20 }, { key: 'head2645', weight: 20 },
-      { key: 'income', weight: 30 }, { key: 'eduUnivPlus', weight: 20 },
+      { key: 'head2645', weight: 35 }, { key: 'eduUnivPlus', weight: 45 }, { key: 'income', weight: 20 },
+    ],
+  },
+  {
+    id: 'heat', name: '新屋熱度', short: '熱度', preset: true,
+    desc: '最近人往這裡搬、新住宅在這裡交屋的程度（反映已發生的買氣與供給，選址看動能用）',
+    components: [
+      { key: 'cohortYoung', weight: 30 }, { key: 'cohortMid', weight: 20 }, { key: 'social', weight: 20 },
+      { key: 'dwellingsGrowth', weight: 30 },
     ],
   },
 ]
+
+/** 客源分析只用三個客群指數（新屋熱度是目的地訊號，不能當客源強度） */
+export const presetById = (id: string): IndexDef => {
+  const p = PRESET_INDICES.find(x => x.id === id)
+  if (!p) throw new Error(`unknown preset index: ${id}`)
+  return p
+}
 
 /* ── 指標目錄 ─────────────────────────────────────────────────── */
 const RIS = '內政部戶政司 村里統計'

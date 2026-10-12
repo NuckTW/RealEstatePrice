@@ -1,11 +1,11 @@
 -- ============================================================
--- 潛在客群分析｜村里潛在客群指數（首購／換新屋／換二手）
+-- 潛在客群分析｜村里潛在客群指數（首購／換新屋／換二手）＋新屋熱度（v7）
 -- ⚠️ 請在 Supabase SQL Editor 手動執行（確認後再跑）
 -- 前置：20261002_potential_buyers.sql 已執行且資料已匯入
 -- 每月匯入後執行：SELECT refresh_village_buyer_indicators();
 -- 規劃文件：docs/potential-buyer-analysis-plan.md §7.1
 --
--- 計分方式：各指標轉全市百分位（0–100）後加權相加
+-- 計分方式：各指標轉全市百分位（0–100）後加權相加（⚠️ 目前公式見下方 v7；以下兩行是 v1–v5 的歷史紀錄）
 --   首購指數 = 世代淨移入(25–34) 30 + 25–34 占比 25 + 結婚率 10 + 所得 25 + 社會增加 10（v5 起；v4 以前結婚 20、占比 20、所得 20）
 --   換屋指數 = 世代淨移入(35–44) 20 + 35–44 占比 20 + 出生率 20 + 所得 30 + 社會增加 10（v4 起拆成換新屋／換二手，見下）
 -- 時間窗：最新月份往前 12 個月
@@ -24,6 +24,18 @@
 -- v5（2026-10-04）：首購結婚率權重 20 → 10，釋出的 10 分給 25–34 占比、所得各 5（使用者決定）
 --   依據：結婚率與各區近 24 月預售成交排名相關只有 0.26，是首購組成中最弱的一項；調整後預售相關 0.53 → 0.57
 -- v6：移除部署過渡用的 upgrader_index（新版前端自 PR #10 起不再使用）
+-- v7（2026-10-12）：客群指數只看「住在這裡的人」，另增新屋熱度 heat_index（使用者決定，方案 A）
+--   理由：世代淨移入、社會增加、設籍宅數成長多是「買房交屋後遷入設籍」的結果（目的地／供給動能），
+--         混在客群指數裡會讓客源分析把剛交屋的重劃區當成主要客源
+--   首購指數   = 25–34 占比 70 + 結婚率 15 + 所得 15
+--   換新屋指數 = 35–44 占比 45 + 出生率 40 + 所得 15
+--   換二手指數 = 26–45 歲戶長占比 35 + 大學以上學歷 45 + 所得 20
+--   新屋熱度   = 世代淨移入(25–34) 30 + 世代淨移入(35–44) 20 + 社會增加 20 + 設籍宅數成長 30
+--   驗證（跨期：2021–2024 年 7 月分數 vs 之後 24 個月各區交易／每千戶，Spearman，都市 18 區）：
+--     首購 新屋 0.60／二手 0.14、換新屋 新屋 0.70／二手 −0.01、換二手 二手 0.82／新屋 0.01、熱度 新屋 0.77／二手 −0.01
+--     重現方式：python scripts/validate_buyer_indices.py
+--   另：share_25_34、share_35_44、marriage_k、birth_k 的百分位補上 NULL → 50
+--       （原本 ORDER BY 預設 NULLS LAST，NULL 會被排到接近 100 分；目前資料沒有 NULL，屬防呆）
 -- ============================================================
 
 DROP MATERIALIZED VIEW IF EXISTS village_buyer_indicators;
@@ -205,10 +217,15 @@ pct AS (
          ELSE percent_rank() OVER (PARTITION BY cohort_young_k IS NULL ORDER BY cohort_young_k) * 100 END AS p_cohort_young,
     CASE WHEN cohort_mid_k IS NULL THEN 50
          ELSE percent_rank() OVER (PARTITION BY cohort_mid_k IS NULL ORDER BY cohort_mid_k) * 100 END     AS p_cohort_mid,
-    percent_rank() OVER (ORDER BY share_25_34) * 100                                                     AS p_share_25_34,
-    percent_rank() OVER (ORDER BY share_35_44) * 100                                                     AS p_share_35_44,
-    percent_rank() OVER (ORDER BY marriage_k) * 100                                                      AS p_marriage,
-    percent_rank() OVER (ORDER BY birth_k) * 100                                                         AS p_birth,
+    -- v7：補上 NULL → 50（與前端 percentRanks 一致）
+    CASE WHEN share_25_34 IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY share_25_34 IS NULL ORDER BY share_25_34) * 100 END     AS p_share_25_34,
+    CASE WHEN share_35_44 IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY share_35_44 IS NULL ORDER BY share_35_44) * 100 END     AS p_share_35_44,
+    CASE WHEN marriage_k IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY marriage_k IS NULL ORDER BY marriage_k) * 100 END       AS p_marriage,
+    CASE WHEN birth_k IS NULL THEN 50
+         ELSE percent_rank() OVER (PARTITION BY birth_k IS NULL ORDER BY birth_k) * 100 END             AS p_birth,
     CASE WHEN social_k IS NULL THEN 50
          ELSE percent_rank() OVER (PARTITION BY social_k IS NULL ORDER BY social_k) * 100 END             AS p_social,
     CASE WHEN income_median IS NULL THEN 50
@@ -226,13 +243,12 @@ SELECT
   village_code, district, village,
   (SELECT to_char(end_date, 'YYYY-MM') FROM win) AS data_month,   -- 人口資料月份（西元）
   income_tax_year,                                                -- 所得資料年度（民國，落後約 2–3 年）
-  -- 指數
-  round((0.30 * p_cohort_young + 0.25 * p_share_25_34 + 0.10 * p_marriage
-       + 0.25 * p_income + 0.10 * p_social)::numeric, 1)          AS first_buyer_index,
-  round((0.20 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_birth
-       + 0.20 * p_income + 0.20 * p_dwellings_growth)::numeric, 1) AS new_home_index,
-  round((0.10 * p_cohort_mid + 0.20 * p_share_35_44 + 0.20 * p_head_26_45
-       + 0.30 * p_income + 0.20 * p_edu_univ)::numeric, 1)        AS resale_index,
+  -- 指數（v7）：三個客群指數只看住戶條件；新屋熱度收納遷入／交屋類訊號
+  round((0.70 * p_share_25_34 + 0.15 * p_marriage + 0.15 * p_income)::numeric, 1)   AS first_buyer_index,
+  round((0.45 * p_share_35_44 + 0.40 * p_birth + 0.15 * p_income)::numeric, 1)      AS new_home_index,
+  round((0.35 * p_head_26_45 + 0.45 * p_edu_univ + 0.20 * p_income)::numeric, 1)    AS resale_index,
+  round((0.30 * p_cohort_young + 0.20 * p_cohort_mid + 0.20 * p_social
+       + 0.30 * p_dwellings_growth)::numeric, 1)                                      AS heat_index,
   -- 各指標百分位
   round(p_cohort_young::numeric, 1) AS p_cohort_young, round(p_cohort_mid::numeric, 1) AS p_cohort_mid,
   round(p_share_25_34::numeric, 1)  AS p_share_25_34,  round(p_share_35_44::numeric, 1) AS p_share_35_44,
