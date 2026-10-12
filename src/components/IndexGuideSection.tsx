@@ -120,7 +120,7 @@ const RECIPES: { seg: Seg; who: string; parts: { label: string; w: number; incom
  * match＝這個指數該對應的交易；other＝另一種交易（越接近 0 代表越分得清新屋／二手客群）
  */
 const VALIDATION: { seg: Seg; match: string; other: string; all: [number, number]; urban: [number, number] }[] = [
-  { seg: 'fb', match: '新屋', other: '二手', all: [0.81, 0.64], urban: [0.60, 0.14] },
+  { seg: 'fb', match: '新屋', other: '二手', all: [0.81, 0.64], urban: [0.59, 0.15] },
   { seg: 'nh', match: '新屋', other: '二手', all: [0.81, 0.64], urban: [0.70, -0.01] },
   { seg: 'rs', match: '二手', other: '新屋', all: [0.86, 0.71], urban: [0.82, 0.01] },
   { seg: 'ht', match: '新屋', other: '二手', all: [0.77, 0.46], urban: [0.77, -0.01] },
