@@ -31,6 +31,6 @@ const Dashboard = dynamic(() => import('./Dashboard'), {
   ),
 })
 
-export default function DashboardClient() {
-  return <Dashboard />
+export default function DashboardClient({ lastDate }: { lastDate: string | null }) {
+  return <Dashboard lastDate={lastDate} />
 }
