@@ -24,9 +24,12 @@ const ROOMS_OPTIONS = [
   { label: '2房', value: '2' }, { label: '3房', value: '3' },
   { label: '4房', value: '4' }, { label: '5房以上', value: '5+' },
 ]
-const ROC_YEAR_OPTIONS = Array.from({ length: 6 }, (_, i) => {
-  const y = 110 + i; return { label: `${y}年`, value: String(y) }
-})
+/** 年份選項：民國 110 年（資料起點）到 maxYear，跨年後自動多一個選項，不用再改程式 */
+function rocYearOptions(maxYear: number) {
+  return Array.from({ length: Math.max(maxYear, 110) - 110 + 1 }, (_, i) => {
+    const y = 110 + i; return { label: `${y}年`, value: String(y) }
+  })
+}
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
   label: `${i + 1}月`, value: String(i + 1),
 }))
@@ -51,11 +54,22 @@ export interface FilterValues {
   presale: string; buildingAge: string
 }
 
-export const DEFAULT_FILTERS: FilterValues = {
-  dateFromYear: '114', dateFromMonth: '1',
-  dateToYear:   '115', dateToMonth:   '6',
-  // 網站主要受眾為看預售屋的建商/房仲，預設即預售模式
-  districts: [], types: [], rooms: [], presale: 'true', buildingAge: 'all',
+/**
+ * 預設篩選條件。日期跟著資料走：迄月 = 資料最新交易月，起月 = 前一年 1 月
+ * （例：最新 115/9 → 114/1～115/9）。
+ * @param lastDate 資料最新交易日（西元 YYYY-MM-DD，來自 fetchMeta）；
+ *                 拿不到時退回今天所在月份，查詢頂多是最後幾個月沒資料
+ */
+export function buildDefaultFilters(lastDate?: string | null): FilterValues {
+  let [y, m] = (lastDate ?? '').split('-').map(Number)
+  if (!y || !m) { const now = new Date(); y = now.getFullYear(); m = now.getMonth() + 1 }
+  const rocYear = y - 1911
+  return {
+    dateFromYear: String(rocYear - 1), dateFromMonth: '1',
+    dateToYear:   String(rocYear),     dateToMonth:   String(m),
+    // 網站主要受眾為看預售屋的建商/房仲，預設即預售模式
+    districts: [], types: [], rooms: [], presale: 'true', buildingAge: 'all',
+  }
 }
 
 /* ── Shared select style ──────────────────────────────────────── */
@@ -324,15 +338,18 @@ export function ActiveFilterTags({ filters, onRemove }: {
 }
 
 /* ── FilterBar ─────────────────────────────────────────────────── */
-export default function FilterBar({ onApply, loading, autoApply, value }: {
+export default function FilterBar({ onApply, loading, autoApply, value, defaults }: {
   onApply: (f: FilterValues) => void
   loading?: boolean
   /** true 時任何改動立即套用（地圖／框選模式用），不需按「套用篩選」 */
   autoApply?: boolean
   /** 外部 filters 狀態（刪除標籤、URL 還原時同步回篩選列） */
   value?: FilterValues
+  /** 預設條件（buildDefaultFilters 產生），「清除」會回到這組 */
+  defaults: FilterValues
 }) {
-  const [f, setF] = useState<FilterValues>(value ?? DEFAULT_FILTERS)
+  const [f, setF] = useState<FilterValues>(value ?? defaults)
+  const yearOptions = rocYearOptions(Number(defaults.dateToYear))
   const [expanded, setExpanded] = useState(false)  // 手機版展開狀態
 
   // 外部 value 變更時同步回本地 f：這是 React 官方文件「Adjusting state when a prop
@@ -351,7 +368,7 @@ export default function FilterBar({ onApply, loading, autoApply, value }: {
     if (autoApply) onApply(next)
   }
 
-  const handleClear = () => { setF(DEFAULT_FILTERS); onApply(DEFAULT_FILTERS) }
+  const handleClear = () => { setF(defaults); onApply(defaults) }
 
   const activeCount = f.districts.length + f.types.length + f.rooms.length
     + (f.presale !== 'all' ? 1 : 0) + (f.buildingAge !== 'all' ? 1 : 0)
@@ -400,7 +417,7 @@ export default function FilterBar({ onApply, loading, autoApply, value }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-caps)', fontWeight: 'var(--weight-medium)', fontFamily: 'var(--font-sans)' }}>起始</span>
           <div style={{ display: 'flex', gap: 4 }}>
-            <StyledSelect options={ROC_YEAR_OPTIONS}  value={f.dateFromYear}  onChange={v => set('dateFromYear', v)} />
+            <StyledSelect options={yearOptions} value={f.dateFromYear}  onChange={v => set('dateFromYear', v)} />
             <StyledSelect options={MONTH_OPTIONS}     value={f.dateFromMonth} onChange={v => set('dateFromMonth', v)} />
           </div>
         </div>
@@ -408,7 +425,7 @@ export default function FilterBar({ onApply, loading, autoApply, value }: {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: 'var(--tracking-caps)', fontWeight: 'var(--weight-medium)', fontFamily: 'var(--font-sans)' }}>結束</span>
           <div style={{ display: 'flex', gap: 4 }}>
-            <StyledSelect options={ROC_YEAR_OPTIONS} value={f.dateToYear}  onChange={v => set('dateToYear', v)} />
+            <StyledSelect options={yearOptions} value={f.dateToYear}  onChange={v => set('dateToYear', v)} />
             <StyledSelect options={MONTH_OPTIONS}    value={f.dateToMonth} onChange={v => set('dateToMonth', v)} />
           </div>
         </div>

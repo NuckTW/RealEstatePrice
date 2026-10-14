@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo , useRef } from 'react'
 import dynamic from 'next/dynamic'
-import FilterBar, { FilterValues, DEFAULT_FILTERS, ActiveFilterTags } from './FilterBar'
+import FilterBar, { FilterValues, buildDefaultFilters, ActiveFilterTags } from './FilterBar'
 import KpiBar, { DateBadge } from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
 import CaseDetailPanel from './CaseDetailPanel'
@@ -133,8 +133,8 @@ function Skeleton() {
 type TabId = 'data' | 'map' | 'area'
 
 /** URL query → FilterValues（無參數時回傳預設值） */
-function paramsToFilters(p: URLSearchParams): FilterValues {
-  const f = { ...DEFAULT_FILTERS }
+function paramsToFilters(p: URLSearchParams, defaults: FilterValues): FilterValues {
+  const f = { ...defaults }
   const from = p.get('from'), to = p.get('to')
   if (from?.includes('-')) [f.dateFromYear, f.dateFromMonth] = from.split('-')
   if (to?.includes('-'))   [f.dateToYear,   f.dateToMonth]   = to.split('-')
@@ -147,17 +147,18 @@ function paramsToFilters(p: URLSearchParams): FilterValues {
   return f
 }
 
-/** FilterValues + tab → URL query（只寫非預設值；保留其他頁面的參數如 projects） */
-function syncUrl(f: FilterValues, tab: TabId) {
+/** FilterValues + tab → URL query（只寫非預設值；保留其他頁面的參數如 projects）。
+    預設日期跟著資料最新月滾動，所以不帶 from/to 的連結永遠代表「最新期間」。 */
+function syncUrl(f: FilterValues, tab: TabId, defaults: FilterValues) {
   const p = new URLSearchParams(window.location.search)
   const setOrDel = (k: string, v: string, def: string) => { if (v !== def) p.set(k, v); else p.delete(k) }
   setOrDel('tab', tab, 'data')
-  setOrDel('from', `${f.dateFromYear}-${f.dateFromMonth}`, `${DEFAULT_FILTERS.dateFromYear}-${DEFAULT_FILTERS.dateFromMonth}`)
-  setOrDel('to',   `${f.dateToYear}-${f.dateToMonth}`,     `${DEFAULT_FILTERS.dateToYear}-${DEFAULT_FILTERS.dateToMonth}`)
+  setOrDel('from', `${f.dateFromYear}-${f.dateFromMonth}`, `${defaults.dateFromYear}-${defaults.dateFromMonth}`)
+  setOrDel('to',   `${f.dateToYear}-${f.dateToMonth}`,     `${defaults.dateToYear}-${defaults.dateToMonth}`)
   setOrDel('districts', f.districts.join(','), '')
   setOrDel('types',     f.types.join(','),     '')
   setOrDel('rooms',     f.rooms.join(','),     '')
-  setOrDel('presale',   f.presale,     DEFAULT_FILTERS.presale)
+  setOrDel('presale',   f.presale,     defaults.presale)
   setOrDel('age',       f.buildingAge, 'all')
   const qs = p.toString()
   window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
@@ -178,8 +179,8 @@ function buildChartQuery(f: FilterValues): string {
 }
 
 /** 從 URL 讀初始篩選條件。本元件以 ssr:false 掛載，window 必定存在。 */
-function readInitialFilters(): FilterValues {
-  return paramsToFilters(new URLSearchParams(window.location.search))
+function readInitialFilters(defaults: FilterValues): FilterValues {
+  return paramsToFilters(new URLSearchParams(window.location.search), defaults)
 }
 
 /** 初始 tab：URL 參數優先，其次 localStorage 記憶的上次選擇 */
@@ -194,14 +195,19 @@ function readInitialTab(): TabId {
 }
 
 /* ── Dashboard ─────────────────────────────────────────────── */
-export default function Dashboard() {
+export default function Dashboard({ lastDate }: {
+  /** 資料最新交易日（西元 YYYY-MM-DD），由首頁 server 端查好傳入；查詢失敗時為 null */
+  lastDate: string | null
+}) {
+  // 預設日期 = 前一年 1 月～資料最新月；lastDate 在元件生命週期內不變，memo 只算一次
+  const defaults = useMemo(() => buildDefaultFilters(lastDate), [lastDate])
   // 資料連同「它對應的查詢條件」一起存，loading 由兩者是否一致推導出來，
   // 就不需要在 effect 裡同步 setLoading(true)（會造成串聯渲染）
   const [result, setResult] = useState<{ key: string; data: ChartData | null } | null>(null)
   const latestKey = useRef('')
   // 直接以 lazy initializer 取初始值：不需要「先給預設值、再用 effect 還原」，
   // 也就不需要 restored 旗標來擋住還原完成前的 URL 回寫
-  const [filters, setFilters] = useState<FilterValues>(readInitialFilters)
+  const [filters, setFilters] = useState<FilterValues>(() => readInitialFilters(defaults))
   const [activeTab, setActiveTab] = useState<TabId>(readInitialTab)
 
   // Case detail panel state
@@ -214,14 +220,8 @@ export default function Dashboard() {
   // 統計總覽（行政區／類型／房型）可摺疊區塊，預設收合
   const [statsExpanded, setStatsExpanded] = useState(false)
 
-  // 資料最新交易日（用於 KPI 補登警示），與篩選條件無關，只抓一次
-  const [lastDataDate, setLastDataDate] = useState<string | null>(null)
-  useEffect(() => {
-    fetch('/api/meta')
-      .then(r => r.json())
-      .then(d => { if (d.last_date) setLastDataDate(d.last_date) })
-      .catch(() => {})
-  }, [])
+  // 資料最新交易日（用於 KPI 補登警示），與篩選條件無關；改由 server 端傳入，不再另打 /api/meta
+  const lastDataDate = lastDate
 
   // 用 promise 鏈而非 async/await：setState 必須落在巢狀回呼裡，
   // async 函式中 await 之後的程式碼仍被視為 effect body 的一部分，
@@ -250,14 +250,14 @@ export default function Dashboard() {
      不再有同步 setState（避免 react-hooks/set-state-in-effect 的串聯渲染）。
      重新解析一次 URL 而非引用 filters，是為了不把 filters 放進 deps 而誤觸重抓。 */
   useEffect(() => {
-    fetchData(readInitialFilters())
-  }, [fetchData])
+    fetchData(readInitialFilters(defaults))
+  }, [fetchData, defaults])
 
   /* 狀態變更 → 寫回 URL（可直接複製分享）＋記住 tab */
   useEffect(() => {
-    syncUrl(filters, activeTab)
+    syncUrl(filters, activeTab, defaults)
     try { localStorage.setItem('tra-tab', activeTab) } catch {}
-  }, [filters, activeTab])
+  }, [filters, activeTab, defaults])
 
   const handleApply = (f: FilterValues) => { setFilters(f); fetchData(f) }
 
@@ -300,7 +300,7 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-app)' }}>
       {/* 地圖／框選模式改動即套用；value 讓刪標籤與 URL 還原同步回篩選列 */}
-      <FilterBar onApply={handleApply} loading={loading} autoApply={activeTab !== 'data'} value={filters} />
+      <FilterBar onApply={handleApply} loading={loading} autoApply={activeTab !== 'data'} value={filters} defaults={defaults} />
 
       {/* Tab 切換。條件膠囊（期間 + 篩選標籤）跟 tab 同列：兩者都是「目前看的是什麼」，
           另起一行會多吃一段垂直空間，也讓人以為是不同層級的資訊。 */}
