@@ -4,6 +4,8 @@ import { runChatQuery } from '@/lib/queries/client'
 import { genAI, withFallback, isQuotaError, safeEqual, checkRateLimit, clientIp } from '@/lib/aiGuard'
 // 圖表判斷、給回答模型的摘要（前端 ChatChart 也共用，見 src/lib/chatData.ts）
 import { detectChartConfig, buildRowSummary, CLIENT_ROW_LIMIT, CHAT_ROW_CAP } from '@/lib/chatData'
+// 重劃區／生活圈的路名規則，與網站篩選列共用同一份
+import { ZONES, zoneCondition } from '@/lib/zones'
 
 const DB_SCHEMA = `
 你是台南市實價登錄資料分析師。資料庫有一個主要資料表 transactions，欄位如下：
@@ -51,6 +53,9 @@ const DB_SCHEMA = `
 - 總價（元）→ 萬元：除以 10000
 - 單價（元/m²）→ 萬元/坪：× 3.3058 ÷ 10000
 - 資料涵蓋民國110年（2021年）至今（2026年）
+
+區域（重劃區／生活圈）：實價登錄沒有重劃區欄位，使用者提到下列名稱時，WHERE 直接放入對應條件（已含行政區），不要自己用 address LIKE 猜：
+${ZONES.map(z => `- ${z.name}（${z.district}）：${zoneCondition(z)}`).join('\n')}
 `
 
 interface HistoryItem {

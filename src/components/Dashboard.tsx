@@ -140,6 +140,7 @@ function paramsToFilters(p: URLSearchParams, defaults: FilterValues): FilterValu
   if (to?.includes('-'))   [f.dateToYear,   f.dateToMonth]   = to.split('-')
   const csv = (k: string) => (p.get(k) ?? '').split(',').filter(Boolean)
   if (p.get('districts')) f.districts = csv('districts')
+  if (p.get('zones'))     f.zones     = csv('zones')
   if (p.get('types'))     f.types     = csv('types')
   if (p.get('rooms'))     f.rooms     = csv('rooms')
   if (p.get('presale'))   f.presale   = p.get('presale')!
@@ -156,6 +157,7 @@ function syncUrl(f: FilterValues, tab: TabId, defaults: FilterValues) {
   setOrDel('from', `${f.dateFromYear}-${f.dateFromMonth}`, `${defaults.dateFromYear}-${defaults.dateFromMonth}`)
   setOrDel('to',   `${f.dateToYear}-${f.dateToMonth}`,     `${defaults.dateToYear}-${defaults.dateToMonth}`)
   setOrDel('districts', f.districts.join(','), '')
+  setOrDel('zones',     f.zones.join(','),     '')
   setOrDel('types',     f.types.join(','),     '')
   setOrDel('rooms',     f.rooms.join(','),     '')
   setOrDel('presale',   f.presale,     defaults.presale)
@@ -175,6 +177,7 @@ function buildChartQuery(f: FilterValues): string {
   if (f.types.length > 0)     p.set('types', f.types.join(','))
   if (f.rooms.length > 0)     p.set('rooms', f.rooms.join(','))
   if (f.districts.length > 0) p.set('districts', f.districts.join(','))
+  if (f.zones.length > 0)     p.set('zones', f.zones.join(','))
   return p.toString()
 }
 

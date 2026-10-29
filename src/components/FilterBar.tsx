@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, CSSProperties } from 'react'
+import { ZONES, findZone, zoneLabel } from '@/lib/zones'
 
 const TAINAN_DISTRICTS = [
   '中西區','東區','南區','北區','安平區','安南區',
@@ -50,7 +51,7 @@ const BUILDING_AGE_OPTIONS = [
 export interface FilterValues {
   dateFromYear: string; dateFromMonth: string
   dateToYear: string;   dateToMonth: string
-  districts: string[]; types: string[]; rooms: string[]
+  districts: string[]; zones: string[]; types: string[]; rooms: string[]
   presale: string; buildingAge: string
 }
 
@@ -68,7 +69,7 @@ export function buildDefaultFilters(lastDate?: string | null): FilterValues {
     dateFromYear: String(rocYear - 1), dateFromMonth: '1',
     dateToYear:   String(rocYear),     dateToMonth:   String(m),
     // 網站主要受眾為看預售屋的建商/房仲，預設即預售模式
-    districts: [], types: [], rooms: [], presale: 'true', buildingAge: 'all',
+    districts: [], zones: [], types: [], rooms: [], presale: 'true', buildingAge: 'all',
   }
 }
 
@@ -281,6 +282,100 @@ function DistrictSelect({ selected, onChange }: { selected: string[]; onChange: 
   )
 }
 
+/* ── Zone multi-select（重劃區／生活圈，每項附涵蓋路段） ─────────── */
+function ZoneSelect({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+  const [open, setOpen] = useState(false)
+  // 下拉面板寬度與左移量：手機上按鈕常在畫面右半，面板貼齊按鈕左緣會超出螢幕，打開時量一次往左推
+  const [panel, setPanel] = useState({ width: 280, shift: 0 })
+  const ref = useRef<HTMLDivElement>(null)
+
+  const handleToggleOpen = () => {
+    if (!open && ref.current) {
+      const width = Math.min(280, window.innerWidth - 32)
+      const left = ref.current.getBoundingClientRect().left
+      setPanel({ width, shift: Math.min(0, window.innerWidth - 16 - width - left) })
+    }
+    setOpen(!open)
+  }
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const toggle = (id: string) =>
+    onChange(selected.includes(id) ? selected.filter(x => x !== id) : [...selected, id])
+
+  const first = selected.length === 1 ? findZone(selected[0]) : undefined
+  const displayText = selected.length === 0 ? '全部區域'
+    : first ? first.name
+    : `${selected.length} 個區域`
+
+  const hasActive = selected.length > 0
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={{
+        fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
+        textTransform: 'uppercase', letterSpacing: 'var(--tracking-caps)',
+        fontWeight: 'var(--weight-medium)', fontFamily: 'var(--font-sans)',
+      }}>重劃區／生活圈</span>
+
+      <button
+        onClick={handleToggleOpen}
+        style={{
+          ...selectStyle, minWidth: 120,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 6, padding: '0 8px 0 10px', backgroundImage: 'none',
+          color: hasActive ? 'var(--accent-tint)' : 'var(--text-default)',
+          borderColor: open ? 'var(--accent)' : hasActive ? 'var(--accent-wash-border)' : 'var(--border-control)',
+          backgroundColor: hasActive ? 'var(--accent-wash)' : 'var(--surface-control)',
+        }}
+      >
+        <span>{displayText}</span>
+        <svg style={{ width: 10, height: 6, flexShrink: 0, color: 'var(--text-faint)', transform: open ? 'rotate(180deg)' : 'none', transition: 'var(--transition-base)' }} fill="none" viewBox="0 0 10 6">
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', marginTop: 4, left: panel.shift, zIndex: 9999,
+          background: 'var(--surface-overlay)', border: '1px solid var(--border-strong)',
+          borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-pop)',
+          width: panel.width, maxHeight: 360, overflowY: 'auto',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderBottom: '1px solid var(--border-card)', position: 'sticky', top: 0, background: 'var(--surface-overlay)' }}>
+            <button onClick={() => onChange([])} style={{ fontSize: 'var(--text-2xs)', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>清除</button>
+            <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', fontFamily: 'var(--font-sans)' }}>依路名歸區，邊界路可能有誤差</span>
+          </div>
+          <div style={{ padding: 4 }}>
+            {ZONES.map(z => (
+              <label key={z.id} title={z.note} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10,
+                padding: '6px 10px', borderRadius: 'var(--radius-md)',
+                cursor: 'pointer', fontFamily: 'var(--font-sans)',
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+              >
+                <input type="checkbox" checked={selected.includes(z.id)} onChange={() => toggle(z.id)}
+                  style={{ accentColor: 'var(--accent)', width: 12, height: 12, flexShrink: 0, cursor: 'pointer', marginTop: 2 }} />
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-default)' }}>{zoneLabel(z)}</span>
+                  {/* 涵蓋路段直接列出來，規則不黑箱 */}
+                  <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', lineHeight: 1.4 }}>{z.summary}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Active filter tags ───────────────────────────────────────── */
 export function ActiveFilterTags({ filters, onRemove }: {
   filters: FilterValues; onRemove: (updated: FilterValues) => void
@@ -289,6 +384,10 @@ export function ActiveFilterTags({ filters, onRemove }: {
 
   filters.districts.forEach(d =>
     tags.push({ label: d, onRemove: () => onRemove({ ...filters, districts: filters.districts.filter(x => x !== d) }) }))
+  filters.zones.forEach(id => {
+    const z = findZone(id)
+    tags.push({ label: z ? z.name : id, onRemove: () => onRemove({ ...filters, zones: filters.zones.filter(x => x !== id) }) })
+  })
   filters.types.forEach(t => {
     const label = TYPE_OPTIONS.find(o => o.value === t)?.label ?? t
     tags.push({ label, onRemove: () => onRemove({ ...filters, types: filters.types.filter(x => x !== t) }) })
@@ -370,7 +469,7 @@ export default function FilterBar({ onApply, loading, autoApply, value, defaults
 
   const handleClear = () => { setF(defaults); onApply(defaults) }
 
-  const activeCount = f.districts.length + f.types.length + f.rooms.length
+  const activeCount = f.districts.length + f.zones.length + f.types.length + f.rooms.length
     + (f.presale !== 'all' ? 1 : 0) + (f.buildingAge !== 'all' ? 1 : 0)
 
   return (
@@ -433,6 +532,7 @@ export default function FilterBar({ onApply, loading, autoApply, value, defaults
         <div style={{ width: 1, height: 28, background: 'var(--border-card)', alignSelf: 'flex-end' }} />
 
         <DistrictSelect selected={f.districts} onChange={v => set('districts', v)} />
+        <ZoneSelect selected={f.zones} onChange={v => set('zones', v)} />
         <MultiSelect label="類型" options={TYPE_OPTIONS} selected={f.types} onChange={v => set('types', v)} placeholder="全部類型" />
         <MultiSelect label="房型" options={ROOMS_OPTIONS} selected={f.rooms} onChange={v => set('rooms', v)} placeholder="全部房型" />
 

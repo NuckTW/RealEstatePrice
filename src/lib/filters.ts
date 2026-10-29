@@ -1,8 +1,9 @@
 /**
  * 共用篩選條件解析
- * 所有 API route 的日期區間、行政區、建物型態、房型、預售/成屋、屋齡
+ * 所有 API route 的日期區間、行政區、區域（重劃區）、建物型態、房型、預售/成屋、屋齡
  * 解析邏輯集中在這裡，確保各 API 套用相同規則。
  */
+import { zonesWhere } from './zones'
 
 /** SQL 字串跳脫（單引號） */
 export function escapeSqlString(s: string): string {
@@ -87,6 +88,10 @@ export function buildWhere(params: URLSearchParams, tableAlias = '', skipDate = 
     const list = districts.map(d => `'${escapeSqlString(d)}'`).join(',')
     conds.push(`${p}district IN (${list})`)
   }
+
+  // 重劃區／生活圈：依路名規則比對地址（規則見 zones.ts），多選取聯集
+  const zoneCond = zonesWhere(parseCsv(params, 'zones'), p)
+  if (zoneCond) conds.push(zoneCond)
 
   const types = parseCsv(params, 'types')
   if (types.length > 0) {

@@ -44,6 +44,7 @@ function buildQuery(f: FilterValues): string {
   if (f.types.length > 0)     p.set('types', f.types.join(','))
   if (f.rooms.length > 0)     p.set('rooms', f.rooms.join(','))
   if (f.districts.length > 0) p.set('districts', f.districts.join(','))
+  if (f.zones.length > 0)     p.set('zones', f.zones.join(','))
   return p.toString()
 }
 
