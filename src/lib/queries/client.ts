@@ -10,9 +10,14 @@ export async function runQuery(sql: string): Promise<Row[]> {
   return (data as Row[]) ?? []
 }
 
-/** 執行唯讀 SQL，回傳 { rows, error } 而不丟例外（供 chat 等需把錯誤訊息回報給使用者的流程） */
-export async function runQueryRaw(sql: string): Promise<{ rows: Row[]; error: { message: string } | null }> {
-  const { data, error } = await supabaseAdmin.rpc('execute_query', { query_text: sql })
+/**
+ * AI 問答專用：執行 LLM 產生的 SQL，回傳 { rows, error } 而不丟例外（錯誤訊息要回報給使用者）
+ * 走 chat_query 而不是 execute_query：DB 端以唯讀 chat_reader 身分執行、只能讀 transactions 與統計 view、
+ * 8 秒逾時、最多回 10001 筆（見 supabase/migrations/20261029_chat_query_readonly.sql）
+ * ⚠️ LLM 或使用者輸入產生的 SQL 一律走這裡，不要用 runQuery / cachedQuery
+ */
+export async function runChatQuery(sql: string): Promise<{ rows: Row[]; error: { message: string } | null }> {
+  const { data, error } = await supabaseAdmin.rpc('chat_query', { query_text: sql })
   const rows = Array.isArray(data) ? (data as Row[]) : data ? [data as Row] : []
   return { rows, error }
 }

@@ -8,7 +8,7 @@ import {
   LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
-import type { ChartConfig } from '@/app/api/chat/route'
+import { buildChartData, friendlyLabel, type ChartConfig } from '@/lib/chatData'
 import { useCssPx } from '@/hooks/useCssPx'
 
 // Brass & Clay 系列色
@@ -21,17 +21,6 @@ const SERIES_COLORS = [
   '#e0573f', // negative
 ]
 
-const FRIENDLY: Record<string, string> = {
-  avg_unit_price:    '平均單價(萬/坪)',
-  unit_price:        '單價(萬/坪)',
-  avg_total_price:   '平均總價(萬)',
-  total_price:       '總價(萬)',
-  transaction_count: '交易筆數',
-  count:             '筆數',
-  avg_price:         '均價',
-  total_sales:       '總銷(億)',
-}
-
 // tooltip 是 Recharts 內建 contentStyle，套用在 HTML div 上，可以直接吃 CSS var()
 const tooltipContentStyle = {
   background: 'var(--surface-card)',
@@ -40,6 +29,11 @@ const tooltipContentStyle = {
   fontSize: 'var(--text-2xs)',
   color: 'var(--text-default)',
 }
+
+// y 軸刻度：1600000 → 160萬，避免長數字擠爆軸寬
+const compactFmt = new Intl.NumberFormat('zh-TW', { notation: 'compact', maximumFractionDigits: 1 })
+const fmtY = (v: number) => compactFmt.format(v)
+const fmtTooltip = (v: unknown) => (typeof v === 'number' ? v.toLocaleString('zh-TW') : String(v ?? '—'))
 
 // 格式化 X 軸 label（日期/月份清理）
 function fmtXLabel(val: unknown): string {
@@ -59,7 +53,7 @@ interface Props {
 }
 
 export default function ChatChart({ rows, chart }: Props) {
-  const { type, xKey, yKeys } = chart
+  const { type, xKey, yKeys, seriesKey } = chart
 
   // tick 是畫在 SVG 座標系裡，Recharts 內部用 canvas 量測文字寬度，吃不了 CSS var()，
   // 必須傳真正的數字 px；用 useCssPx 讀取換算後的實際值，字級切換時會自動重讀。
@@ -70,13 +64,15 @@ export default function ChatChart({ rows, chart }: Props) {
     fontFamily: 'var(--font-sans)',
   }
 
-  const data = rows.map(r => {
-    const entry: Record<string, unknown> = { [xKey]: fmtXLabel(r[xKey]) }
-    for (const k of yKeys) entry[k] = Number(r[k]) || 0
-    return entry
-  })
+  // 有 seriesKey 時會長轉寬（例：每月 × 行政區 → 每區一條線）
+  const { data, series } = buildChartData(rows, chart, fmtXLabel)
 
-  const chartHeight = Math.min(220, Math.max(160, rows.length * 22))
+  // 圖上方的指標說明：只有一條時沒有 legend，要靠這行說明畫的是什麼
+  const caption = seriesKey
+    ? `${friendlyLabel(yKeys[0])}・依${friendlyLabel(seriesKey)}`
+    : yKeys.map(friendlyLabel).join('、')
+
+  const chartHeight = Math.min(220, Math.max(160, data.length * 22))
 
   const commonProps = {
     data,
@@ -92,18 +88,22 @@ export default function ChatChart({ rows, chart }: Props) {
       padding: '12px 8px 8px',
       width: '100%',
     }}>
+      <div style={{
+        fontSize: 'var(--text-3xs)', color: 'var(--text-muted)',
+        fontFamily: 'var(--font-sans)', padding: '0 4px 6px',
+      }}>{caption}</div>
       <ResponsiveContainer width="100%" height={chartHeight}>
         {type === 'bar' ? (
           <BarChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-card)" vertical={false} />
             <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
-            <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={52} />
-            <Tooltip contentStyle={tooltipContentStyle} />
-            {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)' }} />}
-            {yKeys.map((k, i) => (
+            <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={52} tickFormatter={fmtY} />
+            <Tooltip contentStyle={tooltipContentStyle} formatter={fmtTooltip} />
+            {series.length > 1 && <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)' }} />}
+            {series.map((s, i) => (
               <Bar
-                key={k} dataKey={k}
-                name={FRIENDLY[k] ?? k}
+                key={s.key} dataKey={s.key}
+                name={s.label}
                 fill={SERIES_COLORS[i % SERIES_COLORS.length]}
                 radius={[3, 3, 0, 0]} maxBarSize={40}
               />
@@ -113,13 +113,13 @@ export default function ChatChart({ rows, chart }: Props) {
           <LineChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border-card)" vertical={false} />
             <XAxis dataKey={xKey} tick={axisStyle} axisLine={false} tickLine={false} />
-            <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={52} />
-            <Tooltip contentStyle={tooltipContentStyle} />
-            {yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)' }} />}
-            {yKeys.map((k, i) => (
+            <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={52} tickFormatter={fmtY} />
+            <Tooltip contentStyle={tooltipContentStyle} formatter={fmtTooltip} />
+            {series.length > 1 && <Legend wrapperStyle={{ fontSize: 'var(--text-3xs)' }} />}
+            {series.map((s, i) => (
               <Line
-                key={k} type="monotone" dataKey={k}
-                name={FRIENDLY[k] ?? k}
+                key={s.key} type="monotone" dataKey={s.key}
+                name={s.label}
                 stroke={SERIES_COLORS[i % SERIES_COLORS.length]}
                 strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }}
               />

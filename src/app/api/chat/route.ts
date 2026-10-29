@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server'
-import { runQueryRaw } from '@/lib/queries/client'
+import { runChatQuery } from '@/lib/queries/client'
 // Gemini client、模型 fallback、密碼驗證、限流與 AI 權重建議共用（見 src/lib/aiGuard.ts）
 import { genAI, withFallback, isQuotaError, safeEqual, checkRateLimit, clientIp } from '@/lib/aiGuard'
+// 圖表判斷、給回答模型的摘要（前端 ChatChart 也共用，見 src/lib/chatData.ts）
+import { detectChartConfig, buildRowSummary, CLIENT_ROW_LIMIT, CHAT_ROW_CAP } from '@/lib/chatData'
 
 const DB_SCHEMA = `
 你是台南市實價登錄資料分析師。資料庫有一個主要資料表 transactions，欄位如下：
@@ -43,92 +45,13 @@ const DB_SCHEMA = `
 - urban_land_use (text): 都市土地使用分區
 - parking_type (text): 車位類別
 
-有用的 View：
-- district_monthly_stats: 行政區月統計（district, month, transaction_count, avg_unit_price, avg_total_price）
-- yearly_overview: 全市年度統計（year, total_transactions, avg_unit_price, avg_total_price_wan）
+只能查 transactions 這一張表（其他表與 view 都沒有權限），統計請直接對 transactions 做 GROUP BY。
 
 重要換算：
 - 總價（元）→ 萬元：除以 10000
 - 單價（元/m²）→ 萬元/坪：× 3.3058 ÷ 10000
 - 資料涵蓋民國110年（2021年）至今（2026年）
 `
-
-export interface ChartConfig {
-  type: 'bar' | 'line'
-  xKey: string
-  yKeys: string[]
-}
-
-function detectChartConfig(rows: Record<string, unknown>[]): ChartConfig | null {
-  if (rows.length < 2) return null
-  const keys = Object.keys(rows[0])
-
-  // 找時間軸 key
-  const timeKey = keys.find(k =>
-    /^(month|year|ym|quarter|date)$/i.test(k)
-  )
-  // 找分類 key
-  const catKey = keys.find(k =>
-    /^(district|building_type|type|rooms|行政區|類型|區域)$/.test(k)
-  )
-
-  // 找數值 key（排除分類和時間）
-  const numKeys = keys.filter(k => {
-    if (k === timeKey || k === catKey) return false
-    const v = rows[0][k]
-    return typeof v === 'number' ||
-      (typeof v === 'string' && v !== '' && !isNaN(Number(v)))
-  })
-
-  if (!numKeys.length) return null
-
-  if (timeKey) {
-    return { type: 'line', xKey: timeKey, yKeys: numKeys.slice(0, 3) }
-  }
-  if (catKey && rows.length >= 2) {
-    return { type: 'bar', xKey: catKey, yKeys: numKeys.slice(0, 2) }
-  }
-  return null
-}
-
-// 把全部 rows 壓縮成 Gemini 可讀的摘要，避免 token 爆炸
-function buildRowSummary(rows: Record<string, unknown>[]): string {
-  if (!rows.length) return '（無資料）'
-
-  const keys = Object.keys(rows[0])
-
-  // 數值欄位 → 計算 avg / min / max
-  const numStats: string[] = []
-  for (const k of keys) {
-    const vals = rows
-      .map(r => Number(r[k]))
-      .filter(v => !isNaN(v) && v !== 0)
-    if (!vals.length) continue
-    const avg = vals.reduce((a, b) => a + b, 0) / vals.length
-    const min = Math.min(...vals)
-    const max = Math.max(...vals)
-    numStats.push(`${k}：平均 ${avg.toFixed(1)}，最低 ${min.toFixed(1)}，最高 ${max.toFixed(1)}`)
-  }
-
-  // 文字欄位 → 頻率前5
-  const catStats: string[] = []
-  for (const k of keys) {
-    const vals = rows.map(r => r[k]).filter(v => typeof v === 'string' && v)
-    if (!vals.length) continue
-    const freq: Record<string, number> = {}
-    for (const v of vals) freq[String(v)] = (freq[String(v)] ?? 0) + 1
-    const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5)
-    catStats.push(`${k}：${top.map(([v, n]) => `${v}(${n}筆)`).join('、')}`)
-  }
-
-  const sampleRows = rows.slice(0, 20)
-
-  return [
-    numStats.length ? `數值統計：\n${numStats.join('\n')}` : '',
-    catStats.length ? `類別分佈：\n${catStats.join('\n')}` : '',
-    `前 ${sampleRows.length} 筆樣本：\n${JSON.stringify(sampleRows, null, 2)}`,
-  ].filter(Boolean).join('\n\n')
-}
 
 interface HistoryItem {
   role: 'user' | 'assistant'
@@ -198,9 +121,11 @@ ${historyCtx}使用者問題：「${question}」
         sql = sql.replace(/^```sql\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/, '').trim()
         sql = sql.replace(/;\s*$/, '').trim()
 
-        const lower = sql.toLowerCase()
-        if (['insert', 'update', 'delete', 'drop', 'truncate', 'alter'].some(k => lower.includes(k))) {
-          send({ type: 'error', message: '不支援修改類型的查詢' })
+        // 第一道：只收單一 SELECT / WITH（擋掉明顯不對的，省一次 DB 往返）
+        // 真正的防線在 DB：chat_query 以唯讀 chat_reader 身分執行，見 runChatQuery 註解
+        // 舊版的關鍵字黑名單會誤殺 updated_at 這類欄名、又擋不住註解變形，已拿掉
+        if (!/^(select|with)\b/i.test(sql) || sql.includes(';')) {
+          send({ type: 'error', message: '只支援查詢類型的問題' })
           controller.close()
           return
         }
@@ -208,7 +133,7 @@ ${historyCtx}使用者問題：「${question}」
         send({ type: 'sql', sql })
 
         // ── Step 2：執行 SQL ─────────────────────────────
-        const { rows: queryRows, error: dbError } = await runQueryRaw(sql)
+        const { rows: queryRows, error: dbError } = await runChatQuery(sql)
 
         let rows: Record<string, unknown>[] = []
         if (dbError) {
@@ -219,15 +144,22 @@ ${historyCtx}使用者問題：「${question}」
           rows = queryRows
         }
 
+        // DB 最多回 CHAT_ROW_CAP + 1 筆：超過代表被截斷，統計只涵蓋前 CHAT_ROW_CAP 筆
+        const truncated = rows.length > CHAT_ROW_CAP
+        if (truncated) rows = rows.slice(0, CHAT_ROW_CAP)
+
+        // 圖表與摘要用完整結果算；送前端的只截前 CLIENT_ROW_LIMIT 筆（逐筆明細可能上萬筆）
         const chart = detectChartConfig(rows)
-        send({ type: 'rows', rows, chart })
+        send({ type: 'rows', rows: rows.slice(0, CLIENT_ROW_LIMIT), total: rows.length, truncated, chart })
 
         // ── Step 3：Streaming 自然語言回答 ──────────────
-        // 傳給 Gemini 的是「摘要 + 前20筆樣本」，不傳全部（避免 token 爆炸）
+        // 傳給 Gemini 的是「摘要 + 樣本」，結果不多時才給全部（避免 token 爆炸）
         const rowSummary = buildRowSummary(rows)
         const answerPrompt = `使用者問題：「${question}」
 
-查詢共回傳 ${rows.length} 筆資料。
+${truncated
+  ? `查詢結果超過 ${CHAT_ROW_CAP} 筆，只取前 ${CHAT_ROW_CAP} 筆，以下統計不代表全部資料；請在回答中說明這點，並建議使用者縮小範圍（例如指定行政區、期間）或改問統計型問題。`
+  : `查詢共回傳 ${rows.length} 筆資料。`}
 ${rowSummary}
 
 ${dbError ? `查詢時發生錯誤：${dbError.message}\n` : ''}
@@ -235,7 +167,8 @@ ${dbError ? `查詢時發生錯誤：${dbError.message}\n` : ''}
 - 必須使用繁體中文，禁止出現簡體字
 - 回答格式以「・」或「－」開頭的條列項目呈現，每點一個重點
 - 金額請加「萬元」單位，數量加「筆」或「件」
-- 數字盡量精確，並標明是平均值或總計
+- 數字盡量精確，並標明是中位數、平均值或總計
+- 價格以中位數為主（平均數容易被整批交易、土地交易等極端值拉高）
 - 若結果為空，請說明可能原因
 - 總結放在最後一條，以「📌 小結：」開頭`
 
