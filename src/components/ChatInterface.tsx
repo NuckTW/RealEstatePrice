@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import dynamic from 'next/dynamic'
-import type { ChartConfig } from '@/app/api/chat/route'
+import { friendlyLabel, valueLabel, type ChartConfig } from '@/lib/chatData'
 import { usePassword, savePassword } from '@/lib/chatPassword'
 
 const ChatChart = dynamic(() => import('./ChatChart'), { ssr: false })
@@ -12,7 +12,9 @@ interface Message {
   role: 'user' | 'assistant'
   content: string
   sql?: string
-  rows?: Record<string, unknown>[]
+  rows?: Record<string, unknown>[]   // server 只送前 CLIENT_ROW_LIMIT 筆
+  totalRows?: number                 // 查詢實際筆數
+  truncated?: boolean                // DB 端超過上限被截斷（實際筆數 > totalRows）
   chart?: ChartConfig | null
   streaming?: boolean
   error?: boolean
@@ -60,12 +62,47 @@ function isNumeric(v: unknown) {
   return typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v)) && v !== '')
 }
 
+/* ── Markdown（輕量版）───────────────────────────────────
+ * Gemini 回答常帶 **粗體**、「- 」條列、「## 」標題，原本用純文字顯示會露出符號。
+ * 只處理這幾種；保持 pre-wrap 讓串流中的游標接在最後一個字後面。
+ * 不解析 HTML（React 會自動 escape），未閉合的 ** 會先原樣顯示，等串流補齊後才變粗體。 */
+function renderInline(text: string, keyPrefix: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*\n]+?\*\*|`[^`\n]+`)/g).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return <strong key={`${keyPrefix}-${i}`} style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+    }
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+      return <code key={`${keyPrefix}-${i}`} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.92em' }}>{part.slice(1, -1)}</code>
+    }
+    return part
+  })
+}
+
+function ChatMarkdown({ text }: { text: string }) {
+  const lines = text.split('\n')
+  return (
+    <>
+      {lines.map((line, i) => {
+        const heading = line.match(/^\s{0,3}#{1,6}\s+(.*)$/)
+        const bullet = line.match(/^(\s*)[-*+]\s+(.*)$/)   // 半形 - * + 條列；全形「－」本來就好讀，不動
+        const content = heading
+          ? <strong style={{ color: 'var(--text-strong)', fontWeight: 600 }}>{renderInline(heading[1], `h${i}`)}</strong>
+          : bullet
+            ? <>{bullet[1]}・ {renderInline(bullet[2], `b${i}`)}</>
+            : /^\s*(-{3,}|\*{3,})\s*$/.test(line) ? null : renderInline(line, `l${i}`)
+        return <span key={i}>{content}{i < lines.length - 1 ? '\n' : ''}</span>
+      })}
+    </>
+  )
+}
+
 /* ── Mini DataTable ─────────────────────────────────────── */
-function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
+function MiniTable({ rows, total, truncated }: { rows: Record<string, unknown>[]; total: number; truncated?: boolean }) {
   const [expanded, setExpanded] = useState(false)
   if (!rows.length) return null
 
   const keys = Object.keys(rows[0])
+  const totalText = `${total.toLocaleString()}${truncated ? '+' : ''}`
   const displayRows = expanded ? rows : rows.slice(0, 5)
   const hasMore = rows.length > 5
 
@@ -74,7 +111,7 @@ function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-2xs)' }}>
         <thead>
           <tr>
-            {keys.map(k => <th key={k} style={thStyle()}>{k}</th>)}
+            {keys.map(k => <th key={k} title={k} style={thStyle()}>{friendlyLabel(k)}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -82,7 +119,7 @@ function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
             <tr key={i} style={{ background: i % 2 === 1 ? 'var(--bg-sunken)' : 'transparent' }}>
               {keys.map(k => (
                 <td key={k} style={tdStyle(isNumeric(row[k]))}>
-                  {row[k] == null ? '—' : String(row[k])}
+                  {row[k] == null ? '—' : typeof row[k] === 'boolean' ? valueLabel(k, row[k]) : String(row[k])}
                 </td>
               ))}
             </tr>
@@ -99,7 +136,11 @@ function MiniTable({ rows }: { rows: Record<string, unknown>[] }) {
             cursor: 'pointer', fontFamily: 'var(--font-sans)',
           }}
         >
-          {expanded ? `▲ 收起（共 ${rows.length} 筆）` : `▼ 顯示全部 ${rows.length} 筆`}
+          {expanded
+            ? `▲ 收起（共 ${totalText} 筆）`
+            : total > rows.length
+              ? `▼ 顯示前 ${rows.length} 筆（共 ${totalText} 筆）`
+              : `▼ 顯示全部 ${rows.length} 筆`}
         </button>
       )}
     </div>
@@ -125,7 +166,8 @@ function MessageBubble({ msg }: {
         }}>南</div>
       )}
 
-      <div style={{ maxWidth: '88%', minWidth: 0 }}>
+      {/* 有圖表時撐滿寬度：泡泡預設隨文字縮放，回答短時圖會被擠得很窄 */}
+      <div style={{ maxWidth: '88%', minWidth: 0, width: !isUser && msg.chart ? '88%' : undefined }}>
         {/* Main bubble */}
         <div style={{
           padding: '11px 15px',
@@ -146,7 +188,7 @@ function MessageBubble({ msg }: {
           })
         }}>
           <div style={{ whiteSpace: 'pre-wrap' }}>
-            {msg.content}
+            {isUser ? msg.content : <ChatMarkdown text={msg.content} />}
             {msg.streaming && (
               <span style={{
                 display: 'inline-block', width: 2, height: '1em',
@@ -163,7 +205,7 @@ function MessageBubble({ msg }: {
 
           {/* Data table (when no chart, but has rows) */}
           {!isUser && !msg.chart && msg.rows && msg.rows.length > 0 && (
-            <MiniTable rows={msg.rows} />
+            <MiniTable rows={msg.rows} total={msg.totalRows ?? msg.rows.length} truncated={msg.truncated} />
           )}
 
         </div>
@@ -174,7 +216,7 @@ function MessageBubble({ msg }: {
             marginTop: 4, fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
             fontFamily: 'var(--font-sans)', paddingLeft: 2,
           }}>
-            {msg.rows.length} 筆資料
+            {(msg.totalRows ?? msg.rows.length).toLocaleString()}{msg.truncated ? '+' : ''} 筆資料
             {msg.chart ? `　${msg.chart.type === 'bar' ? '▦' : '〜'} 已視覺化` : ''}
           </div>
         )}
@@ -287,6 +329,8 @@ export default function ChatInterface() {
             case 'rows':
               updateLast(() => ({
                 rows: event.rows as Record<string, unknown>[],
+                totalRows: (event.total as number | undefined) ?? (event.rows as unknown[]).length,
+                truncated: event.truncated === true,
                 chart: (event.chart as ChartConfig | null) ?? null,
               }))
               break

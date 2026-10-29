@@ -57,7 +57,7 @@ flowchart TB
 |------|------|
 | 資料來源 | 實價登錄（成屋＋預售屋）每 10 天更新一批；公會開放資料含建照/使照（月）與新建餘屋（季）；價格指數為官方研究報告靜態資料（基期 110 年 1 月 = 100） |
 | 排程管線 | 兩條 GitHub Actions 排程獨立執行，皆透過 `SUPABASE_SERVICE_ROLE_KEY`（repo secret）寫入；所有寫入採 upsert 去重，重複執行不會產生重複資料 |
-| 資料庫 | 應用層只透過 `execute_query` RPC 查詢（僅允許 SELECT）；DDL 一律手動在 Supabase SQL Editor 執行，migration 檔存放於 `supabase/migrations/` |
+| 資料庫 | 應用層只透過 `execute_query` RPC 查詢（僅允許 SELECT，只開放給 service role）；AI 問答由 LLM 產生的 SQL 改走 `chat_query`（以唯讀 `chat_reader` 身分執行、只能讀 transactions 與統計 view、8 秒逾時）；DDL 一律手動在 Supabase SQL Editor 執行，migration 檔存放於 `supabase/migrations/` |
 | 應用層 | 查詢邏輯集中在 `src/lib/queries/`（依領域分檔），篩選條件解析共用 `src/lib/filters.ts`；查詢結果以 SQL 字串為 key 快取 1 小時（資料每月僅更新數次，不影響時效） |
 | 部署 | GitHub push 至 main 即觸發 Vercel 自動部署 |
 
