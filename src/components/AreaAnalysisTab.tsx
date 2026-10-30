@@ -53,6 +53,7 @@ export default function AreaAnalysisTab({ filters }: Props) {
     if (filters.types.length     > 0) p.set('types',     filters.types.join(','))
     if (filters.rooms.length     > 0) p.set('rooms',     filters.rooms.join(','))
     if (filters.districts.length > 0) p.set('districts', filters.districts.join(','))
+    if (filters.zones.length     > 0) p.set('zones',     filters.zones.join(','))
 
     fetch(`/api/map?${p}`)
       .then(r => r.json())
