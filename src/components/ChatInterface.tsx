@@ -226,7 +226,8 @@ function MessageBubble({ msg }: {
 }
 
 /* ── Main Component ─────────────────────────────────────── */
-export default function ChatInterface() {
+/** height：獨立頁面用固定 640；放進 AI 抽屜時傳 '100%' 填滿抽屜 */
+export default function ChatInterface({ height = 640 }: { height?: number | string } = {}) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -376,13 +377,13 @@ export default function ChatInterface() {
   }
 
   // 尚未載入 localStorage 前先不渲染，避免密碼閘閃一下
-  if (password === null) return <div style={{ height: 640 }} />
+  if (password === null) return <div style={{ height }} />
 
   if (!password) {
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: 640, gap: 14, padding: 24,
+        height, gap: 14, padding: 24,
         background: 'var(--surface-card)',
         border: '1px solid var(--border-card)',
         borderRadius: 'var(--radius-xl)',
@@ -432,7 +433,7 @@ export default function ChatInterface() {
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', height: 640,
+      display: 'flex', flexDirection: 'column', height,
       background: 'var(--surface-card)',
       border: '1px solid var(--border-card)',
       borderRadius: 'var(--radius-xl)',

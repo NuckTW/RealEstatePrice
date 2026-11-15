@@ -119,7 +119,17 @@
   /* 控制項高度跟著字級縮放，避免字級放大後文字撐破固定高度的圓角按鈕/下拉選單 */
   --control-h-sm: calc(28px * var(--font-scale)); --control-h-md: calc(32px * var(--font-scale));
   --pad-card: 16px; --nav-h: 56px;
+  /* 改版 shell：篩選列高度、手機底部 tab bar 高度（桌機為 0） */
+  --chips-h: 48px;
+  --tabbar-h: 0px;
 }
+
+@media (max-width: 767px) {
+  :root { --nav-h: 52px; --chips-h: 50px; --tabbar-h: calc(58px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* 頁面內容區：手機要讓出底部 tab bar 的空間 */
+.tra-page { padding-bottom: var(--tabbar-h); }
 
 /* ── Light theme ──────────────────────────────────────────────── */
 :root[data-theme="light"] {

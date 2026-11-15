@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, CSSProperties } from 'react'
 import { ZONES, findZone, zoneLabel } from '@/lib/zones'
 
-const TAINAN_DISTRICTS = [
+export const TAINAN_DISTRICTS = [
   '中西區','東區','南區','北區','安平區','安南區',
   '永康區','歸仁區','新化區','左鎮區','玉井區','楠西區',
   '南化區','仁德區','關廟區','龍崎區','官田區','麻豆區',
@@ -12,7 +12,7 @@ const TAINAN_DISTRICTS = [
   '柳營區','鹽水區','善化區','大內區','山上區','新市區','安定區',
 ]
 
-const TYPE_OPTIONS = [
+export const TYPE_OPTIONS = [
   { label: '住宅大樓', value: '住宅大樓' },
   { label: '透天厝',   value: '透天厝' },
   { label: '公寓',     value: '公寓' },
@@ -20,26 +20,26 @@ const TYPE_OPTIONS = [
   { label: '套房',     value: '套房' },
   { label: '辦公商業', value: '辦公' },
 ]
-const ROOMS_OPTIONS = [
+export const ROOMS_OPTIONS = [
   { label: '0房', value: '0' }, { label: '1房', value: '1' },
   { label: '2房', value: '2' }, { label: '3房', value: '3' },
   { label: '4房', value: '4' }, { label: '5房以上', value: '5+' },
 ]
 /** 年份選項：民國 110 年（資料起點）到 maxYear，跨年後自動多一個選項，不用再改程式 */
-function rocYearOptions(maxYear: number) {
+export function rocYearOptions(maxYear: number) {
   return Array.from({ length: Math.max(maxYear, 110) - 110 + 1 }, (_, i) => {
     const y = 110 + i; return { label: `${y}年`, value: String(y) }
   })
 }
-const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
+export const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => ({
   label: `${i + 1}月`, value: String(i + 1),
 }))
-const PRESALE_OPTIONS = [
+export const PRESALE_OPTIONS = [
   { label: '成屋 + 預售', value: 'all' },
   { label: '成屋',        value: 'false' },
   { label: '預售屋',      value: 'true' },
 ]
-const BUILDING_AGE_OPTIONS = [
+export const BUILDING_AGE_OPTIONS = [
   { label: '不限屋齡', value: 'all' },
   { label: '5年以內',  value: '5' },
   { label: '10年以內', value: '10' },
@@ -204,7 +204,7 @@ export function MultiSelect({ label, options, selected, onChange, placeholder }:
 }
 
 /* ── District multi-select ────────────────────────────────────── */
-function DistrictSelect({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+export function DistrictSelect({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -283,7 +283,7 @@ function DistrictSelect({ selected, onChange }: { selected: string[]; onChange: 
 }
 
 /* ── Zone multi-select（重劃區／生活圈，每項附涵蓋路段） ─────────── */
-function ZoneSelect({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
+export function ZoneSelect({ selected, onChange }: { selected: string[]; onChange: (v: string[]) => void }) {
   const [open, setOpen] = useState(false)
   // 下拉面板寬度與左移量：手機上按鈕常在畫面右半，面板貼齊按鈕左緣會超出螢幕，打開時量一次往左推
   const [panel, setPanel] = useState({ width: 280, shift: 0 })

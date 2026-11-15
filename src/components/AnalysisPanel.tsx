@@ -247,19 +247,28 @@ function YearMonthRange({
 }
 
 /* ── Main ────────────────────────────────────────────────── */
-export default function AnalysisPanel() {
+/** 市場頁傳入的起始條件（來自全站篩選列）；之後在面板內調整不會回寫篩選列 */
+export interface AnalysisInitial {
+  districts?: string[]
+  yearFrom?: number; monthFrom?: number
+  yearTo?: number;   monthTo?: number
+  mode?: 'all' | 'presale' | 'existing'
+}
+
+export default function AnalysisPanel({ initial }: { initial?: AnalysisInitial } = {}) {
   const [metric,      setMetric]      = useState('unit_price')
   const [stat,        setStat]        = useState<'avg' | 'max' | 'min'>('avg')
   const [granularity, setGranularity] = useState('quarter')
   const [chartType,   setChartType]   = useState<ChartType>('line')
-  const [mode, setMode] = useState('all')  // 'all' | 'presale' | 'existing'
+  const [mode, setMode] = useState<string>(initial?.mode ?? 'all')  // 'all' | 'presale' | 'existing' | 'split'
   const [buildingType, setBuildingType] = useState('')
   const [roomType,     setRoomType]     = useState('')
-  const [yearFrom,    setYearFrom]    = useState(110)
-  const [monthFrom,   setMonthFrom]   = useState(1)
-  const [yearTo,      setYearTo]      = useState(115)
-  const [monthTo,     setMonthTo]     = useState(12)
-  const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
+  const [yearFrom,    setYearFrom]    = useState(initial?.yearFrom ?? 110)
+  const [monthFrom,   setMonthFrom]   = useState(initial?.monthFrom ?? 1)
+  const [yearTo,      setYearTo]      = useState(initial?.yearTo ?? 115)
+  const [monthTo,     setMonthTo]     = useState(initial?.monthTo ?? 12)
+  // 數據分析最多比較 6 區；沒指定時由 API 自動取交易量前 5 名
+  const [selectedDistricts, setSelectedDistricts] = useState<string[]>((initial?.districts ?? []).slice(0, 6))
   const [yMin, setYMin] = useState('')
   const [yMax, setYMax] = useState('')
   const [data,    setData]    = useState<AnalysisData | null>(null)
