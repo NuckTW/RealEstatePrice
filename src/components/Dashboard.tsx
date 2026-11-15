@@ -3,18 +3,22 @@
 import { useState, useEffect, useCallback, useMemo , useRef } from 'react'
 import dynamic from 'next/dynamic'
 import FilterBar, { FilterValues, buildDefaultFilters, ActiveFilterTags } from './FilterBar'
-import KpiBar, { DateBadge } from './KpiBar'
+import KpiBar, { DateBadge, type KpiData } from './KpiBar'
 import DataTable, { ColDef } from './DataTable'
 import CaseDetailPanel from './CaseDetailPanel'
 import TransactionTable from './TransactionTable'
+import type { TrendRow } from './KpiTrend'
 
 // 動態 import 避免 SSR（Leaflet 需要 window）
 const MapView = dynamic(() => import('./MapView'), { ssr: false, loading: () => (
-  <div className="w-full rounded-2xl bg-[#0d1420] border border-white/6 flex items-center justify-center" style={{height: 'calc(100dvh - 260px)', minHeight: 480}}>
-    <span className="text-gray-600 text-sm">地圖載入中…</span>
+  <div className="w-full rounded-2xl flex items-center justify-center"
+    style={{ height: 'calc(100dvh - 260px)', minHeight: 480, background: 'var(--bg-sunken)', border: '1px solid var(--border-card)' }}>
+    <span style={{ color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>地圖載入中…</span>
   </div>
 ) })
 const AreaAnalysisTab = dynamic(() => import('./AreaAnalysisTab'), { ssr: false })
+// 量價走勢小圖（recharts，比照其他圖表元件用 ssr:false 載入）
+const KpiTrend = dynamic(() => import('./KpiTrend'), { ssr: false })
 
 /* ── Column definitions ────────────────────────────────────── */
 // Brass & Clay series colours
@@ -94,19 +98,12 @@ function getCasesCols(presale: string): ColDef[] {
 
 /* ── Types ─────────────────────────────────────────────────── */
 interface ChartData {
-  kpi: {
-    total?: number
-    avg_unit_price?: number
-    avg_parking?: number
-    parking_count?: number
-    avg_area?: number
-    avg_total?: number
-    total_sales?: number
-  }
+  kpi: KpiData
   districts: Record<string, unknown>[]
   types:     Record<string, unknown>[]
   rooms:     Record<string, unknown>[]
   cases:     Record<string, unknown>[]
+  trend?:    TrendRow[]
 }
 
 /* ── Skeleton ──────────────────────────────────────────────── */
@@ -217,11 +214,12 @@ export default function Dashboard({ lastDate }: {
   const [panelOpen, setPanelOpen]         = useState(false)
   const [panelCase, setPanelCase]         = useState<{ name: string; district: string; caseType: 'presale' | 'existing' } | null>(null)
 
-  // 個案統計卡片：實價登錄明細（預設）／個案排行 雙 tab；不需寫進 URL
-  const [caseSubTab, setCaseSubTab] = useState<'transactions' | 'ranking'>('transactions')
+  // 個案統計卡片：個案排行（預設）／實價登錄明細 雙 tab；不需寫進 URL。
+  // 先給彙總、再給逐筆明細（明細屬於下鑽層級，不該佔首屏）
+  const [caseSubTab, setCaseSubTab] = useState<'transactions' | 'ranking'>('ranking')
 
-  // 統計總覽（行政區／類型／房型）可摺疊區塊，預設收合
-  const [statsExpanded, setStatsExpanded] = useState(false)
+  // 統計總覽（行政區／類型／房型）可摺疊區塊，預設展開
+  const [statsExpanded, setStatsExpanded] = useState(true)
 
   // 資料最新交易日（用於 KPI 補登警示），與篩選條件無關；改由 server 端傳入，不再另打 /api/meta
   const lastDataDate = lastDate
@@ -302,8 +300,9 @@ export default function Dashboard({ lastDate }: {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-app)' }}>
-      {/* 地圖／框選模式改動即套用；value 讓刪標籤與 URL 還原同步回篩選列 */}
-      <FilterBar onApply={handleApply} loading={loading} autoApply={activeTab !== 'data'} value={filters} defaults={defaults} />
+      {/* 所有子分頁一律改動即套用（原本數據看板要按「套用」，與地圖行為不一致）；
+          value 讓刪標籤與 URL 還原同步回篩選列 */}
+      <FilterBar onApply={handleApply} loading={loading} autoApply value={filters} defaults={defaults} />
 
       {/* Tab 切換。條件膠囊（期間 + 篩選標籤）跟 tab 同列：兩者都是「目前看的是什麼」，
           另起一行會多吃一段垂直空間，也讓人以為是不同層級的資訊。 */}
@@ -355,29 +354,7 @@ export default function Dashboard({ lastDate }: {
       {/* ── 地圖 tab ── */}
       {activeTab === 'map' && (
         <div className="px-5 pt-3 pb-6">
-          <div className="px-0 pt-1 pb-2" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {/* 成／預售快速切換（房仲最常用的篩選，直接放地圖上方） */}
-            <div style={{ display: 'inline-flex', gap: 2, background: 'var(--surface-control)', border: '1px solid var(--border-control)', borderRadius: 'var(--radius-full)', padding: 2 }}>
-              {([
-                { v: 'true',  l: '預售屋' },
-                { v: 'false', l: '成屋' },
-                { v: 'all',   l: '全部' },
-              ] as const).map(o => (
-                <button
-                  key={o.v}
-                  onClick={() => handleApply({ ...filters, presale: o.v })}
-                  style={{
-                    padding: '3px 12px', borderRadius: 'var(--radius-full)', border: 'none',
-                    fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', cursor: 'pointer',
-                    fontWeight: filters.presale === o.v ? 'var(--weight-semibold)' : 'var(--weight-regular)',
-                    background: filters.presale === o.v ? 'var(--accent)' : 'transparent',
-                    color: filters.presale === o.v ? 'var(--on-accent)' : 'var(--text-muted)',
-                    transition: 'var(--transition-base)',
-                  }}
-                >{o.l}</button>
-              ))}
-            </div>
-          </div>
+          {/* 原本這裡有一組「預售屋／成屋／全部」快速切換，與篩選列的「成／預售」重複，已移除，只留篩選列一處 */}
           <MapView
             filters={filters}
             onCaseClick={(name, caseType, district) => {
@@ -412,16 +389,23 @@ export default function Dashboard({ lastDate }: {
               {/* KPI */}
               <KpiBar data={data.kpi} showBackfillWarning={showBackfillWarning} />
 
+              {/* 量價走勢：補上 KPI 最缺的「時間」維度（是漲是跌、量能如何） */}
+              {data.trend && data.trend.length > 1 && (
+                <div style={{ padding: '0 20px 14px' }}>
+                  <KpiTrend rows={data.trend} lastDataDate={lastDataDate} />
+                </div>
+              )}
+
               {/* Divider */}
               <div style={{ margin: '0 20px 16px', height: 1, background: 'var(--border-card)' }} />
 
               <div className="px-5 space-y-4">
-                {/* 實價登錄明細／個案排行：雙 tab 卡片，緊接在 KPI 之下 */}
+                {/* 個案排行／實價登錄明細：雙 tab 卡片，緊接在走勢圖之下 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {([
-                      { id: 'transactions' as const, label: '實價登錄明細' },
                       { id: 'ranking'      as const, label: '個案排行' },
+                      { id: 'transactions' as const, label: '實價登錄明細' },
                     ]).map(tab => {
                       const active = caseSubTab === tab.id
                       return (

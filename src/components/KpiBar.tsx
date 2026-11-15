@@ -1,4 +1,4 @@
-interface KpiData {
+export interface KpiData {
   total?: number
   avg_unit_price?: number
   avg_area?: number
@@ -6,46 +6,73 @@ interface KpiData {
   avg_parking?: number
   parking_count?: number
   total_sales?: number
+  // 中位數與實際納入筆數（統一口徑：首頁預設看中位數，平均數放小字對照）
+  median_unit_price?: number
+  median_area?: number
+  median_total?: number
+  median_parking?: number
+  unit_price_n?: number
+  area_n?: number
+  total_price_n?: number
 }
 
-const CARDS = [
+type NumKey = keyof KpiData
+
+interface CardDef {
+  key: NumKey          // 主數字（中位數）
+  avgKey?: NumKey      // 小字對照的平均數；中位數欄位缺漏時也拿它當主數字
+  nKey?: NumKey        // 納入計算的筆數
+  label: string
+  icon: string
+  format: (v: number) => string
+  unit: string
+  tone: string
+}
+
+const CARDS: CardDef[] = [
   {
-    key: 'total' as const,
+    key: 'total',
     label: '成交戶數', icon: '◳',
-    format: (v: number) => v.toLocaleString(),
+    format: v => v.toLocaleString(),
     unit: '戶', tone: 'var(--series-1)',
   },
   {
-    key: 'avg_unit_price' as const,
-    label: '均單價', icon: '◰',
-    format: (v: number) => String(v),
+    key: 'median_unit_price', avgKey: 'avg_unit_price', nKey: 'unit_price_n',
+    label: '中位單價', icon: '◰',
+    format: v => String(v),
     unit: '萬/坪', tone: 'var(--series-3)',
   },
   {
-    key: 'avg_area' as const,
-    label: '均坪數', icon: '◆',
-    format: (v: number) => String(v),
+    key: 'median_area', avgKey: 'avg_area', nKey: 'area_n',
+    label: '中位坪數', icon: '◆',
+    format: v => String(v),
     unit: '坪', tone: 'var(--series-6)',
   },
   {
-    key: 'avg_total' as const,
-    label: '均總價', icon: '◆',
-    format: (v: number) => v.toLocaleString(),
+    key: 'median_total', avgKey: 'avg_total', nKey: 'total_price_n',
+    label: '中位總價', icon: '◆',
+    format: v => v.toLocaleString(),
     unit: '萬', tone: 'var(--clay-400)',
   },
   {
-    key: 'avg_parking' as const,
-    label: '均車位價', icon: '◲',
-    format: (v: number) => v.toLocaleString(),
+    key: 'median_parking', avgKey: 'avg_parking', nKey: 'parking_count',
+    label: '中位車位價', icon: '◲',
+    format: v => v.toLocaleString(),
     unit: '萬', tone: 'var(--series-4)',
   },
   {
-    key: 'total_sales' as const,
+    key: 'total_sales',
     label: '總銷售額', icon: '▦',
-    format: (v: number) => v.toLocaleString(),
+    format: v => v.toLocaleString(),
     unit: '億', tone: 'var(--series-8)',
   },
 ]
+
+/** 卡片底部小字樣式 */
+const footStyle = {
+  fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
+  fontFamily: 'var(--font-sans)', lineHeight: 1.4,
+} as const
 
 /**
  * 期間膠囊。從 KpiBar 抽出來獨立匯出，讓 Dashboard 能把它與
@@ -87,8 +114,11 @@ export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; s
         gap: 8,
       }}>
         {CARDS.map(card => {
-          const raw = data[card.key]
+          // 中位數欄位缺漏（舊版 API 快取）時退回平均數，避免整張卡變 0
+          const raw = data[card.key] ?? (card.avgKey ? data[card.avgKey] : undefined)
           const value = raw != null ? raw : 0
+          const avg = card.avgKey ? data[card.avgKey] : undefined
+          const n = card.nKey ? data[card.nKey] : undefined
           return (
             <div
               key={card.key}
@@ -137,24 +167,24 @@ export default function KpiBar({ data, showBackfillWarning }: { data: KpiData; s
                 }}>{card.unit}</span>
               </div>
 
-              {/* 均車位價的分母與其他卡不同：只計「有拆出車位價」的交易。
-                  多數交易的車位價併入房價未拆分，不標註會讓人以為是全體平均。 */}
-              {card.key === 'avg_parking' && data.parking_count != null && data.total ? (
-                <span style={{
-                  fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
-                  fontFamily: 'var(--font-sans)', lineHeight: 1.4,
-                }}>
+              {/* 車位價的分母與其他卡不同：只計「有拆出車位價」的交易。
+                  多數交易的車位價併入房價未拆分，不標註會讓人以為是全體統計。 */}
+              {card.key === 'median_parking' && data.parking_count != null && data.total ? (
+                <span style={footStyle}>
                   僅計 {data.parking_count.toLocaleString()} 筆有拆出車位價者
                   （{Math.round(data.parking_count / data.total * 100)}%）
+                  {avg != null ? ` · 平均 ${card.format(avg)}` : ''}
+                </span>
+              ) : card.nKey && n != null ? (
+                // 其他中位數卡：標示納入筆數 n 與平均數，讓使用者知道口徑
+                <span style={footStyle}>
+                  n={n.toLocaleString()}{avg != null ? ` · 平均 ${card.format(avg)}` : ''}
                 </span>
               ) : null}
 
               {/* 補登警示：只在「成交戶數」卡片、且迄月落在最新資料月往前 2 個月內才顯示 */}
               {card.key === 'total' && showBackfillWarning && (
-                <span style={{
-                  fontSize: 'var(--text-3xs)', color: 'var(--text-faint)',
-                  fontFamily: 'var(--font-sans)', lineHeight: 1.4,
-                }}>
+                <span style={footStyle}>
                   最近 2 個月仍在補登，戶數會被低估
                 </span>
               )}

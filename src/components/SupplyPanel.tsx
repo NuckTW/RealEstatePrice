@@ -57,7 +57,7 @@ export default function SupplyPanel() {
     <div style={{ padding: '12px 20px 0', display: 'flex', flexDirection: 'column', gap: 14, fontFamily: 'var(--font-sans)' }}>
 
       <div style={cardStyle()}>
-        {sectionTitle('建照／使照核發量 × 實價登錄成交量', '建照為供給領先指標，使照反映完工交屋；疊上成交量觀察供需是否平衡（民國年月）')}
+        {sectionTitle('建照／使照核發量 × 實價登錄成交量', '建照為供給領先指標，使照反映完工交屋；疊上成交量觀察供需是否平衡（民國年月）。114/12 公會來源發布值全為 0，視為缺資料不畫；斜線底為實價登錄補登中月份')}
         <PermitTxChart rows={data.permits} />
       </div>
 

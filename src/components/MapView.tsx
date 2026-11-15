@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type * as L from 'leaflet'
 import { FilterValues } from './FilterBar'
 import { priceToColor } from '@/lib/colorScale'
@@ -28,6 +28,37 @@ interface Marker {
 
 /** 熱力圖單價標籤只在此 zoom 以上顯示（縮遠時 1,500+ 標籤會疊成一團） */
 const HEAT_LABEL_MIN_ZOOM = 13
+
+/** 成屋標記色（成屋不依單價上色，固定一色與預售區分） */
+const EXISTING_COLOR = '#14b8a6'
+
+/** 中位數（輸入需已排序） */
+function medianOf(sorted: number[]): number {
+  const n = sorted.length
+  if (!n) return 0
+  return n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2
+}
+
+/** 依底色亮度決定上面文字用深色或白色（黃色底配白字會看不清） */
+function textOn(color: string): string {
+  let r = 0, g = 0, b = 0
+  const rgb = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+  if (rgb) { r = +rgb[1]; g = +rgb[2]; b = +rgb[3] }
+  else if (/^#[0-9a-f]{6}$/i.test(color)) {
+    r = parseInt(color.slice(1, 3), 16); g = parseInt(color.slice(3, 5), 16); b = parseInt(color.slice(5, 7), 16)
+  }
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.6 ? '#1a1206' : '#ffffff'
+}
+
+/** 地圖浮層共用樣式：跟著站上主題 token 走（原本寫死深藍色，亮色模式下很突兀） */
+const overlayStyle: CSSProperties = {
+  background: 'color-mix(in srgb, var(--surface-overlay) 94%, transparent)',
+  border: '1px solid var(--border-control)',
+  color: 'var(--text-muted)',
+  boxShadow: 'var(--shadow-pop)',
+  fontSize: 'var(--text-xs)',
+}
 
 /** 'YYYY-MM' → '115/05'（民國年月） */
 function rocMonth(ym?: string | null): string {
@@ -82,6 +113,14 @@ export default function MapView({ filters, onCaseClick }: Props) {
   const [count, setCount]     = useState(0)
   const [presaleRange, setPresaleRange] = useState<[number, number]>([0, 0])
   const [viewMode, setViewMode] = useState<'marker' | 'heat'>('marker')
+  // 操作提示：滾輪沒按 Ctrl／觸控只用一指時，告訴使用者怎麼縮放（不再劫持整頁捲動）
+  const [hint, setHint] = useState<null | 'wheel' | 'touch'>(null)
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showHint = (kind: 'wheel' | 'touch') => {
+    setHint(kind)
+    if (hintTimer.current) clearTimeout(hintTimer.current)
+    hintTimer.current = setTimeout(() => setHint(null), 1400)
+  }
 
   // loadMarkers 移到兩個會呼叫它的 effect 之前宣告 —— react-hooks 的新規則要求「用到的函式
   // 必須先於使用處被宣告」（原本放在檔案後段雖然因 function 宣告會 hoist、執行時沒問題，
@@ -186,13 +225,34 @@ export default function MapView({ filters, onCaseClick }: Props) {
         map.on('zoomend', syncLabels)
         zoomHandlerRef.current = syncLabels
       } else {
+        // 每個 Leaflet 標記對應的原始資料，群集圖示要靠它算子標記的中位單價
+        const dataOf = new WeakMap<L.Marker, Marker>()
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const cluster = (Lx as any).markerClusterGroup({
           maxClusterRadius: 60,
-          iconCreateFunction: (c: { getChildCount: () => number }) => Lx.divIcon({
-            html: `<div class="map-cluster">${c.getChildCount()}</div>`,
-            className: '', iconSize: Lx.point(40, 40),
-          }),
+          // 群集依「子標記中的預售中位單價」上色、圓內顯示該單價，與圖例色階一致；
+          // 全是成屋（無預售單價）的群集用成屋色、只顯示棟數
+          iconCreateFunction: (c: { getChildCount: () => number; getAllChildMarkers: () => L.Marker[] }) => {
+            const n = c.getChildCount()
+            const prices = c.getAllChildMarkers()
+              .map(mk => dataOf.get(mk))
+              .filter((d): d is Marker => !!d && d.case_type === '預售' && d.unit_price > 0)
+              .map(d => d.unit_price)
+              .sort((a, b) => a - b)
+            if (!prices.length) {
+              return Lx.divIcon({
+                html: `<div class="map-cluster" style="background:${EXISTING_COLOR};color:#fff"><b>${n}</b></div>`,
+                className: '', iconSize: Lx.point(40, 40),
+              })
+            }
+            const med   = medianOf(prices)
+            const color = priceToColor(med, presaleMin, presaleMax)
+            return Lx.divIcon({
+              html: `<div class="map-cluster" style="background:${color};color:${textOn(color)}" title="預售中位單價 ${med.toFixed(1)} 萬/坪 · ${n} 棟"><b>${med.toFixed(1)}</b><span>${n}</span></div>`,
+              className: '', iconSize: Lx.point(46, 46),
+            })
+          },
         }) as L.LayerGroup
 
         clusterRef.current = cluster
@@ -200,8 +260,8 @@ export default function MapView({ filters, onCaseClick }: Props) {
         markers.forEach(m => {
           const isPresale = m.case_type === '預售'
           const color     = isPresale
-            ? (m.unit_price > 0 ? priceToColor(m.unit_price, presaleMin, presaleMax) : '#8b5cf6')
-            : '#14b8a6'
+            ? (m.unit_price > 0 ? priceToColor(m.unit_price, presaleMin, presaleMax) : '#cda86a')
+            : EXISTING_COLOR
           const price     = m.unit_price ? `${m.unit_price}萬/坪` : '—'
 
           const icon = Lx.divIcon({
@@ -209,9 +269,9 @@ export default function MapView({ filters, onCaseClick }: Props) {
             className: '', iconSize: Lx.point(72, 28), iconAnchor: Lx.point(36, 14),
           })
 
-          Lx.marker([m.lat, m.lon], { icon })
-            .bindPopup(buildPopup(m, color))
-            .addTo(cluster)
+          const mk = Lx.marker([m.lat, m.lon], { icon }).bindPopup(buildPopup(m, color))
+          dataOf.set(mk, m)
+          mk.addTo(cluster)
         })
 
         map.addLayer(cluster)
@@ -257,8 +317,33 @@ export default function MapView({ filters, onCaseClick }: Props) {
         shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       })
 
-      const map = Lx.map(mapRef.current!, { zoomControl: true }).setView([23.0, 120.2], 11)
+      // 觸控裝置：單指留給整頁捲動，兩指才移動／縮放地圖（關掉 dragging 後，
+      // Leaflet 的 touchZoom 仍會跟著兩指中心點平移）
+      const coarse = window.matchMedia('(pointer: coarse)').matches
+      const map = Lx.map(mapRef.current!, {
+        zoomControl: true,
+        scrollWheelZoom: false,   // 預設不吃滾輪，避免捲頁面時被地圖攔截；按住 Ctrl/⌘ 才縮放
+        dragging: !coarse,
+      }).setView([23.0, 120.2], 11)
       mapInst.current = map
+
+      const container = map.getContainer()
+      // capture 階段先判斷修飾鍵：有按 Ctrl/⌘（含 Mac 觸控板雙指捏合）才交給 Leaflet 縮放，
+      // 並擋掉瀏覽器的整頁縮放；沒按就讓頁面正常捲動、顯示提示
+      container.addEventListener('wheel', (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault()
+          if (!map.scrollWheelZoom.enabled()) map.scrollWheelZoom.enable()
+        } else {
+          if (map.scrollWheelZoom.enabled()) map.scrollWheelZoom.disable()
+          showHint('wheel')
+        }
+      }, { capture: true, passive: false })
+      if (coarse) {
+        container.addEventListener('touchstart', (e: TouchEvent) => {
+          if (e.touches.length === 1) showHint('touch')
+        }, { passive: true })
+      }
 
       Lx.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
@@ -302,42 +387,52 @@ export default function MapView({ filters, onCaseClick }: Props) {
       <div ref={mapRef} className="w-full h-full rounded-2xl overflow-hidden" />
 
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#080d16]/60 rounded-2xl z-[1000]">
-          <div className="flex items-center gap-2 text-gray-300" style={{ fontSize: 'var(--text-sm)' }}>
-            <span className="w-4 h-4 border border-gray-600 border-t-violet-400 rounded-full animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-[1000]"
+          style={{ background: 'color-mix(in srgb, var(--bg-app) 55%, transparent)' }}>
+          <div className="flex items-center gap-2" style={{ ...overlayStyle, fontSize: 'var(--text-sm)', borderRadius: 999, padding: '6px 14px', color: 'var(--text-default)' }}>
+            <span className="w-4 h-4 rounded-full animate-spin" style={{ border: '1.5px solid var(--border-strong)', borderTopColor: 'var(--accent)' }} />
             載入地圖資料…
           </div>
         </div>
       )}
 
       {/* left-14 避開 Leaflet zoom 控制鈕（避免蓋住 +/- 造成點不到） */}
-      <div className="absolute top-3 left-14 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full p-1 flex gap-1"
-        style={{ fontSize: 'var(--text-xs)' }}>
-        <button
-          onClick={() => setViewMode('marker')}
-          className={`px-3 py-1 rounded-full transition-colors ${viewMode === 'marker' ? 'bg-amber-500/90 text-[#0d1420] font-medium' : 'text-gray-400 hover:text-gray-200'}`}
-        >
-          標記
-        </button>
-        <button
-          onClick={() => setViewMode('heat')}
-          className={`px-3 py-1 rounded-full transition-colors ${viewMode === 'heat' ? 'bg-amber-500/90 text-[#0d1420] font-medium' : 'text-gray-400 hover:text-gray-200'}`}
-        >
-          熱力圖（預售屋）
-        </button>
+      <div className="absolute top-3 left-14 z-[1000] rounded-full p-1 flex gap-1" style={overlayStyle}>
+        {([
+          { v: 'marker', l: '標記' },
+          { v: 'heat',   l: '熱力圖（預售屋）' },
+        ] as const).map(o => (
+          <button
+            key={o.v}
+            onClick={() => setViewMode(o.v)}
+            className="px-3 py-1 rounded-full transition-colors"
+            style={viewMode === o.v
+              ? { background: 'var(--accent)', color: 'var(--on-accent)', fontWeight: 600 }
+              : { background: 'transparent', color: 'var(--text-muted)' }}
+          >
+            {o.l}
+          </button>
+        ))}
       </div>
 
       {!loading && (
-        <div className="absolute top-3 right-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-full px-3 py-1 text-gray-400"
-          style={{ fontSize: 'var(--text-xs)' }}>
+        <div className="absolute top-3 right-3 z-[1000] rounded-full px-3 py-1" style={overlayStyle}>
           {count.toLocaleString()} 棟
         </div>
       )}
 
-      <div className="absolute bottom-6 left-3 z-[1000] bg-[#0d1420]/90 border border-white/10 rounded-xl px-3 py-2 text-gray-400 flex flex-col gap-1.5"
-        style={{ fontSize: 'var(--text-xs)' }}>
+      {/* 操作提示：不劫持頁面捲動後，告訴使用者怎麼縮放地圖 */}
+      {hint && (
+        <div className="absolute inset-x-0 top-1/2 z-[1001] flex justify-center pointer-events-none" style={{ transform: 'translateY(-50%)' }}>
+          <div className="rounded-full px-4 py-2" style={{ ...overlayStyle, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>
+            {hint === 'wheel' ? '按住 Ctrl（Mac 為 ⌘）再捲動滾輪即可縮放地圖' : '用兩指移動或縮放地圖'}
+          </div>
+        </div>
+      )}
+
+      <div className="absolute bottom-6 left-3 z-[1000] rounded-xl px-3 py-2 flex flex-col gap-1.5" style={{ ...overlayStyle, maxWidth: 'calc(100% - 24px)' }}>
         <div className="flex flex-col gap-0.5">
-          <span>預售屋單價（萬/坪，{viewMode === 'heat' ? '熱力強度' : '標記顏色'}）</span>
+          <span>預售屋單價（萬/坪，{viewMode === 'heat' ? '熱力強度' : '標記與群集顏色'}）</span>
           <div className="flex items-center gap-1.5">
             <span>{presaleRange[0] || '—'}</span>
             <span
@@ -348,8 +443,15 @@ export default function MapView({ filters, onCaseClick }: Props) {
           </div>
         </div>
         {viewMode === 'marker' && (
-          <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-teal-500" />成屋</div>
+          <>
+            <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)' }}>群集圓內：上＝預售中位單價，下＝棟數</span>
+            <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: EXISTING_COLOR }} />成屋</div>
+          </>
         )}
+        {/* 座標是以路名 geocode，同一條路共用一點；必須明講，否則使用者會把標記當成建案位置 */}
+        <span style={{ fontSize: 'var(--text-3xs)', color: 'color-mix(in srgb, var(--warning) 50%, var(--text-strong))', lineHeight: 1.45 }}>
+          ⚠ 位置為路段代表點（同路段共用一點），非建案精確位置
+        </span>
       </div>
 
       <style>{`
@@ -360,7 +462,10 @@ export default function MapView({ filters, onCaseClick }: Props) {
            地圖疊層的 UI（模式切換、棟數、圖例）與 popup 內文則已改用字級 token。 */
         .map-marker-price { font-size:11px; font-weight:600; line-height:1.4; }
         .map-heat-label { color:#f1f5f9; font-size:11px; font-weight:700; text-align:center; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.6); }
-        .map-cluster { width:36px; height:36px; background:rgba(139,92,246,.85); border:2px solid rgba(139,92,246,.4); border-radius:50%; color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+        /* 群集：底色由 JS 依預售中位單價決定（與圖例同一色階），白框讓它在底圖上浮起來 */
+        .map-cluster { width:100%; height:100%; border:2px solid rgba(255,255,255,.85); border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.05; box-shadow:0 2px 8px rgba(0,0,0,.35); font-family:var(--font-mono); }
+        .map-cluster b { font-size:12px; font-weight:700; }
+        .map-cluster span { font-size:9.5px; opacity:.85; }
         .leaflet-popup-content-wrapper { background:#0d1420!important; color:#e2e8f0!important; border:1px solid rgba(255,255,255,.1)!important; border-radius:12px!important; box-shadow:0 8px 32px rgba(0,0,0,.5)!important; }
         .leaflet-popup-tip { background:#0d1420!important; }
         .leaflet-popup-close-button { color:#9ca3af!important; }

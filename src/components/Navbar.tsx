@@ -22,7 +22,8 @@ export default function Navbar() {
       .catch(() => {})
   }, [])
 
-  const navItems: { href: string; label: string; icon: string; disabled?: boolean }[] = [
+  // badge：需要密碼的功能標示「內部」，避免公開訪客點進去只看到密碼閘
+  const navItems: { href: string; label: string; icon: string; disabled?: boolean; badge?: string }[] = [
     { href: '/',            label: '數據看板', icon: '▦' },
     { href: '/analysis',    label: '數據分析', icon: '◈' },
     { href: '/price-index', label: '價格指數', icon: '◉' },
@@ -30,7 +31,7 @@ export default function Navbar() {
     { href: '/potential-buyers', label: '潛在客群', icon: '◐' },
     { href: '/project-compare', label: '建案比較', icon: '◎' },
     { href: '/search',      label: '建案搜尋', icon: '⌕' },
-    { href: '/chat',        label: 'AI 問答', icon: '◇' },
+    { href: '/chat',        label: 'AI 問答', icon: '◇', badge: '內部' },
   ]
 
   return (
@@ -83,7 +84,7 @@ export default function Navbar() {
         {/* Right: nav + theme toggle（窄螢幕 nav 可橫向捲動，不折行） */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <nav className="overflow-x-auto" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {navItems.map(({ href, label, icon, disabled }) => {
+            {navItems.map(({ href, label, icon, disabled, badge }) => {
               const active = pathname === href
 
               if (disabled) {
@@ -143,6 +144,14 @@ export default function Navbar() {
                 >
                   <span style={{ opacity: 0.75 }}>{icon}</span>
                   {label}
+                  {badge && (
+                    <span title="需要密碼" style={{
+                      fontSize: 'var(--text-3xs)', fontWeight: 'var(--weight-medium)',
+                      padding: '0 6px', borderRadius: 'var(--radius-full)',
+                      border: '1px solid var(--border-control)', color: 'var(--text-faint)',
+                      lineHeight: 1.6,
+                    }}>{badge}</span>
+                  )}
                 </Link>
               )
             })}

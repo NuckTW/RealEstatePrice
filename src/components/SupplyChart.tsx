@@ -3,9 +3,11 @@
 // 由 SupplyPanel 透過 dynamic({ ssr: false }) 載入
 import {
   ResponsiveContainer, ComposedChart, BarChart, LineChart,
-  Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea,
 } from 'recharts'
 import { useCssPx } from '@/hooks/useCssPx'
+import { useLastDataDate } from '@/hooks/useLastDataDate'
+import { backfillMonths, incompleteRange, isoToRocYm } from '@/lib/backfill'
 
 // tooltip 是 Recharts 內建 contentStyle，套用在 HTML div 上，可以直接吃 CSS var()
 const tooltipStyle = {
@@ -19,9 +21,28 @@ export function PermitTxChart({ rows, height = 380 }: { rows: Record<string, unk
   // 必須傳真正的數字 px；用 useCssPx 讀取換算後的實際值，字級切換時會自動重讀。
   const axisFontSize = useCssPx('--text-3xs', 10)
   const axisStyle = { fontSize: axisFontSize, fill: 'var(--text-muted)', fontFamily: 'var(--font-sans)' }
+
+  // 實價登錄成交量的最新 2 個月仍在補登（建照／使照不受影響），尾端畫斜線底標示
+  const lastDataDate = useLastDataDate()
+  const rocMonths = backfillMonths(lastDataDate).map(isoToRocYm)   // ['11509', '11510']
+  const backfill = incompleteRange(rows.map(r => String(r.ym)), ym => rocMonths.includes(ym))
+  const ymToLabel = (ym: string) => rows.find(r => String(r.ym) === ym)?.label as string | undefined
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={rows} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+        <defs>
+          <pattern id="tra-supply-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="2.5" height="6" fill="var(--text-faint)" fillOpacity="0.3" />
+          </pattern>
+        </defs>
+        {backfill && (
+          <ReferenceArea
+            yAxisId="tx" x1={ymToLabel(backfill.x1)} x2={ymToLabel(backfill.x2)}
+            fill="url(#tra-supply-hatch)" fillOpacity={1} ifOverflow="extendDomain"
+            label={{ value: '成交量補登中', position: 'insideTopRight', fill: 'var(--text-faint)', fontSize: axisFontSize }}
+          />
+        )}
         <CartesianGrid strokeDasharray="3 3" stroke="var(--border-card)" vertical={false} />
         <XAxis dataKey="label" tick={axisStyle} axisLine={false} tickLine={false} />
         <YAxis yAxisId="permit" tick={axisStyle} axisLine={false} tickLine={false} width={48} />

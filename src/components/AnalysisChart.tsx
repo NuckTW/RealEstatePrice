@@ -2,11 +2,14 @@
 
 // 此檔案由 AnalysisPanel 透過 dynamic({ ssr: false }) 載入
 // 因此可以安全地直接 import recharts
+import { useId } from 'react'
 import {
   ResponsiveContainer, LineChart, BarChart,
-  Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceArea,
 } from 'recharts'
 import { useCssPx } from '@/hooks/useCssPx'
+import { useLastDataDate } from '@/hooks/useLastDataDate'
+import { backfillMonths, incompleteRange, isIncompletePeriod } from '@/lib/backfill'
 
 export const SERIES_COLORS = [
   '#d9912a', '#4ca8e0', '#2bb3a3', '#c0613d',
@@ -65,6 +68,30 @@ export default function AnalysisChart({
     margin: { top: 8, right: 16, left: 0, bottom: 4 },
   }
 
+  // 補登期：資料最新 2 個月（或包含它們的季／年）還在補登，尾端畫斜線底提醒「數字還會變」
+  const lastDataDate = useLastDataDate()
+  const months = backfillMonths(lastDataDate)
+  const backfill = incompleteRange(
+    chartRows.map(r => String(r.period)),
+    p => isIncompletePeriod(p, months),
+    chartType !== 'bar',  // 折線圖 X 軸是點座標，單一點要往前延伸一格才畫得出區塊
+  )
+  const hatchId = `tra-hatch-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const backfillDefs = (
+    <defs>
+      <pattern id={hatchId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="2.5" height="6" fill="var(--text-faint)" fillOpacity="0.3" />
+      </pattern>
+    </defs>
+  )
+  const backfillArea = backfill && (
+    <ReferenceArea
+      x1={backfill.x1} x2={backfill.x2}
+      fill={`url(#${hatchId})`} fillOpacity={1} ifOverflow="extendDomain"
+      label={compact ? undefined : { value: '補登中', position: 'insideTopRight', fill: 'var(--text-faint)', fontSize: axisFontSize }}
+    />
+  )
+
   function renderTooltip(props: { active?: boolean; payload?: readonly unknown[]; label?: string | number }) {
     const { active, label } = props
     const payload = (props.payload ?? []) as unknown as TooltipPayloadItem[]
@@ -97,6 +124,8 @@ export default function AnalysisChart({
     <ResponsiveContainer width="100%" height={height}>
       {chartType === 'bar' ? (
         <BarChart {...commonProps}>
+          {backfillDefs}
+          {backfillArea}
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-card)" vertical={false} />
           <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
           <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={compact ? 44 : 56} domain={yDomain} />
@@ -111,6 +140,8 @@ export default function AnalysisChart({
         </BarChart>
       ) : (
         <LineChart {...commonProps}>
+          {backfillDefs}
+          {backfillArea}
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border-card)" vertical={false} />
           <XAxis dataKey="period" tick={axisStyle} axisLine={false} tickLine={false} />
           <YAxis tick={axisStyle} axisLine={false} tickLine={false} width={compact ? 44 : 56} domain={yDomain} />
