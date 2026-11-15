@@ -353,7 +353,12 @@ export default function WorkbenchMap(props: Props) {
         .wb-dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:-1px; background: rgb(192,92,56); }
         .wb-dot-hollow { background: transparent; border: 2px solid rgb(192,92,56); }
         .wb-pill-key { display:inline-block; width:16px; height:9px; border-radius:5px; margin-right:4px; vertical-align:-1px; border:1.5px solid rgb(192,92,56); background: var(--surface-overlay); }
-        @media (max-width: 767px) { .wb-legend-extra { display: none !important; } }
+        /* 手機：底部有 bottom sheet，圖例與 Leaflet 右下控制鈕往上讓出 sheet 收合時的高度 */
+        @media (max-width: 767px) {
+          .wb-legend-extra { display: none !important; }
+          .wb-legend { bottom: calc(var(--sheet-peek) + 10px) !important; }
+          .leaflet-bottom { bottom: calc(var(--sheet-peek) - 2px); }
+        }
 
         /* 地圖標記是固定尺寸的圖形，字級刻意不跟 --font-scale 縮放，避免爆出圖形外 */
         .wb-chip { display:inline-flex; align-items:center; justify-content:center; min-width:40px; height:22px; padding:0 6px;

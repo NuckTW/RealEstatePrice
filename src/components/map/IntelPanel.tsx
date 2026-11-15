@@ -149,6 +149,8 @@ export default function IntelPanel(p: Props) {
     const presale = m.case_type === '預售'
     const qs = filterOnlyQuery(new URLSearchParams(window.location.search))
     return (
+      <>
+      <style>{IP_CSS}</style>
       <CaseDetailPanel
         embedded open
         caseName={m.location_key}
@@ -164,6 +166,7 @@ export default function IntelPanel(p: Props) {
           {presale && <Link className="ip-link" href={`/projects${qs ? `${qs}&` : '?'}projects=${encodeURIComponent(m.location_key)}`}>加入建案比較 →</Link>}
         </>}
       />
+      </>
     )
   }
 
@@ -224,7 +227,13 @@ export default function IntelPanel(p: Props) {
         </p>
       </div>
 
-      <style>{`
+      <style>{IP_CSS}</style>
+    </div>
+  )
+}
+
+/** 情報欄樣式：清單模式與建案詳情模式都要輸出（詳情模式的標籤、連結也用這些 class） */
+const IP_CSS = `
         .ip-row { display:flex; align-items:center; gap:10px; width:100%; padding:8px; border:none; background:transparent;
           border-radius:var(--radius-md); cursor:pointer; font-size:var(--text-xs); font-family:var(--font-sans); color:var(--text-default);
           border-bottom:1px solid var(--border-card); }
@@ -241,7 +250,4 @@ export default function IntelPanel(p: Props) {
         .ip-tag { font-size:var(--text-3xs); padding:2px 8px; border-radius:999px; background:var(--surface-control); color:var(--text-muted); }
         .ip-link { font-size:var(--text-2xs); color:var(--accent-tint); background:none; border:none; padding:0; cursor:pointer;
           text-decoration:none; font-family:var(--font-sans); font-weight:var(--weight-semibold); }
-      `}</style>
-    </div>
-  )
-}
+`

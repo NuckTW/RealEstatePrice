@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   TAINAN_DISTRICTS, TYPE_OPTIONS, ROOMS_OPTIONS, BUILDING_AGE_OPTIONS, MONTH_OPTIONS,
   rocYearOptions, StyledSelect, type FilterValues,
@@ -144,6 +145,7 @@ function Segmented({ value, onChange }: { value: string; onChange: (v: string) =
         return (
           <button key={o.v} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.v)} style={{
             height: 24, padding: '0 12px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+            whiteSpace: 'nowrap', flexShrink: 0,
             fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)',
             background: on ? 'var(--surface-card)' : 'transparent',
             color: on ? 'var(--text-strong)' : 'var(--text-muted)',
@@ -297,9 +299,9 @@ export default function FilterChips() {
         )}
       </div>
 
-      {/* 手機：一顆摘要按鈕 */}
+      {/* 手機：一顆摘要按鈕（display 交給 className 控制，inline style 不能寫 display，否則會蓋掉 md:hidden） */}
       <button type="button" className="flex md:hidden" onClick={() => setSheetOpen(true)} style={{
-        ...chipBase, flex: 1, minWidth: 0, justifyContent: 'space-between', height: 34,
+        ...chipBase, display: undefined, flex: 1, minWidth: 0, justifyContent: 'space-between', alignItems: 'center', height: 34,
       }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
           {areaText(f)}・{presaleText(f.presale)}・{periodLabel}
@@ -310,7 +312,9 @@ export default function FilterChips() {
         </span>
       </button>
 
-      {sheetOpen && (
+      {/* 篩選列有 backdrop-filter，會讓裡面 position:fixed 的元素以篩選列為定位基準，
+          所以全螢幕 sheet 要用 portal 掛到 body 底下 */}
+      {sheetOpen && createPortal(
         <div role="dialog" aria-modal="true" aria-label="篩選條件" style={{
           position: 'fixed', inset: 0, zIndex: 3000, background: 'var(--bg-app)',
           display: 'flex', flexDirection: 'column',
@@ -334,7 +338,8 @@ export default function FilterChips() {
               fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)',
             }}>完成</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <style>{`

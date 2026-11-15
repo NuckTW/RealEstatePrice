@@ -148,8 +148,41 @@ export default function TransactionTable({ filters, onCaseClick }: Props) {
         )}
       </div>
 
-      {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
+      {/* 手機：卡片列（9 個欄位的表格在手機上要一直左右捲，改成兩行摘要） */}
+      <div className="md:hidden">
+        {errored && <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--negative)', fontSize: 'var(--text-sm)' }}>查詢失敗，請稍後再試</div>}
+        {!errored && !loading && data && data.rows.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-faint)', fontSize: 'var(--text-sm)' }}>無符合條件的資料</div>
+        )}
+        {!errored && data && data.rows.map((row, i) => {
+          const clickable = row.is_presale ? !!row.project_name : !!row.address
+          return (
+            <button key={i} type="button" disabled={!clickable} onClick={() => handleRowClick(row)} className="tx-card">
+              <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-strong)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                  {row.is_presale ? (row.project_name || '—') : (row.address || '—')}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-strong)', fontWeight: 600, flexShrink: 0 }}>
+                  {row.unit_price ?? '—'}<span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', fontWeight: 400 }}> 萬/坪</span>
+                </span>
+              </span>
+              <span style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 'var(--text-3xs)', color: 'var(--text-muted)' }}>
+                <span className="mono">{row.transaction_date}</span>
+                <span>{row.district ?? '—'}・{row.is_presale ? '預售' : '成屋'}</span>
+                <span>{floorLabel(row)} 樓</span>
+                <span className="mono">{row.area ?? '—'} 坪</span>
+                <span className="mono">{row.total_price != null ? row.total_price.toLocaleString() : '—'} 萬</span>
+                {row.is_special && <Badge text="特殊關係" tone="negative" />}
+                {row.has_addition && <Badge text="增建" tone="warning" />}
+                {row.with_parking && <Badge text="含車位" tone="neutral" />}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 桌機：表格 */}
+      <div className="hidden md:block" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-card)' }}>
@@ -199,10 +232,13 @@ export default function TransactionTable({ filters, onCaseClick }: Props) {
                     {row.is_presale ? (row.project_name || '—') : (row.address || '—')}
                   </td>
                   <td style={tdStyle}>
-                    <span
-                      className={`inline-block px-2 py-0.5 rounded-full font-semibold ${row.is_presale ? 'bg-sky-500/20 text-sky-300' : 'bg-teal-500/20 text-teal-300'}`}
-                      style={{ fontSize: 'var(--text-3xs)' }}
-                    >
+                    {/* 預售實心、成屋空心（與地圖標記同一套語意，不再用藍／青色區分） */}
+                    <span style={{
+                      display: 'inline-block', padding: '1px 8px', borderRadius: 'var(--radius-full)', fontWeight: 600,
+                      fontSize: 'var(--text-3xs)',
+                      background: row.is_presale ? 'var(--surface-hover)' : 'transparent',
+                      color: 'var(--text-default)', border: '1px solid var(--border-strong)',
+                    }}>
                       {row.is_presale ? '預售' : '成屋'}
                     </span>
                   </td>
@@ -245,7 +281,15 @@ export default function TransactionTable({ filters, onCaseClick }: Props) {
         </div>
       )}
 
-      <style>{`@keyframes tra-spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes tra-spin { to { transform: rotate(360deg); } }
+        .tx-card { display:flex; flex-direction:column; gap:4px; width:100%; padding:10px 14px; text-align:left; border:none;
+          border-bottom:1px solid var(--border-card); background:transparent; font-size:var(--text-xs); font-family:var(--font-sans);
+          color:var(--text-default); cursor:pointer; }
+        .tx-card:disabled { cursor:default; }
+        .tx-card:not(:disabled):active { background: var(--accent-wash); }
+        .tx-card .mono { font-family: var(--font-mono); }
+      `}</style>
     </div>
   )
 }

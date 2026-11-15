@@ -6,7 +6,7 @@ export type SheetSnap = 'peek' | 'half' | 'full'
 
 /** 三段高度：收合只露出標頭與 KPI、半開看清單、全開看詳情 */
 const SNAP_HEIGHT: Record<SheetSnap, string> = {
-  peek: '148px',
+  peek: 'var(--sheet-peek)',
   half: '52%',
   full: 'calc(100% - 16px)',
 }

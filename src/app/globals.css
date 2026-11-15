@@ -122,6 +122,8 @@
   /* 改版 shell：篩選列高度、手機底部 tab bar 高度（桌機為 0） */
   --chips-h: 48px;
   --tabbar-h: 0px;
+  /* 手機地圖 bottom sheet 收合時的高度（露出標頭＋第一列 KPI），地圖圖例與縮放鈕會讓出這段 */
+  --sheet-peek: 200px;
 }
 
 @media (max-width: 767px) {
