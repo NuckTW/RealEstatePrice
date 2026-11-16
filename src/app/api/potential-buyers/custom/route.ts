@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
-import { checkAccess } from '@/lib/aiGuard'
+import { checkAccess, checkWriteLimit, clientIp } from '@/lib/aiGuard'
 
 /**
  * 潛在客群｜手動資料與自訂指數（讀寫）
@@ -64,6 +64,9 @@ export async function GET(req: NextRequest) {
 /* ── 寫入：saveDataset / deleteDataset / saveIndex / deleteIndex ── */
 export async function POST(req: NextRequest) {
   const d = deny(req); if (d) return d
+  // 寫入限流：密碼外流時擋住大量寫入或整批刪除（私人 token 一樣受限，寫入量本來就不大）
+  const limited = checkWriteLimit(clientIp(req))
+  if (limited) return NextResponse.json({ error: limited }, { status: 429 })
   let body: Json
   try { body = await req.json() } catch { return NextResponse.json({ error: '格式錯誤' }, { status: 400 }) }
 

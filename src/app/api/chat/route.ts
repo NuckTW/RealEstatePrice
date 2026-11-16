@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { runChatQuery } from '@/lib/queries/client'
 // Gemini client、模型 fallback、密碼驗證、限流與 AI 權重建議共用（見 src/lib/aiGuard.ts）
-import { genAI, withFallback, isQuotaError, safeEqual, checkRateLimit, clientIp } from '@/lib/aiGuard'
+import { genAI, withFallback, isQuotaError, checkAccess, checkRateLimit, clientIp } from '@/lib/aiGuard'
 // 圖表判斷、給回答模型的摘要（前端 ChatChart 也共用，見 src/lib/chatData.ts）
 import { detectChartConfig, buildRowSummary, CLIENT_ROW_LIMIT, CHAT_ROW_CAP } from '@/lib/chatData'
 // 重劃區／生活圈的路名規則，與網站篩選列共用同一份
@@ -58,6 +58,17 @@ const DB_SCHEMA = `
 ${ZONES.map(z => `- ${z.name}（${z.district}）：${zoneCondition(z)}`).join('\n')}
 `
 
+const MAX_QUESTION_CHARS = 500
+const MAX_HISTORY_CHARS  = 1500
+
+/** DB 錯誤原文不回傳給前端或模型（可能含內部物件名稱），只給分類後的說明；原文留在 server log */
+function publicDbError(message: string): string {
+  if (/statement timeout|canceling statement/i.test(message)) return '查詢逾時，請縮小範圍（例如指定行政區或期間）'
+  if (/permission denied/i.test(message)) return '查詢了沒有權限的資料表'
+  if (/Only SELECT/i.test(message)) return '只支援查詢類型的問題'
+  return '查詢語法有誤'
+}
+
 interface HistoryItem {
   role: 'user' | 'assistant'
   content: string
@@ -65,24 +76,33 @@ interface HistoryItem {
 
 export async function POST(req: NextRequest) {
   // ── 存取控制 ──
-  const byToken = safeEqual(req.headers.get('x-api-token'), process.env.CHAT_API_TOKEN)
-  if (!byToken) {
-    if (!process.env.CHAT_PASSWORD) {
-      return Response.json({ error: 'AI 問答功能尚未設定密碼，暫停服務' }, { status: 503 })
-    }
-    if (!safeEqual(req.headers.get('x-chat-password'), process.env.CHAT_PASSWORD)) {
-      return Response.json({ error: '密碼錯誤' }, { status: 401 })
-    }
+  // 與其他 AI 路由共用 checkAccess（含密碼錯誤次數限制）
+  const access = checkAccess(req)
+  if (!access.ok) return Response.json({ error: access.error }, { status: access.status })
+  if (!access.byToken) {
     // 私人 token 不限流；密碼使用者走限流
     const denied = checkRateLimit(clientIp(req))
     if (denied) return Response.json({ error: denied }, { status: 429 })
   }
 
-  const body = await req.json()
-  const question: string = body.question ?? ''
-  const history: HistoryItem[] = body.history ?? []
+  let body: { question?: unknown; history?: unknown }
+  try { body = await req.json() } catch { return Response.json({ error: '格式錯誤' }, { status: 400 }) }
 
-  if (!question.trim()) {
+  // 輸入長度上限：避免超長問題或歷史內容灌爆 token 額度
+  const question = typeof body.question === 'string' ? body.question.trim() : ''
+  if (question.length > MAX_QUESTION_CHARS) {
+    return Response.json({ error: `問題太長（上限 ${MAX_QUESTION_CHARS} 字）` }, { status: 400 })
+  }
+  // 歷史只收最近 8 則、role 合法、內容為字串者，每則截到 MAX_HISTORY_CHARS
+  const history: HistoryItem[] = (Array.isArray(body.history) ? body.history : [])
+    .filter((h): h is HistoryItem =>
+      !!h && typeof h === 'object'
+      && ((h as HistoryItem).role === 'user' || (h as HistoryItem).role === 'assistant')
+      && typeof (h as HistoryItem).content === 'string')
+    .slice(-8)
+    .map(h => ({ role: h.role, content: h.content.slice(0, MAX_HISTORY_CHARS) }))
+
+  if (!question) {
     return Response.json({ error: '請輸入問題' }, { status: 400 })
   }
 
@@ -96,7 +116,7 @@ export async function POST(req: NextRequest) {
 
       try {
         // ── 對話歷史 context（最近4輪）──────────────────
-        const recentHistory = history.slice(-8)
+        const recentHistory = history
         const historyCtx = recentHistory.length
           ? '對話歷史（供參考）：\n' +
             recentHistory.map(h =>
@@ -143,7 +163,7 @@ ${historyCtx}使用者問題：「${question}」
         let rows: Record<string, unknown>[] = []
         if (dbError) {
           console.error('[chat] DB error:', dbError.message)
-          send({ type: 'db_error', message: dbError.message })
+          send({ type: 'db_error', message: publicDbError(dbError.message) })
           // 繼續讓 AI 說明
         } else {
           rows = queryRows
@@ -167,7 +187,7 @@ ${truncated
   : `查詢共回傳 ${rows.length} 筆資料。`}
 ${rowSummary}
 
-${dbError ? `查詢時發生錯誤：${dbError.message}\n` : ''}
+${dbError ? `查詢時發生錯誤：${publicDbError(dbError.message)}\n` : ''}
 請用**繁體中文**、條列式方式回答使用者問題。
 - 必須使用繁體中文，禁止出現簡體字
 - 回答格式以「・」或「－」開頭的條列項目呈現，每點一個重點
