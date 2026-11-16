@@ -1,10 +1,8 @@
-import Navbar from '@/components/Navbar'
 import ChatInterface from '@/components/ChatInterface'
 
 export default function ChatPage() {
   return (
     <main style={{ minHeight: '100vh', background: 'var(--bg-app)', color: 'var(--text-default)' }}>
-      <Navbar />
       <div style={{ maxWidth: 896, margin: '0 auto' }}>
         <div style={{ padding: '24px 20px 8px' }}>
           <h2 style={{

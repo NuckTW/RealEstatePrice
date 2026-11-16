@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildWhere } from '@/lib/filters'
-import { fetchKpi, fetchDistrictStats, fetchBuildingTypeStats, fetchRoomStats } from '@/lib/queries/kpi'
+import { fetchKpi, fetchDistrictStats, fetchBuildingTypeStats, fetchRoomStats, fetchMonthlyTrend } from '@/lib/queries/kpi'
 import { fetchCaseRanking } from '@/lib/queries/projects'
 
 type Row = Record<string, unknown>
@@ -19,12 +19,13 @@ export async function GET(req: NextRequest) {
     // 預售屋：不含日期的篩選條件（用於統計完整銷售期資料）
     const whereNoDate = buildWhere(req.nextUrl.searchParams, '', true)
 
-    const [kpiRows, distRows, typeRows, roomRows, caseRows] = await Promise.all([
+    const [kpiRows, distRows, typeRows, roomRows, caseRows, trendRows] = await Promise.all([
       fetchKpi(where),
       fetchDistrictStats(where),
       fetchBuildingTypeStats(where),
       fetchRoomStats(where),
       fetchCaseRanking(where, whereNoDate),
+      fetchMonthlyTrend(where),
     ])
 
     const total = Number(kpiRows[0]?.total) || 1
@@ -37,6 +38,12 @@ export async function GET(req: NextRequest) {
       types:     addPct(typeRows, typeTotal),
       rooms:     addPct(roomRows, roomsTotal),
       cases:     caseRows,
+      // 新增欄位（向下相容）：月度量價走勢
+      trend:     trendRows.map(r => ({
+        period: String(r.period),
+        count: Number(r.count) || 0,
+        median_unit_price: r.median_unit_price != null ? Number(r.median_unit_price) : null,
+      })),
     })
   } catch (err) {
     console.error('[/api/charts]', err)

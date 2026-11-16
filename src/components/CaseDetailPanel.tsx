@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { FilterValues } from './FilterBar'
 
 interface DetailRow {
@@ -33,6 +33,10 @@ interface Props {
   district: string
   filters: FilterValues
   onClose: () => void
+  /** true：嵌在首頁情報欄裡（不滑出、不蓋背景）；false：右側滑出面板 */
+  embedded?: boolean
+  /** 標頭下方的額外操作（例如「在地圖上看」） */
+  actions?: ReactNode
 }
 
 function rocDate(iso: string) {
@@ -159,7 +163,7 @@ function ExpandedDetail({ row, caseType }: { row: DetailRow; caseType: 'presale'
 }
 
 /* ── 主元件 ──────────────────────────────────────────────────── */
-export default function CaseDetailPanel({ open, caseName, caseType, district, filters, onClose }: Props) {
+export default function CaseDetailPanel({ open, caseName, caseType, district, filters, onClose, embedded = false, actions }: Props) {
   // query 當作資料的識別鍵；rows/loading 由「手上的資料是否對應目前的 query」推導，
   // 不在 effect 裡同步呼叫 setState（會被 react-hooks/set-state-in-effect 判違規）
   const query = useMemo(() => {
@@ -217,21 +221,25 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        style={{
-          position: 'fixed', inset: 0, zIndex: 3000,
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(2px)',
-          transition: 'opacity 300ms',
-          opacity: open ? 1 : 0,
-          pointerEvents: open ? 'auto' : 'none',
-        }}
-        onClick={onClose}
-      />
+      {/* Backdrop（嵌入模式不需要） */}
+      {!embedded && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 3000,
+            background: 'rgba(0,0,0,0.45)',
+            backdropFilter: 'blur(2px)',
+            transition: 'opacity 300ms',
+            opacity: open ? 1 : 0,
+            pointerEvents: open ? 'auto' : 'none',
+          }}
+          onClick={onClose}
+        />
+      )}
 
       {/* Panel */}
-      <div style={{
+      <div style={embedded ? {
+        height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface-card)',
+      } : {
         position: 'fixed', top: 0, right: 0, zIndex: 3100,
         height: '100%', width: '100%', maxWidth: 720,
         background: 'var(--surface-card)',
@@ -274,8 +282,10 @@ export default function CaseDetailPanel({ open, caseName, caseType, district, fi
                 <span style={{ color: 'var(--text-faint)', marginLeft: 4 }}>· 點擊列可展開詳情</span>
               </p>
             )}
+            {actions && <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
           </div>
           <button
+            aria-label={embedded ? '返回' : '關閉'}
             onClick={onClose}
             style={{
               marginTop: 2, width: 28, height: 28,

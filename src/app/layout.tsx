@@ -1,5 +1,21 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SiteShell from "@/components/shell/SiteShell";
+import { fetchMeta } from "@/lib/queries/kpi";
+
+// 資料最新月由 layout 查一次、透過 SiteShell 給所有頁面（預設篩選期間跟著它）。
+// scraper 每月 1、11、21 日才更新，每小時重產一次就夠，與 cachedQuery 的快取一致。
+export const revalidate = 3600;
+
+/** 資料最新交易日（西元 YYYY-MM-DD）；查詢失敗回 null，預設期間會退回今天所在月份 */
+async function getLastDate(): Promise<string | null> {
+  try {
+    const rows = await fetchMeta();
+    return (rows[0]?.last_date as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /*
  * 字型載入（不使用 next/font，build 時不需連線下載字型）：
@@ -46,7 +62,8 @@ const themeScript = `
 })();
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const lastDate = await getLastDate();
   return (
     // suppressHydrationWarning：themeScript 在 hydration 前就會改 data-theme / data-fontsize，屬預期差異
     <html lang="zh-Hant" suppressHydrationWarning className="h-full">
@@ -57,7 +74,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href={NOTO_SANS_TC_CSS} />
       </head>
-      <body className="min-h-full flex flex-col antialiased">{children}</body>
+      <body className="min-h-full flex flex-col antialiased">
+        <SiteShell lastDate={lastDate}>{children}</SiteShell>
+      </body>
     </html>
   );
 }

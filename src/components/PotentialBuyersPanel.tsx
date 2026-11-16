@@ -57,24 +57,45 @@ export interface CustomStore {
   indices: IndexDef[]
 }
 
-/** 頁籤：村里指數為主，其餘為行政區／縣市層級的背景資料（皆不計入村里指數） */
-type Tab = '村里指數' | '指數說明' | '自訂指數' | '客源分析' | '人口與家庭' | '就業與產業' | '房市與負擔' | '重大建設' | '資料總覽'
+/**
+ * 頁籤：改版後 9 個收成 4 個。
+ *  - 指數地圖：村里指數為主，「自訂指數」收進同頁的進階區塊
+ *  - 區域輪廓：原本的人口與家庭、就業與產業、房市與負擔三頁上下排列
+ *  - 指數說明、資料總覽：屬於參考資料，改放右上角「?」說明抽屜
+ * 行政區／縣市層級的背景資料皆不計入村里指數。
+ */
+type Tab = '指數地圖' | '客源分析' | '區域輪廓' | '重大建設'
+type HelpTab = '指數說明' | '資料總覽'
 const TABS: { key: Tab; desc: string }[] = [
-  { key: '村里指數',   desc: '村里首購／換新屋／換二手指數與新屋熱度地圖與排行' },
-  { key: '指數說明',   desc: '客群指數與新屋熱度怎麼算、每項資料的來源' },
-  { key: '自訂指數',   desc: '手動加入資料、自訂指數權重、AI 建議配方' },
-  { key: '客源分析',   desc: '選建案或在地圖點位置，推估潛在買方來自哪些里' },
-  { key: '人口與家庭', desc: '未來人口推估、學區新生' },
-  { key: '就業與產業', desc: '各區就業結構、南科就業動能' },
-  { key: '房市與負擔', desc: '負擔能力、租金與房貸、建物移轉、空屋、屋齡' },
-  { key: '重大建設',   desc: '捷運、鐵路地下化、交流道、產業園區、重劃區' },
-  { key: '資料總覽',   desc: '所有資料清單，點選即可在地圖或圖表上顯示' },
+  { key: '指數地圖', desc: '村里首購／換新屋／換二手指數與新屋熱度地圖、排行，以及自訂指數' },
+  { key: '客源分析', desc: '選建案或在地圖點位置，推估潛在買方來自哪些里' },
+  { key: '區域輪廓', desc: '人口與家庭、就業與產業、房市與負擔（行政區／縣市層級）' },
+  { key: '重大建設', desc: '捷運、鐵路地下化、交流道、產業園區、重劃區' },
 ]
-/** 從網址 hash 讀取頁籤（如 #房市與負擔），方便分享連結 */
-function tabFromHash(): Tab {
-  if (typeof window === 'undefined') return '村里指數'
+/** 區域輪廓內的段落（舊頁籤名稱 → 段落錨點） */
+const PROFILE_SECTIONS = [
+  { id: 'pb-population', label: '人口與家庭' },
+  { id: 'pb-industry',   label: '就業與產業' },
+  { id: 'pb-housing',    label: '房市與負擔' },
+] as const
+
+interface HashState { tab: Tab; help: HelpTab | null; custom: boolean; anchor: string | null }
+
+/**
+ * 從網址 hash 還原狀態。舊連結的 hash（#房市與負擔、#自訂指數…）也要能對應到新位置，
+ * 不讓已分享出去的連結失效。
+ */
+function stateFromHash(): HashState {
+  const base: HashState = { tab: '指數地圖', help: null, custom: false, anchor: null }
+  if (typeof window === 'undefined') return base
   const h = decodeURIComponent(window.location.hash.replace(/^#/, ''))
-  return TABS.some(t => t.key === h) ? (h as Tab) : '村里指數'
+  if (TABS.some(t => t.key === h)) return { ...base, tab: h as Tab }
+  if (h === '村里指數') return base
+  if (h === '自訂指數') return { ...base, custom: true }
+  if (h === '指數說明' || h === '資料總覽') return { ...base, help: h }
+  const sec = PROFILE_SECTIONS.find(s => s.label === h)
+  if (sec) return { ...base, tab: '區域輪廓', anchor: sec.id }
+  return base
 }
 
 /* ── 小工具 ───────────────────────────────────────────────────── */
@@ -111,13 +132,36 @@ export default function PotentialBuyersPanel() {
   const [focusCodes, setFocusCodes] = useState<string[] | null>(null)
   const [assumption, setAssumption] = useState<MortgageAssumption>(DEFAULT_ASSUMPTION)
   // 伺服器端渲染時資料尚未載入（只顯示「載入中」），因此直接以 hash 初始化不會造成 hydration 不一致
-  const [tab, setTab] = useState<Tab>(tabFromHash)
+  const [initial] = useState<HashState>(stateFromHash)
+  const [tab, setTab] = useState<Tab>(initial.tab)
+  const [help, setHelp] = useState<HelpTab | null>(initial.help)       // 說明抽屜（null = 關閉）
+  const [customOpen, setCustomOpen] = useState(initial.custom)         // 指數地圖下方的「自訂指數」進階區塊
+  const [pendingAnchor, setPendingAnchor] = useState<string | null>(initial.anchor)
   // 瀏覽器上一頁／下一頁或手動改 hash 時同步頁籤
   useEffect(() => {
-    const onHash = () => setTab(tabFromHash())
+    const onHash = () => {
+      const s = stateFromHash()
+      setTab(s.tab); setHelp(s.help); setCustomOpen(c => c || s.custom); setPendingAnchor(s.anchor)
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+  // 切頁後要捲到的段落（等內容渲染完才捲；扣掉頂部固定的導覽列與頁籤列）。
+  // 資料還沒載入時段落不存在，所以把 data 也放進 deps，載入完會再試一次
+  useEffect(() => {
+    if (!pendingAnchor) return
+    const t = setTimeout(() => {
+      const el = document.getElementById(pendingAnchor)
+      if (!el) return
+      setPendingAnchor(null)
+      const top = Math.max(0, ...[...document.querySelectorAll<HTMLElement>('header, .pb-sticky')].map(e => {
+        const cs = getComputedStyle(e)
+        return cs.position === 'sticky' || cs.position === 'fixed' ? (parseFloat(cs.top) || 0) + e.offsetHeight : 0
+      }))
+      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - top - 12, behavior: 'smooth' })
+    }, 80)
+    return () => clearTimeout(t)
+  }, [pendingAnchor, tab, data])
 
   useEffect(() => {
     Promise.all([
@@ -249,28 +293,35 @@ export default function PotentialBuyersPanel() {
   }
   const changeTab = (t: Tab) => {
     setTab(t)
-    window.history.replaceState(null, '', t === '村里指數' ? window.location.pathname : `#${encodeURIComponent(t)}`)
+    // 保留 query（從其他頁帶過來的篩選條件），只換 hash
+    const base = window.location.pathname + window.location.search
+    window.history.replaceState(null, '', t === '指數地圖' ? base : `${base}#${encodeURIComponent(t)}`)
   }
-  // 明細面板的「怎麼看？」：切到說明頁籤後捲到對應段落（等頁籤渲染完再捲）
+  /** 舊頁籤名稱（資料總覽的「前往」按鈕仍用舊名）→ 新位置 */
+  const goLegacy = (name: string) => {
+    setHelp(null)
+    if (name === '自訂指數') { changeTab('指數地圖'); setCustomOpen(true); setPendingAnchor('pb-custom'); return }
+    if (name === '指數說明' || name === '資料總覽') { setHelp(name); return }
+    const sec = PROFILE_SECTIONS.find(s => s.label === name)
+    if (sec) { changeTab('區域輪廓'); setPendingAnchor(sec.id); return }
+    if (TABS.some(t => t.key === name)) changeTab(name as Tab)
+    else changeTab('指數地圖')
+  }
+  // 明細面板的「怎麼看？」：打開說明抽屜並捲到對應段落
   const openGuide = (anchor: string) => {
-    changeTab('指數說明')
-    setTimeout(() => {
-      const el = document.getElementById(anchor)
-      if (!el) return
-      // 扣掉頂部固定的導覽列／頁籤列，避免標題被蓋住；手機版頁籤列不固定，只算真的 sticky/fixed 的
-      const top = Math.max(0, ...[...document.querySelectorAll<HTMLElement>('header, .pb-sticky')].map(e => {
-        const cs = getComputedStyle(e)
-        return cs.position === 'sticky' || cs.position === 'fixed' ? (parseFloat(cs.top) || 0) + e.offsetHeight : 0
-      }))
-      window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - top - 12, behavior: 'smooth' })
-    }, 50)
+    setHelp('指數說明')
+    setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
   }
   const pickFromTable = (code: string) => {
     setSelected(code)
     setFocusCodes([code])
   }
-  /** 自訂指數頁「在地圖上看」：切回村里指數頁並選這個指數 */
-  const viewIndexOnMap = (id: string) => { setIndexId(id); changeTab('村里指數') }
+  /** 自訂指數區塊的「在地圖上看」：選這個指數並捲回地圖 */
+  const viewIndexOnMap = (id: string) => {
+    setIndexId(id)
+    changeTab('指數地圖')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const hl = district || undefined
   const customIndices = allIndices.filter(i => !i.preset)
@@ -300,10 +351,15 @@ export default function PotentialBuyersPanel() {
               }}
             >{t.key}</button>
           ))}
+          <span style={{ flex: 1 }} />
+          {/* 參考資料（指數算法、資料清單）收進說明抽屜 */}
+          <button type="button" onClick={() => setHelp('指數說明')} aria-label="指數說明與資料總覽" title="指數說明與資料總覽" className="pb-help-btn">
+            ? 說明
+          </button>
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-          {tab === '村里指數' && (
+          {tab === '指數地圖' && (
             <div role="tablist" aria-label="指數類型" style={{ display: 'inline-flex', padding: 3, gap: 3, borderRadius: 'var(--radius-full)', background: 'var(--surface-control)', border: '1px solid var(--border-control)' }}>
               {PRESET_INDICES.map(m => (
                 <button
@@ -322,7 +378,7 @@ export default function PotentialBuyersPanel() {
               ))}
             </div>
           )}
-          {tab === '村里指數' && customIndices.length > 0 && (
+          {tab === '指數地圖' && customIndices.length > 0 && (
             <select
               value={def.preset ? '' : def.id}
               onChange={e => setIndexId(e.target.value || 'firstBuyer')}
@@ -356,7 +412,7 @@ export default function PotentialBuyersPanel() {
             ))}
           </select>
 
-          {tab === '村里指數' && (
+          {tab === '指數地圖' && (
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-xs)', color: 'var(--text-muted)', cursor: 'pointer' }}>
               <input type="checkbox" checked={hideLow} onChange={e => setHideLow(e.target.checked)} />
               排行榜隱藏人口未滿 1,000 的里
@@ -364,15 +420,15 @@ export default function PotentialBuyersPanel() {
           )}
 
           <span style={{ marginLeft: 'auto', fontSize: 'var(--text-2xs)', color: 'var(--text-faint)' }}>
-            {tab === '村里指數'
+            {tab === '指數地圖'
               ? <span style={{ fontFamily: 'var(--font-mono)' }}>人口 {rocMonth(data.meta.dataMonth)}・所得 {data.meta.incomeTaxYear} 年度</span>
               : TABS.find(t => t.key === tab)?.desc}
-            {district && tab !== '村里指數' && <span style={{ color: 'var(--accent-tint)' }}>；已標示{district}</span>}
+            {district && tab !== '指數地圖' && <span style={{ color: 'var(--accent-tint)' }}>；已標示{district}</span>}
           </span>
         </div>
       </div>
 
-      {tab === '村里指數' && (
+      {tab === '指數地圖' && (
         <>
           {/* 地圖 + 明細 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 14 }}>
@@ -418,32 +474,45 @@ export default function PotentialBuyersPanel() {
             <RankingTable rows={ranking.slice(0, 30)} def={def} result={result} catalog={catalog} score={score} cityRank={cityRank} selected={selected} onPick={pickFromTable} />
           </div>
 
-          {/* 方法說明移到「指數說明」頁籤 */}
-          <button onClick={() => changeTab('指數說明')} style={{
+          {/* 方法說明在說明抽屜 */}
+          <button onClick={() => setHelp('指數說明')} style={{
             ...cardStyle, cursor: 'pointer', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8,
             fontFamily: 'var(--font-sans)', color: 'var(--text-default)',
           }}>
             <span><b style={{ color: 'var(--text-strong)' }}>指數怎麼算？</b><span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginLeft: 8 }}>圖解三個客群指數＋新屋熱度的算法與每項資料來源</span></span>
             <span style={{ color: 'var(--accent-tint)', fontSize: 'var(--text-sm)' }}>看指數說明 →</span>
           </button>
+
+          {/* 自訂指數：原本是獨立頁籤，改成指數地圖下方的進階區塊 */}
+          <div id="pb-custom" style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <button type="button" onClick={() => setCustomOpen(o => !o)} aria-expanded={customOpen} style={{
+              width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: 16,
+              background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)', color: 'var(--text-default)',
+            }}>
+              <span>
+                <b style={{ color: 'var(--text-strong)' }}>自訂指數（進階）</b>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginLeft: 8 }}>手動加入資料、調整權重、AI 建議配方；建好後可在上方地圖切換</span>
+              </span>
+              <span aria-hidden style={{ color: 'var(--text-faint)', transform: customOpen ? 'rotate(180deg)' : 'none', transition: 'var(--transition-base)' }}>⌄</span>
+            </button>
+            {customOpen && (
+              <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <CustomIndexSection
+                  catalog={catalog}
+                  villages={villages}
+                  geo={geo}
+                  presets={PRESET_INDICES}
+                  store={custom}
+                  password={password}
+                  onPassword={savePassword}
+                  onChanged={reloadCustom}
+                  onViewOnMap={viewIndexOnMap}
+                  highlightDistrict={hl}
+                />
+              </div>
+            )}
+          </div>
         </>
-      )}
-
-      {tab === '指數說明' && <IndexGuideSection villages={villages} catalog={catalog} />}
-
-      {tab === '自訂指數' && (
-        <CustomIndexSection
-          catalog={catalog}
-          villages={villages}
-          geo={geo}
-          presets={PRESET_INDICES}
-          store={custom}
-          password={password}
-          onPassword={savePassword}
-          onChanged={reloadCustom}
-          onViewOnMap={viewIndexOnMap}
-          highlightDistrict={hl}
-        />
       )}
 
       {tab === '客源分析' && (
@@ -456,8 +525,17 @@ export default function PotentialBuyersPanel() {
         />
       )}
 
-      {tab === '人口與家庭' && (
+      {tab === '區域輪廓' && (
+        <nav aria-label="區域輪廓段落" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {PROFILE_SECTIONS.map(s => (
+            <button key={s.id} type="button" onClick={() => setPendingAnchor(s.id)} className="pb-anchor">{s.label}</button>
+          ))}
+        </nav>
+      )}
+
+      {tab === '區域輪廓' && (
         <>
+          <h2 id="pb-population" className="pb-h2">人口與家庭</h2>
           {/* 未來人口推估（行政區，僅計自然增減） */}
           {data.projection.rows.length > 0 && <ProjectionSection data={data.projection} highlightDistrict={hl} />}
           {/* 學區學生數（行政區・學年） */}
@@ -465,8 +543,9 @@ export default function PotentialBuyersPanel() {
         </>
       )}
 
-      {tab === '就業與產業' && (
+      {tab === '區域輪廓' && (
         <>
+          <h2 id="pb-industry" className="pb-h2">就業與產業</h2>
           {/* 產業與就業（普查 + 工商家數） */}
           {data.industry.length > 0 && (
             <IndustrySection data={data.industry} popByDistrict={popByDistrict} highlightDistrict={hl} />
@@ -486,8 +565,9 @@ export default function PotentialBuyersPanel() {
         </>
       )}
 
-      {tab === '房市與負擔' && (
+      {tab === '區域輪廓' && (
         <>
+          <h2 id="pb-housing" className="pb-h2">房市與負擔</h2>
           {/* 負擔能力、房貸條件、家庭收支（縣市級） */}
           <AffordabilitySection market={data.market} />
 
@@ -537,20 +617,51 @@ export default function PotentialBuyersPanel() {
 
       {tab === '重大建設' && <MajorProjectsSection highlightDistrict={hl} />}
 
-      {tab === '資料總覽' && (
-        <DataCatalogSection
-          catalog={catalog}
-          villages={villages}
-          geo={geo}
-          indices={allIndices}
-          customStatus={custom.status}
-          onGoTab={(t: string) => changeTab(t as Tab)}
-          highlightDistrict={hl}
-        />
+      {/* 說明抽屜：指數說明、資料總覽（原本是兩個獨立頁籤） */}
+      {help && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 3000 }}>
+          <div aria-hidden onClick={() => setHelp(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+          <aside role="dialog" aria-modal="true" aria-label={help} style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(820px, 100vw)',
+            background: 'var(--bg-app)', borderLeft: '1px solid var(--border-card)', boxShadow: 'var(--shadow-overlay)',
+            display: 'flex', flexDirection: 'column',
+            paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-card)' }}>
+              <div role="tablist" aria-label="說明" style={{ display: 'flex', gap: 4, flex: 1 }}>
+                {(['指數說明', '資料總覽'] as const).map(h => (
+                  <button key={h} role="tab" aria-selected={help === h} onClick={() => setHelp(h)} className="pb-anchor" data-on={help === h || undefined}>{h}</button>
+                ))}
+              </div>
+              <button type="button" onClick={() => setHelp(null)} aria-label="關閉說明" className="pb-help-btn">✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {help === '指數說明' && <IndexGuideSection villages={villages} catalog={catalog} />}
+              {help === '資料總覽' && (
+                <DataCatalogSection
+                  catalog={catalog}
+                  villages={villages}
+                  geo={geo}
+                  indices={allIndices}
+                  customStatus={custom.status}
+                  onGoTab={goLegacy}
+                  highlightDistrict={hl}
+                />
+              )}
+            </div>
+          </aside>
+        </div>
       )}
 
       <style>{`
         ${RAMP_CSS}
+        .pb-help-btn { height:30px; padding:0 12px; border-radius:999px; border:1px solid var(--border-control); background:var(--surface-card);
+          color:var(--text-muted); font-size:var(--text-xs); font-family:var(--font-sans); cursor:pointer; white-space:nowrap; flex-shrink:0; }
+        .pb-help-btn:hover { color:var(--text-default); border-color:var(--accent-wash-border); }
+        .pb-anchor { height:30px; padding:0 14px; border-radius:999px; border:1px solid var(--border-control); background:var(--surface-card);
+          color:var(--text-muted); font-size:var(--text-xs); font-weight:var(--weight-semibold); font-family:var(--font-sans); cursor:pointer; }
+        .pb-anchor[data-on] { background:var(--accent-wash); color:var(--accent-tint); border-color:var(--accent-wash-border); }
+        .pb-h2 { margin: 10px 0 0; font-size: var(--text-lg); font-weight: var(--weight-bold); color: var(--text-strong); }
         .pb-map-box { height: 620px; }
         .pb-tabs::-webkit-scrollbar { display: none; }
         @media (max-width: 760px) {
