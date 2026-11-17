@@ -1,3 +1,4 @@
+import 'server-only'
 import type { NextRequest } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { timingSafeEqual } from 'node:crypto'
@@ -47,14 +48,59 @@ export function safeEqual(a: string | null, b: string | undefined): boolean {
 
 export type Access = { ok: true; byToken: boolean } | { ok: false; status: number; error: string }
 
+const HOUR_MS = 60 * 60 * 1000
+
+// ── 密碼錯誤次數限制（防暴力猜密碼）────────────────────
+// 同一 IP 在 15 分鐘內錯 FAIL_LIMIT 次就鎖住，期間連正確密碼也不放行（否則攻擊者仍可繼續試）
+// 與下方題數限流一樣是 in-memory：每個 instance 各自計數，屬保守估算
+const FAIL_LIMIT     = Number(process.env.CHAT_FAIL_LIMIT ?? 8)
+const FAIL_WINDOW_MS = 15 * 60 * 1000
+const failHits = new Map<string, number[]>()         // ip → 最近 15 分鐘的失敗時間戳
+
+function recentFails(ip: string, now: number): number[] {
+  return (failHits.get(ip) ?? []).filter(t => now - t < FAIL_WINDOW_MS)
+}
+
 /** 驗證密碼或私人 token；未設定 CHAT_PASSWORD 時整個功能暫停 */
 export function checkAccess(req: NextRequest): Access {
   if (safeEqual(req.headers.get('x-api-token'), process.env.CHAT_API_TOKEN)) return { ok: true, byToken: true }
   if (!process.env.CHAT_PASSWORD) return { ok: false, status: 503, error: '尚未設定密碼，暫停服務' }
+
+  const ip = clientIp(req)
+  const now = Date.now()
+  const fails = recentFails(ip, now)
+  if (fails.length >= FAIL_LIMIT) {
+    return { ok: false, status: 429, error: '密碼錯誤次數過多，請 15 分鐘後再試' }
+  }
+
   if (!safeEqual(req.headers.get('x-chat-password'), process.env.CHAT_PASSWORD)) {
+    fails.push(now)
+    failHits.set(ip, fails)
+    // 避免 Map 無限成長：清掉已過期的 IP
+    if (failHits.size > 1000) {
+      for (const [k, v] of failHits) if (!v.some(t => now - t < FAIL_WINDOW_MS)) failHits.delete(k)
+    }
     return { ok: false, status: 401, error: '密碼錯誤' }
   }
   return { ok: true, byToken: false }
+}
+
+// ── 寫入限流（自訂資料／指數的儲存與刪除）──────────────
+// 與 AI 題數分開計：存檔不花 AI 額度，但密碼外流時要擋住大量寫入或整批刪除
+const WRITE_LIMIT = Number(process.env.CHAT_WRITE_LIMIT_PER_HOUR ?? 60)
+const writeHits = new Map<string, number[]>()
+
+/** 回傳 null 表示放行，否則回傳拒絕原因 */
+export function checkWriteLimit(ip: string): string | null {
+  const now = Date.now()
+  const hits = (writeHits.get(ip) ?? []).filter(t => now - t < HOUR_MS)
+  if (hits.length >= WRITE_LIMIT) return `每小時最多儲存／刪除 ${WRITE_LIMIT} 次，請稍後再試`
+  hits.push(now)
+  writeHits.set(ip, hits)
+  if (writeHits.size > 1000) {
+    for (const [k, v] of writeHits) if (!v.some(t => now - t < HOUR_MS)) writeHits.delete(k)
+  }
+  return null
 }
 
 // ── 限流（in-memory）────────────────────────────────────
@@ -63,7 +109,6 @@ export function checkAccess(req: NextRequest): Access {
 // 同一個 instance 內 AI 問答與 AI 權重建議共用計數（不同 route 可能跑在不同 instance，屆時各自計算）。
 const PER_IP_LIMIT   = Number(process.env.CHAT_IP_LIMIT_PER_HOUR ?? 10)   // 每 IP 每小時題數
 const DAILY_LIMIT    = Number(process.env.CHAT_DAILY_LIMIT       ?? 200)  // 全站每日題數
-const HOUR_MS = 60 * 60 * 1000
 
 const ipHits = new Map<string, number[]>()           // ip → 最近一小時的時間戳
 let dailyCount = 0

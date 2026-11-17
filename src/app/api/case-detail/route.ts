@@ -8,8 +8,8 @@ export async function GET(req: NextRequest) {
   try {
     const rows = await fetchCaseDetail({
       caseType:  p.get('case_type') ?? 'presale',   // 'presale' | 'existing'
-      district:  p.get('district')  ?? '',
-      name:      p.get('name')      ?? '',
+      district:  (p.get('district') ?? '').slice(0, 20),
+      name:      (p.get('name') ?? '').slice(0, 120),   // 成屋的 name 是去樓層地址，120 字足夠
       dateRange: parseRocDateRange(p),
     })
     return NextResponse.json({ rows })

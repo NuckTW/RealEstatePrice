@@ -48,22 +48,42 @@ export const ANALYSIS_DATE_KEYS: DateParamKeys = {
   toYear: 'yearTo', toMonth: 'monthTo',
 }
 
+const ROC_YEAR_MIN = 80
+const ROC_YEAR_MAX = 200
+
+/**
+ * 整數參數解析：必須是純數字且落在 [min, max]，否則回預設值。
+ * 參數會直接拼進 SQL，所以不合法的值（NaN、超大數字、夾帶其他字元）一律不放行，
+ * 也避免組出無效日期讓查詢失敗回 500。
+ */
+function intInRange(raw: string | null, min: number, max: number, fallback: number): number {
+  if (raw == null || !/^\d{1,4}$/.test(raw.trim())) return fallback
+  const n = Number(raw.trim())
+  return n >= min && n <= max ? n : fallback
+}
+
 /** 從 URL params 解析民國年月日期區間（預設 110/1 ～ 115/12） */
 export function parseRocDateRange(
   params: URLSearchParams,
   keys: DateParamKeys = DEFAULT_DATE_KEYS
 ): RocDateRange {
   return rocDateRange(
-    parseInt(params.get(keys.fromYear)  ?? '110'),
-    parseInt(params.get(keys.fromMonth) ?? '1'),
-    parseInt(params.get(keys.toYear)    ?? '115'),
-    parseInt(params.get(keys.toMonth)   ?? '12'),
+    intInRange(params.get(keys.fromYear),  ROC_YEAR_MIN, ROC_YEAR_MAX, 110),
+    intInRange(params.get(keys.fromMonth), 1, 12, 1),
+    intInRange(params.get(keys.toYear),    ROC_YEAR_MIN, ROC_YEAR_MAX, 115),
+    intInRange(params.get(keys.toMonth),   1, 12, 12),
   )
 }
 
-/** 解析逗號分隔的多選參數 */
-export function parseCsv(params: URLSearchParams, key: string): string[] {
-  return (params.get(key) ?? '').split(',').map(s => s.trim()).filter(Boolean)
+/** 多選參數上限：最多幾項、每項最長幾字（擋掉用超長清單組出巨大 SQL 的請求） */
+export const CSV_MAX_ITEMS = 60
+export const CSV_MAX_ITEM_CHARS = 60
+
+/** 解析逗號分隔的多選參數（超過上限的項目與過長的項目直接丟棄） */
+export function parseCsv(params: URLSearchParams, key: string, maxItems = CSV_MAX_ITEMS): string[] {
+  return (params.get(key) ?? '').split(',').map(s => s.trim())
+    .filter(s => s && s.length <= CSV_MAX_ITEM_CHARS)
+    .slice(0, maxItems)
 }
 
 /**
@@ -99,11 +119,12 @@ export function buildWhere(params: URLSearchParams, tableAlias = '', skipDate = 
     conds.push(`(${typeConds.join(' OR ')})`)
   }
 
-  const rooms = parseCsv(params, 'rooms')
+  // 房數只收 0–9 的單一數字或 '5+'，其餘忽略（值會直接拼進 SQL）
+  const rooms = parseCsv(params, 'rooms').filter(r => r === '5+' || /^\d$/.test(r))
   if (rooms.length > 0) {
     const roomConds = rooms.map(r => {
       if (r === '5+') return `${p}rooms >= 5`
-      return `COALESCE(${p}rooms, 0) = ${parseInt(r)}`
+      return `COALESCE(${p}rooms, 0) = ${Number(r)}`
     })
     conds.push(`(${roomConds.join(' OR ')})`)
   }
@@ -112,13 +133,15 @@ export function buildWhere(params: URLSearchParams, tableAlias = '', skipDate = 
   if (presale === 'true')       conds.push(`${p}is_presale = true`)
   else if (presale === 'false') conds.push(`${p}is_presale = false`)
 
-  const buildingAge = params.get('buildingAge') ?? 'all'
+  // 屋齡只收 '30+' 或 1–3 位數字，其餘視同未篩選
+  const rawAge = params.get('buildingAge') ?? 'all'
+  const buildingAge = rawAge === '30+' || /^\d{1,3}$/.test(rawAge) ? rawAge : 'all'
   if (buildingAge !== 'all' && presale !== 'true') {
     const ageExpr   = `(EXTRACT(YEAR FROM ${p}transaction_date) - (CAST(LEFT(${p}completion_date, 3) AS INT) + 1911))`
     const ageFilter = `${p}completion_date IS NOT NULL AND LENGTH(${p}completion_date) >= 3 AND ${ageExpr} >= 0`
     const ageCond   = buildingAge === '30+'
       ? `${ageFilter} AND ${ageExpr} > 30`
-      : `${ageFilter} AND ${ageExpr} <= ${parseInt(buildingAge)}`
+      : `${ageFilter} AND ${ageExpr} <= ${Number(buildingAge)}`
 
     if (presale === 'all') {
       conds.push(`(${p}is_presale = true OR (${ageCond}))`)

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type * as L from 'leaflet'
+import { escapeHtml } from '@/lib/escapeHtml'
 import type { FeatureCollection, Geometry } from 'geojson'
 
 export type VillageGeo = FeatureCollection<Geometry, { code: string }>
@@ -122,7 +123,8 @@ export default function VillageChoroplethMap({
         style: f => styleFor(f!.properties.code),
         onEachFeature: (f, lyr) => {
           const code = f.properties.code
-          lyr.bindTooltip(() => tooltipRef.current.get(code) ?? '', { sticky: true, direction: 'top' })
+          // tooltip 內容含使用者輸入的自訂指數名稱，Leaflet 會當 HTML 插入，一律先跳脫
+          lyr.bindTooltip(() => escapeHtml(tooltipRef.current.get(code) ?? ''), { sticky: true, direction: 'top' })
           lyr.on('click', () => onSelectRef.current(code))
         },
       }).addTo(map)
@@ -191,7 +193,7 @@ export default function VillageChoroplethMap({
           radius: 3, weight: 1, color: light ? '#1f2a2b' : '#e8eeec', fillColor: light ? '#1f7a6e' : '#4fbfae', fillOpacity: 0.9,
           bubblingMouseEvents: false,
         })
-          .bindTooltip(p.label, { direction: 'top' })
+          .bindTooltip(escapeHtml(p.label), { direction: 'top' })
           .on('click', () => onPointClickRef.current?.(p.id))
           .addTo(g)
       }
@@ -216,7 +218,7 @@ export default function VillageChoroplethMap({
       Lx.circleMarker([marker.lat, marker.lon], { radius: 8, weight: 3, color: ink, fillColor: '#d9534f', fillOpacity: 1, interactive: false })
         .addTo(g)
       if (marker.label) {
-        Lx.tooltip({ permanent: true, direction: 'right', offset: [10, 0] }).setLatLng([marker.lat, marker.lon]).setContent(marker.label).addTo(g)
+        Lx.tooltip({ permanent: true, direction: 'right', offset: [10, 0] }).setLatLng([marker.lat, marker.lon]).setContent(escapeHtml(marker.label)).addTo(g)   // label 含建案名稱，跟其他 tooltip 一樣跳脫
       }
     })
   }, [ready, marker, rings])
