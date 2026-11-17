@@ -9,12 +9,29 @@ import type { TrendRow } from '@/components/KpiTrend'
 import { priceToColor } from '@/lib/colorScale'
 import { filterOnlyQuery } from '@/lib/globalFilters'
 import { MAX_SELECT } from '@/lib/areaSelection'
-import { POINT_RADII, rocMonth, summarize, type MapMarker, type Selection } from './types'
+import { POINT_RADII, rocDate, rocMonth, summarize, type MapMarker, type Selection } from './types'
 
 const KpiTrend = dynamic(() => import('@/components/KpiTrend'), { ssr: false })
 const AreaAnalysisPanel = dynamic(() => import('@/components/AreaAnalysisPanel'), { ssr: false })
 
 const LIST_PAGE = 40
+
+/** 建案清單排序：依成交筆數（多→少）或依最新成交日（新→舊） */
+type ListSort = 'count' | 'date'
+const SORT_STORAGE_KEY = 'intel-list-sort'
+
+/** 依最新成交日排序：日期新的在前，同一天再依筆數多寡；沒有日期的排最後 */
+function sortList(list: MapMarker[], sort: ListSort): MapMarker[] {
+  const arr = [...list]
+  if (sort === 'date') {
+    return arr.sort((a, b) => {
+      const da = a.last_tx_date ?? '', db = b.last_tx_date ?? ''
+      if (da !== db) return da < db ? 1 : -1
+      return b.count - a.count
+    })
+  }
+  return arr.sort((a, b) => b.count - a.count)
+}
 
 interface Props {
   selection: Selection
@@ -59,8 +76,8 @@ function KpiGrid({ list }: { list: MapMarker[] }) {
   )
 }
 
-function ProjectRow({ m, range, onClick, onHover }: {
-  m: MapMarker; range: [number, number]; onClick: () => void; onHover: (k: string | null) => void
+function ProjectRow({ m, range, sort, onClick, onHover }: {
+  m: MapMarker; range: [number, number]; sort: ListSort; onClick: () => void; onHover: (k: string | null) => void
 }) {
   const color = m.unit_price > 0 ? priceToColor(m.unit_price, range[0], range[1]) : 'rgb(170,160,145)'
   const presale = m.case_type === '預售'
@@ -78,7 +95,9 @@ function ProjectRow({ m, range, onClick, onHover }: {
         <span style={{ fontSize: 'var(--text-3xs)', color: 'var(--text-faint)' }}>
           {m.district}・{m.case_type}
           {presale && m.sales_ratio != null ? `・銷售 ${m.sales_ratio}%` : ''}
-          {m.last_tx_month ? `・最新 ${rocMonth(m.last_tx_month)}` : ''}
+          {sort === 'date' && m.last_tx_date
+            ? `・最新 ${rocDate(m.last_tx_date)}`
+            : m.last_tx_month ? `・最新 ${rocMonth(m.last_tx_month)}` : ''}
         </span>
       </span>
       <span style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -89,21 +108,31 @@ function ProjectRow({ m, range, onClick, onHover }: {
   )
 }
 
-function ProjectList({ list, range, onPick, onHover }: {
-  list: MapMarker[]; range: [number, number]; onPick: (m: MapMarker) => void; onHover: (k: string | null) => void
+function ProjectList({ list, range, sort, onSort, onPick, onHover }: {
+  list: MapMarker[]; range: [number, number]; sort: ListSort; onSort: (s: ListSort) => void
+  onPick: (m: MapMarker) => void; onHover: (k: string | null) => void
 }) {
   const [limit, setLimit] = useState(LIST_PAGE)
-  const sorted = [...list].sort((a, b) => b.count - a.count)
+  const sorted = sortList(list, sort)
   if (!sorted.length) {
     return <div style={{ padding: '24px 4px', textAlign: 'center', color: 'var(--text-faint)', fontSize: 'var(--text-xs)' }}>這個範圍內沒有符合篩選條件的建案</div>
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', padding: '0 8px 4px' }}>
-        <span>建案（依成交筆數）</span><span>單價 萬/坪</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          建案
+          <span role="radiogroup" aria-label="排序方式" style={{ display: 'inline-flex', gap: 4 }}>
+            {([['count', '依筆數'], ['date', '依日期']] as const).map(([v, label]) => (
+              <button key={v} type="button" role="radio" aria-checked={sort === v} onClick={() => onSort(v)}
+                className="ip-chip ip-chip-sm" data-on={sort === v || undefined}>{label}</button>
+            ))}
+          </span>
+        </span>
+        <span>單價 萬/坪</span>
       </div>
       {sorted.slice(0, limit).map(m => (
-        <ProjectRow key={m.location_key} m={m} range={range} onClick={() => onPick(m)} onHover={onHover} />
+        <ProjectRow key={m.location_key} m={m} range={range} sort={sort} onClick={() => onPick(m)} onHover={onHover} />
       ))}
       {sorted.length > limit && (
         <button type="button" onClick={() => setLimit(l => l + LIST_PAGE)} className="ip-more">
@@ -136,6 +165,19 @@ export default function IntelPanel(p: Props) {
   // 框選範圍的多案比較：null = 收起；打開時預設帶入成交前幾名的預售案，可再增刪
   const [compareKeys, setCompareKeys] = useState<string[] | null>(null)
   const comparing = compareKeys !== null
+  // 清單排序：放在主元件，切換視野／群集／框選時不會被重置；記在 localStorage 只是個人偏好
+  // （MapWorkbench 以 ssr:false 載入，初始化時可直接讀 localStorage）
+  const [listSort, setListSort] = useState<ListSort>(() => {
+    try {
+      const v = localStorage.getItem(SORT_STORAGE_KEY)
+      if (v === 'count' || v === 'date') return v
+    } catch { /* 無痕模式等讀不到時用預設 */ }
+    return 'count'
+  })
+  const changeSort = (s: ListSort) => {
+    setListSort(s)
+    try { localStorage.setItem(SORT_STORAGE_KEY, s) } catch { /* 忽略 */ }
+  }
 
   const pick = (m: MapMarker) => {
     onSelect({ kind: 'project', key: m.location_key, from: sel })
@@ -220,7 +262,8 @@ export default function IntelPanel(p: Props) {
           />
         )}
 
-        <ProjectList key={sel.kind === 'group' ? sel.title : sel.kind} list={list} range={range} onPick={pick} onHover={onHover} />
+        <ProjectList key={sel.kind === 'group' ? sel.title : sel.kind} list={list} range={range}
+          sort={listSort} onSort={changeSort} onPick={pick} onHover={onHover} />
 
         <p style={{ margin: 0, fontSize: 'var(--text-3xs)', color: 'var(--text-faint)', lineHeight: 1.5 }}>
           資料來源：內政部不動產交易實價查詢服務網。單價為各案平均，KPI 中位數依成交筆數加權。僅供參考，不構成投資建議。
@@ -244,6 +287,7 @@ const IP_CSS = `
           background:var(--surface-control); color:var(--text-default); cursor:pointer; font-size:var(--text-base); }
         .ip-chip { height:24px; padding:0 10px; border-radius:999px; border:1px solid var(--border-control); background:var(--surface-card);
           color:var(--text-muted); font-size:var(--text-2xs); font-family:var(--font-mono); cursor:pointer; }
+        .ip-chip-sm { height:20px; padding:0 8px; font-family:var(--font-sans); font-size:var(--text-3xs); }
         .ip-chip[data-on] { background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700; }
         .ip-cta { height:34px; border-radius:var(--radius-md); border:1px solid var(--accent-wash-border); background:var(--accent-wash);
           color:var(--accent-tint); font-weight:var(--weight-semibold); cursor:pointer; font-size:var(--text-xs); font-family:var(--font-sans); }

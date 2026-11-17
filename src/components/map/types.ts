@@ -14,6 +14,8 @@ export interface MapMarker {
   sold_total?: number | null
   sales_ratio?: number | null
   last_tx_month?: string | null
+  /** 篩選期間內最新成交日 'YYYY-MM-DD'（情報欄依日期排序用） */
+  last_tx_date?: string | null
 }
 
 /** 情報欄目前顯示的內容 */
@@ -79,6 +81,12 @@ export interface Bounds { south: number; west: number; north: number; east: numb
 
 export function inBounds(m: Pick<MapMarker, 'lat' | 'lon'>, b: Bounds): boolean {
   return m.lat >= b.south && m.lat <= b.north && m.lon >= b.west && m.lon <= b.east
+}
+
+/** 'YYYY-MM-DD' → '115/05/21' */
+export function rocDate(ymd?: string | null): string {
+  if (!ymd || ymd.length < 10) return ''
+  return `${rocMonth(ymd)}/${ymd.slice(8, 10)}`
 }
 
 /** 'YYYY-MM' → '115/05' */

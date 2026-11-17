@@ -9,6 +9,7 @@ import { cachedQuery, type Row } from './client'
  * HAVING 過濾掉 36 個月內無交易的建案（僅顯示銷售中建案，Signal 1）。
  * s 子查詢統計「完整銷售期」的已售戶數與最新成交月（不受日期篩選影響），
  * 搭配 presale_projects 的核准總戶數算銷售成數，口徑與建案排行一致。
+ * last_tx_date 則是「篩選期間內」的最新成交日，供情報欄依日期排序。
  */
 export function fetchPresaleMarkers(where: string): Promise<Row[]> {
   return cachedQuery(`
@@ -27,6 +28,7 @@ export function fetchPresaleMarkers(where: string): Promise<Row[]> {
         THEN ROUND(s.sold_total::numeric / pp.total_units * 100)::int
         ELSE NULL END                                         AS sales_ratio,
       TO_CHAR(s.last_tx, 'YYYY-MM')                           AS last_tx_month,
+      TO_CHAR(MAX(t.transaction_date), 'YYYY-MM-DD')          AS last_tx_date,
       bl.lat,
       bl.lon
     FROM transactions t
@@ -53,7 +55,7 @@ export function fetchPresaleMarkers(where: string): Promise<Row[]> {
   `)
 }
 
-/** 成屋標記：按去樓層地址聚合，JOIN building_locations 取座標 */
+/** 成屋標記：按去樓層地址聚合，JOIN building_locations 取座標；last_tx_* 為篩選期間內最新成交 */
 export function fetchExistingMarkers(where: string): Promise<Row[]> {
   return cachedQuery(`
     SELECT
@@ -65,6 +67,8 @@ export function fetchExistingMarkers(where: string): Promise<Row[]> {
       ROUND((AVG(t.unit_price_sqm)*3.3058/10000)::numeric,1) AS unit_price,
       ROUND(AVG(t.total_price)/10000)::int                   AS avg_total,
       ROUND((AVG(NULLIF(t.building_area_sqm,0))*0.3025)::numeric,1) AS avg_area,
+      TO_CHAR(MAX(t.transaction_date), 'YYYY-MM')             AS last_tx_month,
+      TO_CHAR(MAX(t.transaction_date), 'YYYY-MM-DD')          AS last_tx_date,
       bl.lat,
       bl.lon
     FROM transactions t
